@@ -4,13 +4,13 @@
 
 asmlinkage
 void do_interrupt(struct intr_info *info) {
-    printf("[INTR] number = %x, code = %x\n", info->intr_num, info->error_code);
-
     struct intr_action action = intr_actions[info->intr_num];
     if (action.handler) {
         // TODO: stack switching when necessary
         (*action.handler)(info);
-    }
+    } else {
+        printf("[INTR] number = %x, code = %x\n", info->intr_num, info->error_code);
+    } 
 }
 
 void intr_setaction(uint8_t intr_num, struct intr_action action) {
