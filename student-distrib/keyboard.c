@@ -9,7 +9,7 @@ static void keyboard_handler(struct intr_info *info) {
     send_eoi(KEYBOARD_IRQ);
 
     while (inb(0x64) & 1) {
-        printf("Key: %x\n", inb(0x60));
+        printf("%x", keyboard_map[inb(0x60)]);
     }
 }
 
