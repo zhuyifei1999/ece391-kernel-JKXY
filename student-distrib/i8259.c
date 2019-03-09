@@ -93,13 +93,10 @@ void disable_irq(uint32_t irq_num) {
 
 /* Send end-of-interrupt signal for the specified IRQ */
 void send_eoi(uint32_t irq_num) {
-    if(irq_num & 8){
-        if(irq_num >7){
-            outb(EOI + (irq_num & 7), SLAVE_8259_CMD_PORT);
-            outb(EOI + 4, MASTER_8259_CMD_PORT);
-        }
-        else{
-            outb(EOI + irq_num, MASTER_8259_CMD_PORT);
-        }
+    if (irq_num > 7) {
+        outb(EOI + (irq_num & 7), SLAVE_8259_CMD_PORT);
+        outb(EOI + 4, MASTER_8259_CMD_PORT);
+    } else {
+        outb(EOI + irq_num, MASTER_8259_CMD_PORT);
     }
 }
