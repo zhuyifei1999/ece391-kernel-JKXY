@@ -20,10 +20,13 @@ OBJS=boot.o
 OBJS+=$(filter-out boot.o,$(patsubst %.S,%.o,$(filter %.S,$(SRC))))
 OBJS+=$(patsubst %.c,%.o,$(filter %.c,$(SRC)))
 
+
+filesys_img mp3.img: bootimg
+	sudo ./debug.sh
+
 bootimg: Makefile $(OBJS)
 	rm -f bootimg
 	$(CC) $(LDFLAGS) $(OBJS) -Ttext=0x400000 -o bootimg
-	sudo ./debug.sh
 
 dep: Makefile.dep
 

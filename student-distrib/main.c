@@ -6,18 +6,11 @@
 #include "x86_desc.h"
 #include "lib.h"
 #include "i8259.h"
+#include "interrupt.h"
 #include "debug.h"
 #include "tests.h"
 
 #define RUN_TESTS
-
-struct interrupt_frame;
-
-// TODO: make this look good
-void interrupt_handler() {
-    printf("Interrupted\n");
-}
-
 
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */
@@ -25,8 +18,8 @@ void interrupt_handler() {
 
 /* Check if MAGIC is valid and print the Multiboot information structure
    pointed by ADDR. */
+asmlinkage noreturn
 void entry(unsigned long magic, unsigned long addr) {
-
     multiboot_info_t *mbi;
 
     /* Clear the screen. */
@@ -35,7 +28,7 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Am I booted by a Multiboot-compliant boot loader? */
     if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
         printf("Invalid magic number: 0x%#x\n", (unsigned)magic);
-        return;
+        abort();
     }
 
     /* Set MBI to the address of the Multiboot information structure. */
@@ -75,7 +68,7 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Bits 4 and 5 are mutually exclusive! */
     if (CHECK_FLAG(mbi->flags, 4) && CHECK_FLAG(mbi->flags, 5)) {
         printf("Both bits 4 and 5 are set.\n");
-        return;
+        abort();
     }
 
     /* Is the section header table of ELF valid? */
@@ -147,27 +140,7 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Init the PIC */
     i8259_init();
 
-    {
-        unsigned int i;
-        for (i = 0; i < NUM_VEC; i++) {
-            // TODO
-            extern void (*entry_interrupt)(void);
-            uint32_t addr = (uint32_t)&entry_interrupt;
-            // uint32_t addr = NULL;
-            idt[i].offset_15_00 = addr;
-            idt[i].offset_31_16 = addr >> 16;
-            // idt[i].offset_31_16 = addr & 0xffff;
-            // idt[i].offset_15_00 = addr >> 16;
-            idt[i].seg_selector = KERNEL_CS;
-            // idt[i].seg_selector = 0;
-            idt[i].size = 1; // 32 bit handler
-            idt[i].dpl = 1; // userspace can't call us
-            idt[i].present = 1;
-            idt[i].type = IDT_TYPE_INTERRUPT; // userspace can't call us
-        }
-        lidt(idt_desc_ptr);
-    }
-    // asm volatile ("jmp .1;");
+    init_IDT();
 
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
@@ -187,6 +160,5 @@ void entry(unsigned long magic, unsigned long addr) {
 #endif
     /* Execute the first program ("shell") ... */
 
-    /* Spin (nicely, so we don't chew up cycles) */
-    asm volatile (".1: hlt; jmp .1;");
+    abort();
 }

@@ -41,6 +41,7 @@ void clear(void) {
  *       the beginning), but I think it's more flexible this way.
  *       Also note: %x is the only conversion specifier that can use
  *       the "#" modifier to alter output. */
+__printf(1, 2)
 int32_t printf(int8_t *format, ...) {
 
     /* Pointer to the format string */

@@ -7,7 +7,6 @@
 #include "x86_desc.h"
 
 .text
-
     # Multiboot header (required for GRUB to boot us)
     .long MULTIBOOT_HEADER_MAGIC
     .long MULTIBOOT_HEADER_FLAGS
@@ -21,16 +20,14 @@ start:
 _start:
     # Make sure interrupts are off
     cli
-    jmp     continue
 
-continue:
     # Load the GDT
     lgdt    gdt_desc
 
     # Load CS with the new descriptor value
-    ljmp    $KERNEL_CS, $keep_going
+    ljmp    $KERNEL_CS, $1f
 
-keep_going:
+1:
     # Set up ESP so we can have an initial stack
     movl    $0x800000, %esp
 
@@ -52,6 +49,6 @@ keep_going:
     call    entry
 
     # We'll never get back here, but we put in a hlt anyway.
-halt:
+2:
     hlt
-    jmp     halt
+    jmp     2b

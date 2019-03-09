@@ -16,6 +16,10 @@
 #define KERNEL_TSS  0x0030
 #define KERNEL_LDT  0x0038
 
+// DPLs of the two modes
+#define KERNEL_DPL  0
+#define USER_DPL    3
+
 /* Size of the task state segment (TSS) */
 #define TSS_SIZE    104
 
