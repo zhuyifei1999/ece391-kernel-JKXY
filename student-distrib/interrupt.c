@@ -46,6 +46,7 @@ void init_IDT() {
     init_IDT_entry(INTR_EXC_VIRTUALIZATION_EXCEPTION, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_SECURITY_EXCEPTION, IDT_TYPE_INTERRUPT, KERNEL_DPL, hascode);
 
+    // TODO: Define 0x80 as a constant
     init_IDT_entry(0x80, IDT_TYPE_TRAP, USER_DPL, nocode);
 
     barrier();
