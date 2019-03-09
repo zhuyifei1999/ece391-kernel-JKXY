@@ -28,6 +28,8 @@
  * to declare the interrupt finished */
 #define EOI                 0x60
 
+#define SLAVE_IRQ           2
+
 /* Externally-visible functions */
 
 /* Initialize both PICs */
