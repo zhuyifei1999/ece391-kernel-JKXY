@@ -1,4 +1,4 @@
-// interrupt.h stuffs related to general interrupts
+// interrupt.h -- stuffs related to general interrupts
 
 #ifndef _INTERRUPT_H
 #define _INTERRUPT_H
@@ -6,6 +6,8 @@
 #ifndef ASM
 
 #include "types.h"
+#include "x86_desc.h"
+#include "compiler.h"
 
 struct intr_info {
     uint32_t edi;
@@ -49,10 +51,25 @@ struct intr_info {
 #define INTR_EXC_VIRTUALIZATION_EXCEPTION 0x14
 #define INTR_EXC_SECURITY_EXCEPTION 0x1E
 
+#define INTR_SYSCALL 0x80
+
+enum intr_stackaction {
+    INTR_STACK_KEEP,
+    INTR_STACK_ALLOC,
+};
+
+struct intr_action {
+    void (*handler)(struct intr_info *info);
+    enum intr_stackaction stackaction;
+};
+
+struct intr_action intr_actions[NUM_VEC];
 
 // Generic routine for all interrupts
-asmlinkage
-void common_interrupt_handler(struct intr_info *info);
+asmlinkage void do_interrupt(struct intr_info *info);
+
+// Set what to do on interrupt
+void intr_setaction(uint8_t intr_num, struct intr_action action);
 
 // initialize IDT
 void init_IDT();

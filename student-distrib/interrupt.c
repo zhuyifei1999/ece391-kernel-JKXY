@@ -2,10 +2,19 @@
 #include "interrupt.h"
 #include "x86_desc.h"
 
-// TODO: prototype
 asmlinkage
-void common_interrupt_handler(struct intr_info *info) {
-    printf("Interrupted by number %d, code = %d\n", info->intr_num, info->error_code);
+void do_interrupt(struct intr_info *info) {
+    printf("[INTR] number = %x, code = %x\n", info->intr_num, info->error_code);
+
+    struct intr_action action = intr_actions[info->intr_num];
+    if (action.handler) {
+        // TODO: stack switching when necessary
+        (*action.handler)(info);
+    }
+}
+
+void intr_setaction(uint8_t intr_num, struct intr_action action) {
+    intr_actions[intr_num] = action;
 }
 
 #define _init_IDT_entry(intr, _type, _dpl, suffix) do { \
@@ -47,7 +56,7 @@ void init_IDT() {
     init_IDT_entry(INTR_EXC_SECURITY_EXCEPTION, IDT_TYPE_INTERRUPT, KERNEL_DPL, hascode);
 
     // TODO: Define 0x80 as a constant
-    init_IDT_entry(0x80, IDT_TYPE_TRAP, USER_DPL, nocode);
+    init_IDT_entry(INTR_SYSCALL, IDT_TYPE_TRAP, USER_DPL, nocode);
 
     barrier();
 

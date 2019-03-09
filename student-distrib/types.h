@@ -21,6 +21,10 @@ typedef unsigned short uint16_t;
 typedef char int8_t;
 typedef unsigned char uint8_t;
 
+typedef _Bool bool;
+#define true 1
+#define false 0
+
 #endif /* ASM */
 
 #endif /* _TYPES_H */

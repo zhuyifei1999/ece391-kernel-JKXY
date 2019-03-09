@@ -7,6 +7,8 @@
 #include "lib.h"
 #include "i8259.h"
 #include "interrupt.h"
+#include "exception.h"
+#include "abort.h"
 #include "debug.h"
 #include "tests.h"
 
@@ -141,6 +143,7 @@ void entry(unsigned long magic, unsigned long addr) {
     i8259_init();
 
     init_IDT();
+    init_exc_handlers();
 
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */

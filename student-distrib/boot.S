@@ -5,6 +5,7 @@
 
 #include "multiboot.h"
 #include "x86_desc.h"
+#include "abort.h"
 
 .text
     # Multiboot header (required for GRUB to boot us)
@@ -48,7 +49,5 @@ _start:
     # Jump to the C entrypoint to the kernel.
     call    entry
 
-    # We'll never get back here, but we put in a hlt anyway.
-2:
-    hlt
-    jmp     2b
+    # We'll never get back here, but abort it anyway.
+    abort

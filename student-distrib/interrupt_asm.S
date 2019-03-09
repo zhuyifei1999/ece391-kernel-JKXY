@@ -23,7 +23,7 @@ ISR_common:
     pushal
     pushl   %esp
     cld
-    call    common_interrupt_handler
+    call    do_interrupt
     add     $4,%esp
     popal
     add     $8,%esp
