@@ -145,6 +145,8 @@ void entry(unsigned long magic, unsigned long addr) {
     init_IDT();
     init_exc_handlers();
 
+    init_keyboard();
+
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */
 
@@ -163,5 +165,7 @@ void entry(unsigned long magic, unsigned long addr) {
 #endif
     /* Execute the first program ("shell") ... */
 
-    abort();
+    for (;;) asm volatile ("pause");
+
+    // abort();
 }

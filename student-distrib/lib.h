@@ -84,10 +84,10 @@ do {                                    \
 } while (0)
 
 /* Writes a byte to a port and delay */
-#define outb_p(data, port)                \
-do {               
-    outb((data), (port));                     \
-    asm volatile ("pause");                \
+#define outb_p(data, port)              \
+do {                                    \
+    outb((data), (port));               \
+    asm volatile ("pause");             \
 } while (0)
 
 /* Writes two bytes to two consecutive ports */

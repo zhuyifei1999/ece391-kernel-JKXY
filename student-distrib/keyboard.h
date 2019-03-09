@@ -1,5 +1,12 @@
-
+// keyboard.h -- kerboard-related functions
 #ifndef _KEYBOARD_H
 #define _KEYBOARD_H
 
-#define KEYBOARD_VECTOR     1
+#include "interrupt.h"
+
+#define KEYBOARD_IRQ 1
+#define KEYBOARD_INTR INTR_IRQ1
+
+void init_keyboard();
+
+#endif

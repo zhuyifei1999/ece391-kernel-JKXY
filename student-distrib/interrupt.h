@@ -51,6 +51,23 @@ struct intr_info {
 #define INTR_EXC_VIRTUALIZATION_EXCEPTION 0x14
 #define INTR_EXC_SECURITY_EXCEPTION 0x1E
 
+#define INTR_IRQ0  0x20
+#define INTR_IRQ1  0x21
+#define INTR_IRQ2  0x22
+#define INTR_IRQ3  0x23
+#define INTR_IRQ4  0x24
+#define INTR_IRQ5  0x25
+#define INTR_IRQ6  0x26
+#define INTR_IRQ7  0x27
+#define INTR_IRQ8  0x28
+#define INTR_IRQ9  0x29
+#define INTR_IRQ10 0x2A
+#define INTR_IRQ11 0x2B
+#define INTR_IRQ12 0x2C
+#define INTR_IRQ13 0x2D
+#define INTR_IRQ14 0x2E
+#define INTR_IRQ15 0x2F
+
 #define INTR_SYSCALL 0x80
 
 enum intr_stackaction {

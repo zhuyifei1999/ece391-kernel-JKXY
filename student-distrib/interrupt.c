@@ -55,7 +55,23 @@ void init_IDT() {
     init_IDT_entry(INTR_EXC_VIRTUALIZATION_EXCEPTION, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_SECURITY_EXCEPTION, IDT_TYPE_INTERRUPT, KERNEL_DPL, hascode);
 
-    // TODO: Define 0x80 as a constant
+    init_IDT_entry(INTR_IRQ0, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ1, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ2, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ3, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ4, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ5, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ6, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ7, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ8, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ9, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ10, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ11, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ12, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ13, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ14, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_IRQ15, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+
     init_IDT_entry(INTR_SYSCALL, IDT_TYPE_TRAP, USER_DPL, nocode);
 
     barrier();

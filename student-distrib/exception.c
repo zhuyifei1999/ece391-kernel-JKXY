@@ -5,7 +5,7 @@
 #include "abort.h"
 
 static void general_protection_fault(struct intr_info *info) {
-    printf("#GPF: %x,", info->error_code);
+    printf("#GPF: %x", info->error_code);
     abort();
 }
 
