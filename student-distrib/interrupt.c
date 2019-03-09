@@ -4,8 +4,8 @@
 
 // TODO: prototype
 asmlinkage
-void common_interrupt_handler(uint32_t intr, struct intr_regs *regs) {
-    printf("Interrupted by number %d, code = %d\n", intr, regs->error_code);
+void common_interrupt_handler(struct intr_info *info) {
+    printf("Interrupted by number %d, code = %d\n", info->intr_num, info->error_code);
 }
 
 #define _init_IDT_entry(intr, _type, _dpl, suffix) do { \

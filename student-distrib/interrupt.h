@@ -7,7 +7,7 @@
 
 #include "types.h"
 
-struct intr_regs {
+struct intr_info {
     uint32_t edi;
     uint32_t esi;
     uint32_t ebp;
@@ -16,6 +16,7 @@ struct intr_regs {
     uint32_t edx;
     uint32_t ecx;
     uint32_t eax;
+    uint32_t intr_num;
     uint32_t error_code;
     uint32_t eip;
     uint16_t cs;
@@ -51,7 +52,7 @@ struct intr_regs {
 
 // Generic routine for all interrupts
 asmlinkage
-void common_interrupt_handler(uint32_t num, struct intr_regs *regs);
+void common_interrupt_handler(struct intr_info *info);
 
 // initialize IDT
 void init_IDT();
