@@ -10,8 +10,6 @@
 uint8_t master_mask = 0xff; /* IRQs 0-7  */
 uint8_t slave_mask = 0xff;  /* IRQs 8-15 */
 
-// TODO: https://elixir.bootlin.com/linux/latest/source/arch/x86/boot/pm.c#L38
-
 /* Initialize the 8259 PIC */
 void i8259_init(void) {
 unsigned long flags;

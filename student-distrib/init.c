@@ -6,6 +6,7 @@
 #include "x86_desc.h"
 #include "lib.h"
 #include "i8259.h"
+#include "keyboard.h"
 #include "interrupt.h"
 #include "exception.h"
 #include "abort.h"
