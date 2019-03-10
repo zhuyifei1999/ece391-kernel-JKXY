@@ -1,60 +1,45 @@
 #include "tests.h"
 #include "x86_desc.h"
 #include "lib.h"
+#include "interrupt.h"
 
-#define PASS 1
-#define FAIL 0
+#if RUN_TESTS
 
-/* format these macros as you see fit */
-#define TEST_HEADER 	\
-	printf("[TEST %s] Running %s at %s:%d\n", __FUNCTION__, __FUNCTION__, __FILE__, __LINE__)
-#define TEST_OUTPUT(name, result)	\
-	printf("[TEST %s] Result = %s\n", name, (result) ? "PASS" : "FAIL");
+// Guard against re-entry during interrupt
+// TODO: replace by atomic variable
+static volatile bool tests_running = false;
+static volatile bool test_status = TEST_PASS;
 
-static inline void assertion_failure(){
-	/* Use exception #15 for assertions, otherwise
-	   reserved by Intel */
-	asm volatile("int $15");
+static void intr_test_failure(struct intr_info *info) {
+    test_status = TEST_FAIL;
 }
 
 
-/* Checkpoint 1 tests */
+bool test_wrapper(initcall_t *fn) {
+    test_status = TEST_PASS;
 
-/* IDT Test - Example
- * 
- * Asserts that first 10 IDT entries are not NULL
- * Inputs: None
- * Outputs: PASS/FAIL
- * Side Effects: None
- * Coverage: Load IDT, IDT definition
- * Files: x86_desc.h/S
- */
-int idt_test(){
-	TEST_HEADER;
+    struct intr_action oldaction = intr_getaction(INTR_TEST);
+    intr_setaction(INTR_TEST, (struct intr_action){
+        .handler = &intr_test_failure } );
 
-	int i;
-	int result = PASS;
-	for (i = 0; i < 10; ++i){
-		if ((idt[i].offset_15_00 == NULL) && 
-			(idt[i].offset_31_16 == NULL)){
-			assertion_failure();
-			result = FAIL;
-		}
-	}
+    (*fn)();
 
-	return result;
+    intr_setaction(INTR_TEST, oldaction);
+    return test_status;
 }
-
-// add more tests here
-
-/* Checkpoint 2 tests */
-/* Checkpoint 3 tests */
-/* Checkpoint 4 tests */
-/* Checkpoint 5 tests */
-
 
 /* Test suite entry point */
 void launch_tests(){
-	TEST_OUTPUT("idt_test", idt_test());
-	// launch your tests here
+    // Test must run with interrupts enabled, but this is critical section
+    cli();
+    if (tests_running)
+        return;
+    tests_running = 1;
+    sti();
+
+    DO_INITCALL(tests);
+
+    tests_running = 0;
 }
+
+#endif

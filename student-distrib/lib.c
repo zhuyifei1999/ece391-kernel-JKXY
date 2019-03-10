@@ -10,7 +10,7 @@
 
 static int screen_x;
 static int screen_y;
-static char* video_mem = (char *)VIDEO;
+static char *video_mem = (char *)VIDEO;
 
 /* static inline void update_cursor(void);
  * Inputs: void

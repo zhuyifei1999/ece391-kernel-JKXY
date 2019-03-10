@@ -86,5 +86,8 @@ asmlinkage void do_interrupt(struct intr_info *info);
 // Set what to do on interrupt
 void intr_setaction(uint8_t intr_num, struct intr_action action);
 
+// And get it
+struct intr_action intr_getaction(uint8_t intr_num);
+
 #endif
 #endif

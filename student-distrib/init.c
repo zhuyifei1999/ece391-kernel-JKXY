@@ -12,8 +12,6 @@
 #include "tests.h"
 #include "paging.h"
 
-#define RUN_TESTS
-
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */
 #define CHECK_FLAG(flags, bit)   ((flags) & (1 << (bit)))
@@ -152,14 +150,17 @@ void entry(unsigned long magic, unsigned long addr) {
     printf("Enabling Interrupts\n");
     sti();
 
-    init_page();
+    // init_page();
 
     asm volatile ("int $0x80;");
 
-#ifdef RUN_TESTS
+    // puts(NULL);
+
+#if RUN_TESTS
     /* Run tests */
     launch_tests();
 #endif
+
     /* Execute the first program ("shell") ... */
 
     for (;;) asm volatile ("pause");

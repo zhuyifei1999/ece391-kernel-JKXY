@@ -2,6 +2,7 @@
 #include "interrupt.h"
 #include "x86_desc.h"
 #include "initcall.h"
+#include "tests.h"
 
 asmlinkage
 void do_interrupt(struct intr_info *info) {
@@ -16,6 +17,10 @@ void do_interrupt(struct intr_info *info) {
 
 void intr_setaction(uint8_t intr_num, struct intr_action action) {
     intr_actions[intr_num] = action;
+}
+
+struct intr_action intr_getaction(uint8_t intr_num) {
+    return intr_actions[intr_num];
 }
 
 #define _init_IDT_entry(intr, _type, _dpl, suffix) do { \
@@ -74,6 +79,10 @@ static void init_IDT() {
     init_IDT_entry(INTR_IRQ14, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_IRQ15, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
 
+#if RUN_TESTS
+    init_IDT_entry(INTR_TEST, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+#endif
+
     init_IDT_entry(INTR_SYSCALL, IDT_TYPE_TRAP, USER_DPL, nocode);
 
     barrier();
@@ -81,3 +90,25 @@ static void init_IDT() {
     lidt(idt_desc_ptr);
 }
 DEFINE_INITCALL(init_IDT, early);
+
+
+#if RUN_TESTS
+/* IDT Entry Test
+ *
+ * Asserts that first 10 IDT entries are not NULL
+ * Inputs: None
+ * Outputs: None
+ * Side Effects: None
+ * Coverage: IDT definition
+ */
+static void idt_entry_test() {
+    int i;
+    for (i = 0; i < 10; ++i){
+        if ((idt[i].offset_15_00 == NULL) &&
+            (idt[i].offset_31_16 == NULL)) {
+            tests_assert_fail();
+        }
+    }
+}
+DEFINE_TEST(idt_entry_test);
+#endif
