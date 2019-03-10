@@ -12,16 +12,35 @@ static int screen_x;
 static int screen_y;
 static char* video_mem = (char *)VIDEO;
 
+/* static inline void update_cursor(void);
+ * Inputs: void
+ * Return Value: none
+ * Function: Updates cursor position */
+static inline void update_cursor(void) {
+    outb(0x0F, 0x3D4);
+    outb((unsigned char)cursor_loc, 0x3D5);
+    outb(0x0E, 0x3D4);
+    outb((unsigned char)(cursor_loc>>8), 0x3D5);
+}
+
 /* void clear(void);
  * Inputs: void
  * Return Value: none
  * Function: Clears video memory */
 void clear(void) {
+    unsigned long flags;
+    cli_and_save(flags);
+
     int32_t i;
     for (i = 0; i < NUM_ROWS * NUM_COLS; i++) {
         *(uint8_t *)(video_mem + (i << 1)) = ' ';
         *(uint8_t *)(video_mem + (i << 1) + 1) = ATTRIB;
     }
+    screen_x = screen_y = 0;
+
+    update_cursor();
+
+    restore_flags(flags);
 }
 
 /* Standard printf().
@@ -43,7 +62,6 @@ void clear(void) {
  *       the "#" modifier to alter output. */
 __printf(1, 2)
 int32_t printf(int8_t *format, ...) {
-
     /* Pointer to the format string */
     int8_t* buf = format;
 
@@ -169,6 +187,9 @@ int32_t puts(int8_t* s) {
  * Return Value: void
  *  Function: Output a character to the console */
 void putc(uint8_t c) {
+    unsigned long flags;
+    cli_and_save(flags);
+
     if (c == '\n' || c == '\r') {
         if (c == '\n')
             screen_y++;
@@ -195,6 +216,8 @@ void putc(uint8_t c) {
 
     if (screen_y == NUM_ROWS) {
         screen_y--;
+
+        // do scrolling
         int32_t i;
         for (i = 0; i < (NUM_ROWS - 1) * NUM_COLS; i++) {
             video_mem[i * 2] = video_mem[(i + NUM_COLS) * 2];
@@ -206,12 +229,9 @@ void putc(uint8_t c) {
         }
     }
 
-    // update cursur
-    unsigned int cursor_loc = NUM_COLS * screen_y + screen_x;
-    outb(0x0F, 0x3D4);
-    outb((unsigned char)cursor_loc, 0x3D5);
-    outb(0x0E, 0x3D4);
-    outb((unsigned char)(cursor_loc>>8), 0x3D5);
+    update_cursor();
+
+    restore_flags(flags);
 }
 
 /* int8_t* itoa(uint32_t value, int8_t* buf, int32_t radix);
