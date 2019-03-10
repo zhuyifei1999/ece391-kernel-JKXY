@@ -1,6 +1,5 @@
 #include "keyboard.h"
-#include "i8259.h"
-#include "interrupt.h"
+#include "irq.h"
 #include "lib.h"
 
 // lots of sources from: https://stackoverflow.com/q/37618111
@@ -99,8 +98,6 @@ static bool shift, ctrl, alt;
 static bool caps;
 
 static void keyboard_handler(struct intr_info *info) {
-    send_eoi(KEYBOARD_IRQ);
-
     while (inb(0x64) & 1) {
         char raw_scancode = inb(0x60);
         bool pressed = raw_scancode >= 0;
@@ -129,7 +126,7 @@ static void keyboard_handler(struct intr_info *info) {
                     }
                     putc(c);
                 } else {
-                    printf("Key: %x\n", scancode);
+                    printf("Key: 0x%x\n", scancode);
                 }
             }
         }
@@ -137,6 +134,5 @@ static void keyboard_handler(struct intr_info *info) {
 }
 
 void init_keyboard() {
-    enable_irq(KEYBOARD_IRQ);
-    intr_setaction(KEYBOARD_INTR, (struct intr_action){ .handler = &keyboard_handler, .stackaction = INTR_STACK_KEEP });
+    set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
 }

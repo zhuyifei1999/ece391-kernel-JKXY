@@ -9,7 +9,7 @@ void do_interrupt(struct intr_info *info) {
         // TODO: stack switching when necessary
         (*action.handler)(info);
     } else {
-        printf("[Unhandled interrupt] number = %x, code = %x\n",
+        printf("[Unhandled interrupt] number = 0x%x, code = 0x%x\n",
                info->intr_num, info->error_code);
     }
 }

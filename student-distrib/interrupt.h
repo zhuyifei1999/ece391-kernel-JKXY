@@ -68,6 +68,8 @@ struct intr_info {
 #define INTR_IRQ14 0x2E
 #define INTR_IRQ15 0x2F
 
+#define INTR_IRQ_MIN INTR_IRQ0
+
 #define INTR_SYSCALL 0x80
 
 enum intr_stackaction {
@@ -75,8 +77,10 @@ enum intr_stackaction {
     INTR_STACK_ALLOC,
 };
 
+typedef void intr_handler_t(struct intr_info *info);
+
 struct intr_action {
-    void (*handler)(struct intr_info *info);
+    intr_handler_t *handler;
     enum intr_stackaction stackaction;
 };
 
