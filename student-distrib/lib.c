@@ -17,6 +17,8 @@ static char* video_mem = (char *)VIDEO;
  * Return Value: none
  * Function: Updates cursor position */
 static inline void update_cursor(void) {
+    unsigned int cursor_loc = NUM_COLS * screen_y + screen_x;
+
     outb(0x0F, 0x3D4);
     outb((unsigned char)cursor_loc, 0x3D5);
     outb(0x0E, 0x3D4);

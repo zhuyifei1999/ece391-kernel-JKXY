@@ -9,6 +9,7 @@
 
 void init_keyboard();
 
-extern unsigned char keyboard_map[128];
+extern unsigned char lower_keyboard_map[128];
+extern unsigned char upper_keyboard_map[128];
 
 #endif
