@@ -10,6 +10,7 @@
 #include "abort.h"
 #include "debug.h"
 #include "tests.h"
+#include "paging.h"
 
 #define RUN_TESTS
 
@@ -150,6 +151,8 @@ void entry(unsigned long magic, unsigned long addr) {
      * without showing you any output */
     printf("Enabling Interrupts\n");
     sti();
+
+    init_page();
 
     asm volatile ("int $0x80;");
 
