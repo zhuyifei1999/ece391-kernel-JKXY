@@ -18,6 +18,6 @@ static void irq_handler(struct intr_info *info) {
 void set_irq_handler(unsigned int irq_num, intr_handler_t *handler) {
     irq_handlers[irq_num] = handler;
     intr_setaction(irq_num + INTR_IRQ_MIN, (struct intr_action){
-        .handler = &irq_handler, .stackaction = INTR_STACK_ALLOC });
+        .handler = &irq_handler });
     enable_irq(irq_num);
 }

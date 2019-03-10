@@ -72,16 +72,10 @@ struct intr_info {
 
 #define INTR_SYSCALL 0x80
 
-enum intr_stackaction {
-    INTR_STACK_KEEP,
-    INTR_STACK_ALLOC,
-};
-
 typedef void intr_handler_t(struct intr_info *info);
 
 struct intr_action {
     intr_handler_t *handler;
-    enum intr_stackaction stackaction;
 };
 
 struct intr_action intr_actions[NUM_VEC];

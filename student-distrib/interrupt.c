@@ -7,7 +7,6 @@ asmlinkage
 void do_interrupt(struct intr_info *info) {
     struct intr_action action = intr_actions[info->intr_num];
     if (action.handler) {
-        // TODO: stack switching when necessary
         (*action.handler)(info);
     } else {
         printf("[Unhandled interrupt] number = 0x%x, code = 0x%x\n",
