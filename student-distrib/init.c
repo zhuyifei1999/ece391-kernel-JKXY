@@ -6,9 +6,8 @@
 #include "x86_desc.h"
 #include "lib.h"
 #include "i8259.h"
-#include "keyboard.h"
-#include "interrupt.h"
-#include "exception.h"
+#include "initcall.h"
+#include "initcall.h"
 #include "abort.h"
 #include "debug.h"
 #include "tests.h"
@@ -140,13 +139,8 @@ void entry(unsigned long magic, unsigned long addr) {
         ltr(KERNEL_TSS);
     }
 
-    /* Init the PIC */
-    i8259_init();
-
-    init_IDT();
-    init_exc_handlers();
-
-    init_keyboard();
+    /* Do early initialization calls */
+    DO_INITCALL(early);
 
     /* Initialize devices, memory, filesystem, enable device interrupts on the
      * PIC, any other initialization stuff... */

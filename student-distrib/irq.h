@@ -1,7 +1,7 @@
 // irq.h -- handle hardware IRQs
 
-#ifndef _EXCEPTION_H
-#define _EXCEPTION_H
+#ifndef _IRQ_H
+#define _IRQ_H
 
 #include "interrupt.h"
 

@@ -92,8 +92,5 @@ asmlinkage void do_interrupt(struct intr_info *info);
 // Set what to do on interrupt
 void intr_setaction(uint8_t intr_num, struct intr_action action);
 
-// initialize IDT
-void init_IDT();
-
 #endif
 #endif

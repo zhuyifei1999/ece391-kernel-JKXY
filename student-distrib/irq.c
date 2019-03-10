@@ -1,6 +1,7 @@
 #include "irq.h"
 #include "i8259.h"
 #include "interrupt.h"
+#include "lib.h"
 
 static intr_handler_t *irq_handlers[IRQ_NUM];
 

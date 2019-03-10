@@ -1,6 +1,8 @@
-#include "keyboard.h"
 #include "irq.h"
 #include "lib.h"
+#include "initcall.h"
+
+#define KEYBOARD_IRQ 1
 
 // lots of sources from: https://stackoverflow.com/q/37618111
 
@@ -136,3 +138,4 @@ static void keyboard_handler(struct intr_info *info) {
 void init_keyboard() {
     set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
 }
+DEFINE_INITCALL(init_keyboard, early);

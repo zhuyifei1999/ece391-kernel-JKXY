@@ -1,6 +1,7 @@
 #include "lib.h"
 #include "interrupt.h"
 #include "x86_desc.h"
+#include "initcall.h"
 
 asmlinkage
 void do_interrupt(struct intr_info *info) {
@@ -79,3 +80,4 @@ void init_IDT() {
 
     lidt(idt_desc_ptr);
 }
+DEFINE_INITCALL(init_IDT, early);
