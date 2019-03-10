@@ -103,6 +103,7 @@ static void keyboard_handler(struct intr_info *info) {
     while (inb(0x64) & 1) {
         char raw_scancode = inb(0x60);
         bool pressed = raw_scancode >= 0;
+        // the most significant digit (0x80) determines if it's pressed or released
         unsigned char scancode = pressed ? raw_scancode : raw_scancode - 0x80;
 
         // update the globals if this is a control key

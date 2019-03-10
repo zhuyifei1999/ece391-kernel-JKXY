@@ -42,6 +42,7 @@ static void init_IDT() {
     init_IDT_entry(INTR_EXC_BOUND_RANGE_EXCEEDED, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_INVALID_OPCODE, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_DEVICE_NOT_AVAILABLE, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
+    // TODO: make double fault use a seperate TSS with task gate
     init_IDT_entry(INTR_EXC_DOUBLE_FAULT, IDT_TYPE_INTERRUPT, KERNEL_DPL, hascode);
     init_IDT_entry(INTR_EXC_COPROCESSOR_SEGMENT_OVERRUN, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_INVALID_TSS, IDT_TYPE_INTERRUPT, KERNEL_DPL, hascode);
