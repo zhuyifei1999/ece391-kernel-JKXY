@@ -7,7 +7,6 @@
 #include "lib.h"
 #include "i8259.h"
 #include "initcall.h"
-#include "initcall.h"
 #include "abort.h"
 #include "debug.h"
 #include "tests.h"
