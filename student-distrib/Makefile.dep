@@ -5,7 +5,7 @@ exception.o: exception.c types.h interrupt.h x86_desc.h compiler.h lib.h \
   abort.h initcall.h
 i8259.o: i8259.c i8259.h types.h lib.h compiler.h delay.h initcall.h
 init.o: init.c multiboot.h types.h x86_desc.h lib.h compiler.h i8259.h \
-  initcall.h abort.h debug.h tests.h
+  initcall.h abort.h debug.h tests.h paging.h
 interrupt.o: interrupt.c lib.h types.h compiler.h interrupt.h x86_desc.h \
   initcall.h
 irq.o: irq.c irq.h interrupt.h types.h x86_desc.h compiler.h i8259.h \
@@ -14,4 +14,6 @@ keyboard.o: keyboard.c irq.h interrupt.h types.h x86_desc.h compiler.h \
   lib.h initcall.h
 lib.o: lib.c lib.h types.h compiler.h
 paging.o: paging.c paging.h types.h lib.h compiler.h
+rtc.o: rtc.c irq.h interrupt.h types.h x86_desc.h compiler.h lib.h \
+  initcall.h rtc.h
 tests.o: tests.c tests.h x86_desc.h types.h lib.h compiler.h
