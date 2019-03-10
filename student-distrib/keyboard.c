@@ -6,7 +6,7 @@
 
 // lots of sources from: https://stackoverflow.com/q/37618111
 
-unsigned char lower_keyboard_map[128] = {
+static unsigned char lower_keyboard_map[128] = {
     0,  27, '1', '2', '3', '4', '5', '6', '7', '8',     /* 9 */
     '9', '0', '-', '=', '\b',     /* Backspace */
     '\t',                 /* Tab */
@@ -45,7 +45,7 @@ unsigned char lower_keyboard_map[128] = {
     0,  /* All other keys are undefined */
 };
 
-unsigned char upper_keyboard_map[128] = {
+static unsigned char upper_keyboard_map[128] = {
     0,  27, '!', '@', '#', '$', '%', '^', '&', '*',     /* 9 */
     '(', ')', '_', '+', '\b',     /* Backspace */
     '\t',                 /* Tab */
@@ -135,7 +135,7 @@ static void keyboard_handler(struct intr_info *info) {
     }
 }
 
-void init_keyboard() {
+static void init_keyboard() {
     set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
 }
 DEFINE_INITCALL(init_keyboard, early);

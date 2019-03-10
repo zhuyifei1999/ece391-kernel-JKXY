@@ -34,7 +34,7 @@ void intr_setaction(uint8_t intr_num, struct intr_action action) {
 } while (0);
 #define init_IDT_entry(intr, _type, _dpl, suffix) _init_IDT_entry(intr, _type, _dpl, suffix)
 
-void init_IDT() {
+static void init_IDT() {
     init_IDT_entry(INTR_EXC_DIVIDE_BY_ZERO_ERROR, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_DEBUG, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_NON_MASKABLE_INTERRUPT, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
