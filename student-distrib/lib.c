@@ -169,16 +169,49 @@ int32_t puts(int8_t* s) {
  * Return Value: void
  *  Function: Output a character to the console */
 void putc(uint8_t c) {
-    if(c == '\n' || c == '\r') {
-        screen_y++;
+    if (c == '\n' || c == '\r') {
+        if (c == '\n')
+            screen_y++;
         screen_x = 0;
+    } else if (c == '\b') {
+        if (screen_x) {
+            screen_x--;
+            video_mem[(NUM_COLS * screen_y + screen_x) * 2] = ' ';
+            video_mem[(NUM_COLS * screen_y + screen_x) * 2 + 1] = ATTRIB;
+        }
+    } else if (c == '\t') {
+        // TODO
+        return putc(' ');
     } else {
-        *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1)) = c;
-        *(uint8_t *)(video_mem + ((NUM_COLS * screen_y + screen_x) << 1) + 1) = ATTRIB;
+        video_mem[(NUM_COLS * screen_y + screen_x) * 2] = c;
+        video_mem[(NUM_COLS * screen_y + screen_x) * 2 + 1] = ATTRIB;
         screen_x++;
-        screen_x %= NUM_COLS;
-        screen_y = (screen_y + (screen_x / NUM_COLS)) % NUM_ROWS;
     }
+
+    if (screen_x == NUM_COLS) {
+        screen_x = 0;
+        screen_y++;
+    }
+
+    if (screen_y == NUM_ROWS) {
+        screen_y--;
+        int32_t i;
+        for (i = 0; i < (NUM_ROWS - 1) * NUM_COLS; i++) {
+            video_mem[i * 2] = video_mem[(i + NUM_COLS) * 2];
+            video_mem[i * 2 + 1] = video_mem[(i + NUM_COLS) * 2 + 1];
+        }
+        for (i = (NUM_ROWS - 1) * NUM_COLS; i < NUM_ROWS * NUM_COLS; i++) {
+            video_mem[i * 2] = ' ';
+            video_mem[i * 2 + 1] = ATTRIB;
+        }
+    }
+
+    // update cursur
+    unsigned int cursor_loc = NUM_COLS * screen_y + screen_x;
+    outb(0x0F, 0x3D4);
+    outb((unsigned char)cursor_loc, 0x3D5);
+    outb(0x0E, 0x3D4);
+    outb((unsigned char)(cursor_loc>>8), 0x3D5);
 }
 
 /* int8_t* itoa(uint32_t value, int8_t* buf, int32_t radix);

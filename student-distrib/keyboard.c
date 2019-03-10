@@ -28,11 +28,11 @@ unsigned char keyboard_map[128] = {
     0,  /* Home key */
     0,  /* Up Arrow */
     0,  /* Page Up */
-  '-',
+    '-',
     0,  /* Left Arrow */
     0,
     0,  /* Right Arrow */
-  '+',
+    '+',
     0,  /* 79 - End key*/
     0,  /* Down Arrow */
     0,  /* Page Down */
