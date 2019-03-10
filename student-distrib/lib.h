@@ -161,6 +161,11 @@ do {                                    \
     );                                  \
 } while (0)
 
+// enable NMI
+#define NMI_enable() outb(inb(0x70) & 0x7F, 0x70)
 
+// disable NMI
+#define NMI_disable() outb(inb(0x70) | 0x80, 0x70)
+#define NMI_disable_select_register(reg) outb((reg) | 0x80, 0x70)
 
 #endif /* _LIB_H */
