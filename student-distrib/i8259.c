@@ -8,7 +8,7 @@
 #include "initcall.h"
 
 /* Interrupt masks to determine which interrupts are enabled and disabled */
-uint8_t master_mask = 0xff; /* IRQs 0-7  */
+uint8_t master_mask = 0xff & ~(1 << SLAVE_IRQ); /* IRQs 0-7  */
 uint8_t slave_mask = 0xff;  /* IRQs 8-15 */
 
 /* Initialize the 8259 PIC */
