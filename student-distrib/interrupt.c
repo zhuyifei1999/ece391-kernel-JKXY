@@ -97,6 +97,7 @@ DEFINE_INITCALL(init_IDT, early);
  * Asserts that first 10 IDT entries are not NULL
  * Coverage: IDT definition
  */
+testfunc
 static void idt_entry_test() {
     int i;
     for (i = 0; i < 10; ++i){

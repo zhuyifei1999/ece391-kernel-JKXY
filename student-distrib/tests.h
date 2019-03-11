@@ -54,6 +54,9 @@ bool _test_wrapper(initcall_t *fn);
 
 /****** BEGIN GENERAL CLIENT MACROS & FUNCTIONS ******/
 
+// function attributes fot rest functions
+#define testfunc __attribute__((unused, section(".text.tests")))
+
 // define a test. this will add the test to initcall list
 #define DEFINE_TEST(fn) \
 static void tests_ ## fn() { \

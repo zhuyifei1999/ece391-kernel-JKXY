@@ -175,6 +175,7 @@ DEFINE_INITCALL(init_keyboard, early);
  * Asserts that scancode caps-ing works correctly
  * Coverage: keyboard scancode match
  */
+testfunc
 static void keyboard_test() {
     int i;
     unsigned char test_scancode_lib[5] = {0x11 , 0x13 , 0x1e, 0x1f , 0x20};

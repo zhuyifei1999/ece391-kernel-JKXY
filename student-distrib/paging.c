@@ -72,6 +72,7 @@ static void print_binary_32(int32_t a) {
     }
     printf("\n");
 }
+testfunc
 static void paging_content_test() {
     // This test is full of "magic numbers" because we are assering the values
     // to be equal to some human-written values, not something processed by a
@@ -105,6 +106,7 @@ DEFINE_TEST(paging_content_test);
  * Asserts that mapped pages do not generate any faults
  * Coverage: Basic page table usage
  */
+testfunc
 static void page_fault_good() {
     TEST_ASSERT_NOINTR(INTR_EXC_PAGE_FAULT, ({
         volatile char a;
@@ -125,6 +127,7 @@ DEFINE_TEST(page_fault_good);
  * Asserts that unmapped pages do generate page faults
  * Coverage: Basic page table usage
  */
+testfunc
 static void page_fault_bad() {
     volatile char a;
     TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({

@@ -79,6 +79,7 @@ DEFINE_INITCALL(init_rtc, early);
  *
  * Test whether rtc interrupt interval is 500 ms
  */
+testfunc
 static void rtc_test() {
     int prev_time = rtc_ret;
     int i = 0;
