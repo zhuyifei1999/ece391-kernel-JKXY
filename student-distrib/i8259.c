@@ -58,16 +58,14 @@ void i8259_init(void) {
 }
 DEFINE_INITCALL(i8259_init, early);
 
-/* Enable (unmask) the specified IRQ */
 /*
  * enable_irq
- *   DESCRIPTION: enable the irq to a specific irq number
+ *   DESCRIPTION: Enable (unmask) the specified IRQ
  *   INPUTS: irq number
  *   OUTPUTS: none
  *   RETURN VALUE: none
  *   SIDE EFFECTS: none
  */
-
 void enable_irq(uint32_t irq_num) {
     unsigned long flags;
     // inital mask 1 in the first bit
@@ -97,16 +95,14 @@ void enable_irq(uint32_t irq_num) {
     }
 }
 
-/* Disable (mask) the specified IRQ */
 /*
  * disable_irq
- *   DESCRIPTION: disable the irq to a specific irq number
+ *   DESCRIPTION: Disable (mask) the specified IRQ
  *   INPUTS: irq number
  *   OUTPUTS: none
  *   RETURN VALUE: none
  *   SIDE EFFECTS: none
  */
-
 void disable_irq(uint32_t irq_num) {
     unsigned long flags;
     // inital mask 1 in the first bit
@@ -131,10 +127,9 @@ void disable_irq(uint32_t irq_num) {
     }
 }
 
-/* Send end-of-interrupt signal for the specified IRQ */
 /*
  * send_eoi
- *   DESCRIPTION: send end of interrupt
+ *   DESCRIPTION: Send end-of-interrupt signal for the specified IRQ
  *   INPUTS: irq number
  *   OUTPUTS: none
  *   RETURN VALUE: none
