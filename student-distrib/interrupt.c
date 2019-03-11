@@ -113,11 +113,6 @@ DEFINE_TEST(idt_entry_test);
  */
 testfunc
 static void idt_exc_registry() {
-    TEST_ASSERT_INTR(INTR_EXC_GENERAL_PROTECTION_FAULT, ({
-        // This test is duel: test that unmapped interrupts cause a #GP and
-        // we can register the #GP handler
-        asm volatile ("int $0xFF");
-    }));
     TEST_ASSERT_INTR(INTR_IRQ2, ({
         asm volatile ("int %0" : : "i"(INTR_IRQ2));
     }));
