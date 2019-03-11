@@ -65,7 +65,6 @@ void init_page()
  * Inputs: None
  * Outputs: None
  * Side Effects: None
- * Coverage: IDT definition
  */
 static void print_binary_32(int32_t a)
 {
