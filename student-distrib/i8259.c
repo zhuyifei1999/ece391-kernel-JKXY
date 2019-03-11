@@ -70,29 +70,29 @@ DEFINE_INITCALL(i8259_init, early);
 
 void enable_irq(uint32_t irq_num) {
     unsigned long flags;
-    //inital mask 1 in the first bit
+    // inital mask 1 in the first bit
     uint8_t mask = 0x01;
-    //check if the irq is in the master pic
+    // check if the irq is in the master pic
     if (irq_num < MASTER_IRQ_NUM) {
-        //make mask in irq_num bit
+        // make mask in irq_num bit
         mask <<= irq_num;
         mask = ~mask;
-        //changing global mask is a critical section
+        // changing global mask is a critical section
         cli_and_save(flags);
             master_mask &= mask;
         restore_flags(flags);
-        //update the master_mask
+        // update the master_mask
         outb(master_mask, MASTER_8259_IMR_PORT);
-    //if irq is in slave's pic
+    // if irq is in slave's pic
     } else {
-        //make mask in irq_num bit
+        // make mask in irq_num bit
         mask <<= irq_num-MASTER_IRQ_NUM;
         mask = ~mask;
-        //changing global mask is a critical section
+        // changing global mask is a critical section
         cli_and_save(flags);
             slave_mask &= mask;
         restore_flags(flags);
-         //update the master_mask
+        // update the master_mask
         outb(slave_mask, SLAVE_8259_IMR_PORT);
     }
 }
@@ -109,24 +109,24 @@ void enable_irq(uint32_t irq_num) {
 
 void disable_irq(uint32_t irq_num) {
     unsigned long flags;
-    //inital mask 1 in the first bit
+    // inital mask 1 in the first bit
     uint8_t mask = 0x01;
-    //check if the irq is in the master pic
+    // check if the irq is in the master pic
     if (irq_num < MASTER_IRQ_NUM) {
         mask <<= irq_num;
-        //changing global mask is a critical section
+        // changing global mask is a critical section
         cli_and_save(flags);
             master_mask |= mask;
         restore_flags(flags);
-        //update the master_mask
+        // update the master_mask
         outb(master_mask, MASTER_8259_IMR_PORT);
     } else {
         mask <<= irq_num-MASTER_IRQ_NUM;
-        //changing global mask is a critical section
+        // changing global mask is a critical section
         cli_and_save(flags);
             slave_mask |= mask;
         restore_flags(flags);
-        //update the slave_mask
+        // update the slave_mask
         outb(slave_mask, SLAVE_8259_IMR_PORT);
     }
 }
@@ -141,7 +141,7 @@ void disable_irq(uint32_t irq_num) {
  *   SIDE EFFECTS: none
  */
 void send_eoi(uint32_t irq_num) {
-    //check if the irq is in the slave pic
+    // check if the irq is in the slave pic
     if (irq_num > (MASTER_IRQ_NUM - 1)) {
         outb(EOI + (irq_num & (MASTER_IRQ_NUM - 1)), SLAVE_8259_CMD_PORT);
         outb(EOI + SLAVE_IRQ, MASTER_8259_CMD_PORT);
