@@ -5,6 +5,7 @@
 
 // some source from https://wiki.osdev.org/RTC
 
+// handle RTC interrupt
 static void rtc_handler(struct intr_info *info) {
     // diacard register C to we get interrupts again
     NMI_disable_select_register(0xC);
@@ -38,6 +39,7 @@ void rtc_change_rate(unsigned char rate) {
     restore_flags(flags);
 }
 
+// initialize RTC
 static void init_rtc() {
     unsigned long flags;
 

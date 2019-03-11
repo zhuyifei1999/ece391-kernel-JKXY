@@ -64,9 +64,6 @@ void init_page()
 /* Paging Test
  *
  * print Values contained in paging structures
- * Inputs: None
- * Outputs: None
- * Side Effects: None
  */
 static void print_binary_32(int32_t a)
 {
