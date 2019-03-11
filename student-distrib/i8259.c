@@ -38,7 +38,7 @@ void i8259_init(void) {
     outb_p(ICW1, SLAVE_8259_CMD_PORT);
 
     /* ICW2: 8259A-2 IR0-7 mapped to ISA_IRQ_VECTOR(8) */
-    outb_p(ICW2_SLAVE,  SLAVE_8259_IMR_PORT);
+    outb_p(ICW2_SLAVE, SLAVE_8259_IMR_PORT);
 
     /* 8259A-2 is a slave on master's IR2 */
     outb_p(ICW3_SLAVE, SLAVE_8259_IMR_PORT);
