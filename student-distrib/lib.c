@@ -65,10 +65,10 @@ void clear(void) {
 __printf(1, 2)
 int32_t printf(int8_t *format, ...) {
     /* Pointer to the format string */
-    int8_t* buf = format;
+    int8_t *buf = format;
 
     /* Stack pointer for the other parameters */
-    int32_t* esp = (void *)&format;
+    int32_t *esp = (void *)&format;
     esp++;
 
     while (*buf != '\0') {
@@ -171,11 +171,11 @@ format_char_switch:
     return (buf - format);
 }
 
-/* int32_t puts(int8_t* s);
+/* int32_t puts(int8_t *s);
  *   Inputs: int_8* s = pointer to a string of characters
  *   Return Value: Number of bytes written
  *    Function: Output a string to the console */
-int32_t puts(int8_t* s) {
+int32_t puts(int8_t *s) {
     register int32_t index = 0;
     while (s[index] != '\0') {
         putc(s[index]);
@@ -236,13 +236,13 @@ void putc(uint8_t c) {
     restore_flags(flags);
 }
 
-/* int8_t* itoa(uint32_t value, int8_t* buf, int32_t radix);
+/* int8_t *itoa(uint32_t value, int8_t *buf, int32_t radix);
  * Inputs: uint32_t value = number to convert
- *            int8_t* buf = allocated buffer to place string in
+ *            int8_t *buf = allocated buffer to place string in
  *          int32_t radix = base system. hex, oct, dec, etc.
  * Return Value: number of bytes written
  * Function: Convert a number to its ASCII representation, with base "radix" */
-int8_t* itoa(uint32_t value, int8_t* buf, int32_t radix) {
+int8_t *itoa(uint32_t value, int8_t *buf, int32_t radix) {
     static int8_t lookup[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     int8_t *newbuf = buf;
     int32_t i;
@@ -274,11 +274,11 @@ int8_t* itoa(uint32_t value, int8_t* buf, int32_t radix) {
     return strrev(buf);
 }
 
-/* int8_t* strrev(int8_t* s);
- * Inputs: int8_t* s = string to reverse
+/* int8_t *strrev(int8_t *s);
+ * Inputs: int8_t *s = string to reverse
  * Return Value: reversed string
  * Function: reverses a string s */
-int8_t* strrev(int8_t* s) {
+int8_t *strrev(int8_t *s) {
     register int8_t tmp;
     register int32_t beg = 0;
     register int32_t end = strlen(s) - 1;
@@ -293,11 +293,11 @@ int8_t* strrev(int8_t* s) {
     return s;
 }
 
-/* uint32_t strlen(const int8_t* s);
- * Inputs: const int8_t* s = string to take length of
+/* uint32_t strlen(const int8_t *s);
+ * Inputs: const int8_t *s = string to take length of
  * Return Value: length of string s
  * Function: return length of string s */
-uint32_t strlen(const int8_t* s) {
+uint32_t strlen(const int8_t *s) {
     register uint32_t len = 0;
     while (s[len] != '\0')
         len++;
@@ -459,9 +459,9 @@ void* memmove(void* dest, const void* src, uint32_t n) {
     return dest;
 }
 
-/* int32_t strncmp(const int8_t* s1, const int8_t* s2, uint32_t n)
- * Inputs: const int8_t* s1 = first string to compare
- *         const int8_t* s2 = second string to compare
+/* int32_t strncmp(const int8_t *s1, const int8_t *s2, uint32_t n)
+ * Inputs: const int8_t *s1 = first string to compare
+ *         const int8_t *s2 = second string to compare
  *               uint32_t n = number of bytes to compare
  * Return Value: A zero value indicates that the characters compared
  *               in both strings form the same string.
@@ -470,7 +470,7 @@ void* memmove(void* dest, const void* src, uint32_t n) {
  *               in str1 than in str2; And a value less than zero
  *               indicates the opposite.
  * Function: compares string 1 and string 2 for equality */
-int32_t strncmp(const int8_t* s1, const int8_t* s2, uint32_t n) {
+int32_t strncmp(const int8_t *s1, const int8_t *s2, uint32_t n) {
     int32_t i;
     for (i = 0; i < n; i++) {
         if ((s1[i] != s2[i]) || (s1[i] == '\0') /* || s2[i] == '\0' */) {
@@ -486,12 +486,12 @@ int32_t strncmp(const int8_t* s1, const int8_t* s2, uint32_t n) {
     return 0;
 }
 
-/* int8_t* strcpy(int8_t* dest, const int8_t* src)
- * Inputs:      int8_t* dest = destination string of copy
- *         const int8_t* src = source string of copy
+/* int8_t *strcpy(int8_t *dest, const int8_t *src)
+ * Inputs:      int8_t *dest = destination string of copy
+ *         const int8_t *src = source string of copy
  * Return Value: pointer to dest
  * Function: copy the source string into the destination string */
-int8_t* strcpy(int8_t* dest, const int8_t* src) {
+int8_t *strcpy(int8_t *dest, const int8_t *src) {
     int32_t i = 0;
     while (src[i] != '\0') {
         dest[i] = src[i];
@@ -501,13 +501,13 @@ int8_t* strcpy(int8_t* dest, const int8_t* src) {
     return dest;
 }
 
-/* int8_t* strcpy(int8_t* dest, const int8_t* src, uint32_t n)
- * Inputs:      int8_t* dest = destination string of copy
- *         const int8_t* src = source string of copy
+/* int8_t *strcpy(int8_t *dest, const int8_t *src, uint32_t n)
+ * Inputs:      int8_t *dest = destination string of copy
+ *         const int8_t *src = source string of copy
  *                uint32_t n = number of bytes to copy
  * Return Value: pointer to dest
  * Function: copy n bytes of the source string into the destination string */
-int8_t* strncpy(int8_t* dest, const int8_t* src, uint32_t n) {
+int8_t *strncpy(int8_t *dest, const int8_t *src, uint32_t n) {
     int32_t i = 0;
     while (src[i] != '\0' && i < n) {
         dest[i] = src[i];

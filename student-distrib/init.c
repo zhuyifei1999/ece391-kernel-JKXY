@@ -52,13 +52,13 @@ void entry(unsigned long magic, unsigned long addr) {
     if (CHECK_FLAG(mbi->flags, 3)) {
         int mod_count = 0;
         int i;
-        module_t* mod = (module_t*)mbi->mods_addr;
+        module_t *mod = (module_t *)mbi->mods_addr;
         while (mod_count < mbi->mods_count) {
             printf("Module %d loaded at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_start);
             printf("Module %d ends at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_end);
             printf("First few bytes of module:\n");
             for (i = 0; i < 16; i++) {
-                printf("0x%x ", *((char*)(mod->mod_start+i)));
+                printf("0x%x ", *((char *)(mod->mod_start+i)));
             }
             printf("\n");
             mod_count++;
