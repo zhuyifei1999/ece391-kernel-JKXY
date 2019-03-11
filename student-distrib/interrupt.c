@@ -38,6 +38,7 @@ struct intr_action intr_getaction(uint8_t intr_num) {
 } while (0);
 #define init_IDT_entry(intr, _type, _dpl, suffix) _init_IDT_entry(intr, _type, _dpl, suffix)
 
+// this initializer initializes IDT, with the macro defined above
 static void init_IDT() {
     init_IDT_entry(INTR_EXC_DIVIDE_BY_ZERO_ERROR, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_DEBUG, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
@@ -84,8 +85,6 @@ static void init_IDT() {
 #endif
 
     init_IDT_entry(INTR_SYSCALL, IDT_TYPE_TRAP, USER_DPL, nocode);
-
-    barrier();
 
     lidt(idt_desc_ptr);
 }
