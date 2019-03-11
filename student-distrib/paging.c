@@ -1,6 +1,6 @@
 #include "paging.h"
 #include "lib.h"
-#include "tests.h"
+
 /*  A Page Table for video memory
  *  Video Memory starts from 0xB8000, size = 4kB
  *  set that page
@@ -11,6 +11,7 @@ __attribute__((aligned(LEN_4K))) static struct page_table video_page_table[LEN_1
         .rw = 1,                        // can be read and write
         .addr = MEM_4K_IDX(VIDEO_ADDR), // address of 4kb page
     }};
+
 /*  One Global Page dirctory
  *  set the page table information for video memory and kernel memory
  */
@@ -28,6 +29,7 @@ __attribute__((aligned(LEN_4K))) static struct page_dirctory page_directory[LEN_
         .size = 1,                       // size = 1 means it points to a 4MB memory space rather than a page table
         .addr = MEM_4K_IDX(KERNEL_ADDR), // set address to a 4MB page (aligned to 4kb)
     }};
+
 /*  init_page
  * initialize page directory and page table for video memory, and enable paging
  * input - none
@@ -58,7 +60,7 @@ void init_page()
     restore_flags(flags); //// restore interrupts
 }
 
-#if RUN_TESTS
+#include "tests.h"
 /* Paging Test
  *
  * print Values contained in paging structures
@@ -95,4 +97,52 @@ static void paging_content_test()
     printf("################################################\n");
 }
 DEFINE_TEST(paging_content_test);
+
+#include "tests.h"
+#if RUN_TESTS
+/* Page fault tests, good accesses
+ *
+ * Asserts that mapped pages do not generate any faults
+ * Coverage: Basic page table usage
+ */
+static void page_fault_good() {
+    TEST_ASSERT_NOINTR(INTR_EXC_PAGE_FAULT, ({
+        volatile char a;
+        // first byte of kernel
+        a = *(char *)KERNEL_ADDR;
+        // last byte of kernel, after 4 MiB page
+        a = *(char *)(KERNEL_ADDR + (4 << 20) - 1);
+        // first byte of video memory
+        a = *(char *)VIDEO_ADDR;
+        // last byte of video memory, after 4 KiB page
+        a = *(char *)(VIDEO_ADDR + (4 << 10) - 1);
+    }));
+}
+DEFINE_TEST(page_fault_good);
+
+/* Page fault tests, bad accesses
+ *
+ * Asserts that unmapped pages do generate page faults
+ * Coverage: Basic page table usage
+ */
+static void page_fault_bad() {
+    volatile char a;
+    TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({
+        // before first byte of kernel
+        a = *(char *)(KERNEL_ADDR - 1);
+    }));
+    TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({
+        // after last byte of kernel
+        a = *(char *)(KERNEL_ADDR + (4 << 20));
+    }));
+    TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({
+        // after first byte of video memory
+        a = *(char *)(VIDEO_ADDR - 1);
+    }));
+    TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({
+        // after last byte of video memory
+        a = *(char *)(VIDEO_ADDR + (4 << 10));
+    }));
+}
+DEFINE_TEST(page_fault_bad);
 #endif
