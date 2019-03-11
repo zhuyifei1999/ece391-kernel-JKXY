@@ -21,7 +21,9 @@ void i8259_init(void) {
     /*
      * outb_p - this has to work on a wide range of PC hardware.
      */
-    outb_p(ICW1, MASTER_8259_CMD_PORT);    /* ICW1: select 8259A-1 init */
+
+    /* ICW1: select 8259A-1 init */
+    outb_p(ICW1, MASTER_8259_CMD_PORT);
 
     /* ICW2: 8259A-1 IR0-7 mapped to ISA_IRQ_VECTOR(0) */
     outb_p(ICW2_MASTER, MASTER_8259_IMR_PORT);
@@ -29,27 +31,43 @@ void i8259_init(void) {
     /* 8259A-1 (the master) has a slave on IR2 */
     outb_p(ICW3_MASTER, MASTER_8259_IMR_PORT);
 
-    outb_p(ICW4, MASTER_8259_IMR_PORT); /* master does normal eoi */
+    /* master does normal eoi */
+    outb_p(ICW4, MASTER_8259_IMR_PORT);
 
-    outb_p(ICW1, SLAVE_8259_CMD_PORT);    /* ICW1: select 8259A-2 init */
+    /* ICW1: select 8259A-2 init */
+    outb_p(ICW1, SLAVE_8259_CMD_PORT);
 
     /* ICW2: 8259A-2 IR0-7 mapped to ISA_IRQ_VECTOR(8) */
     outb_p(ICW2_SLAVE,  SLAVE_8259_IMR_PORT);
+
     /* 8259A-2 is a slave on master's IR2 */
     outb_p(ICW3_SLAVE, SLAVE_8259_IMR_PORT);
+
     /* (slave's support for AEOI in flat mode is to be investigated) */
     outb_p(ICW4, SLAVE_8259_IMR_PORT);
 
-    udelay(100);        /* wait for 8259A to initialize */
+    /* wait for 8259A to initialize */
+    udelay(100);        
 
+    // restore original masking
     outb(master_mask, MASTER_8259_IMR_PORT);
     outb(slave_mask, SLAVE_8259_IMR_PORT);
 
+    // restore flags
     restore_flags(flags);
 }
 DEFINE_INITCALL(i8259_init, early);
 
 /* Enable (unmask) the specified IRQ */
+/*
+ * enable_irq
+ *   DESCRIPTION: enable the irq to a specific irq number
+ *   INPUTS: irq number
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
+
 void enable_irq(uint32_t irq_num) {
     unsigned long flags;
     uint8_t mask = 0x01;
@@ -71,6 +89,15 @@ void enable_irq(uint32_t irq_num) {
 }
 
 /* Disable (mask) the specified IRQ */
+/*
+ * disable_irq
+ *   DESCRIPTION: disable the irq to a specific irq number
+ *   INPUTS: irq number
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
+
 void disable_irq(uint32_t irq_num) {
     unsigned long flags;
     uint8_t mask = 0x01;
@@ -90,6 +117,14 @@ void disable_irq(uint32_t irq_num) {
 }
 
 /* Send end-of-interrupt signal for the specified IRQ */
+/*
+ * send_eoi
+ *   DESCRIPTION: send end of interrupt
+ *   INPUTS: irq number
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 void send_eoi(uint32_t irq_num) {
     if (irq_num > 7) {
         outb(EOI + (irq_num & 7), SLAVE_8259_CMD_PORT);

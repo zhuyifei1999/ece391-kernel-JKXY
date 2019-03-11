@@ -25,11 +25,11 @@ void rtc_change_rate(unsigned char rate) {
     // disable NMI and get initial value of register A
     NMI_disable_select_register(0xA);
     // read the current value of register A
-    char prev = inb(0x71);
+    char prev = inb(RTC_IMR_PORT);
 
     // write only our rate to A. Note, rate is the bottom 4 bits.
     NMI_disable_select_register(0xA);
-    outb((prev & 0xF0) | rate, 0x71);
+    outb((prev & 0xF0) | rate, RTC_IMR_PORT);
     
     // enable NMI
     NMI_enable();
@@ -45,11 +45,11 @@ static void init_rtc() {
 
     NMI_disable_select_register(0xB);
     // read the current value of register B
-    char prev = inb(0x71);
+    char prev = inb(RTC_IMR_PORT);
     
     // disable NMI and get initial value of register B
     NMI_disable_select_register(0xB);
-    outb(prev | 0x40, 0x71);
+    outb(prev | 0x40, RTC_IMR_PORT);
 
     // enable NMI
     NMI_enable();
