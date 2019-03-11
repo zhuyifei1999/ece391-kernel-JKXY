@@ -29,7 +29,7 @@
 #define EOI                 0x60
 
 #define SLAVE_IRQ           2
-
+#define MASTER_IRQ_NUM      8
 /* Externally-visible functions */
 
 /* Initialize both PICs */

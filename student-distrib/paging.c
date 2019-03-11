@@ -1,14 +1,14 @@
 #include "paging.h"
 #include "lib.h"
 /*  A Page Table for video memory
- *  Video Memory starts from 0xB8000, size = 1kB
+ *  Video Memory starts from 0xB8000, size = 4kB
  *  set that page
  */
 __attribute__((aligned(LEN_4K))) static struct page_table video_page_table[LEN_1K] = {
     [PAGE_TABLE_IDX(VIDEO_ADDR)] = {
         .present = 1,           // it presents
         .rw = 1,                // can be read and write
-        .addr = MEM_4K_IDX(VIDEO_ADDR), // address of 4k page
+        .addr = MEM_4K_IDX(VIDEO_ADDR), // address of 4kb page
     }};
 /*  One Global Page dirctory
  *  set the page table information for video memory and kernel memory
@@ -23,7 +23,7 @@ __attribute__((aligned(LEN_4K))) static struct page_dirctory page_directory[LEN_
         .user = 0,                      // only kernel has access
         .rw = 1,
         .size = 1,                      // size = 1 means it points to a 4MB memory space rather than a page table
-        .addr = MEM_4K_IDX(KERNEL_ADDR),// set address to a 4MB page (aligned to 4k)
+        .addr = MEM_4K_IDX(KERNEL_ADDR),// set address to a 4MB page (aligned to 4kb)
     }};
 /*  init_page
  * initialize page directory and page table for video memory, and enable paging
