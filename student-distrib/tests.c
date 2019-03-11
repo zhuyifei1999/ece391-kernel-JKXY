@@ -16,20 +16,20 @@ static volatile struct intr_info saved_context;
 // This is like an syscall for tests
 static void intr_tests(struct intr_info *info) {
     switch (info->eax) {
-        case _TEST_SYS_FAIL: // test failed, unwind stack
-            _test_status = TEST_FAIL;
-            info->eax = 2;
-            intr_tests(info);
-            break;
-        case _TEST_SYS_SETJMP: // save current execution context for future unwinding
-            saved_context = *info;
-            info->eax = 0; // return 0 to indicate this is first run
-            // return 1 to next time indicate that is is a result from stack unwinding
-            saved_context.eax = 1;
-            break;
-        case _TEST_SYS_LONGJMP: // do stack unwinding
-            *info = saved_context;
-            break;
+    case _TEST_SYS_FAIL: // test failed, unwind stack
+        _test_status = TEST_FAIL;
+        info->eax = 2;
+        intr_tests(info);
+        break;
+    case _TEST_SYS_SETJMP: // save current execution context for future unwinding
+        saved_context = *info;
+        info->eax = 0; // return 0 to indicate this is first run
+        // return 1 to next time indicate that is is a result from stack unwinding
+        saved_context.eax = 1;
+        break;
+    case _TEST_SYS_LONGJMP: // do stack unwinding
+        *info = saved_context;
+        break;
     }
 }
 
