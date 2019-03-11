@@ -21,7 +21,7 @@ OBJS+=$(filter-out boot.o,$(patsubst %.S,%.o,$(filter %.S,$(SRC))))
 OBJS+=$(patsubst %.c,%.o,$(filter %.c,$(SRC)))
 
 
-filesys_img mp3.img: bootimg
+mp3.img: bootimg
 	sudo ./debug.sh
 
 bootimg: Makefile $(OBJS)
