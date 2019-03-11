@@ -166,8 +166,8 @@ DEFINE_INITCALL(init_keyboard, early);
  */
 static void keyboard_test() {
     int i;
-    unsigned char test_scancode_lib[5] = { 0x11 , 0x13 , 0x1e, 0x1f , 0x20 };
-    unsigned char test_output_lib[10] = { 'w', 'r', 'a', 's', 'd', 'W', 'R', 'A', 'S', 'D'};
+    unsigned char test_scancode_lib[5] = {0x11 , 0x13 , 0x1e, 0x1f , 0x20};
+    unsigned char test_output_lib[10] = {'w', 'r', 'a', 's', 'd', 'W', 'R', 'A', 'S', 'D'};
     bool caps, shift;
 
     // testcase both shift and caps are 1
