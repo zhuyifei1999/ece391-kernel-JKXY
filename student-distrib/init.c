@@ -150,7 +150,7 @@ void entry(unsigned long magic, unsigned long addr) {
     printf("Enabling Interrupts\n");
     sti();
 
-    // init_page();
+    init_page();
 
     asm volatile ("int $0x80;");
 

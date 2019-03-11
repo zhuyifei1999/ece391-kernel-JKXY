@@ -19,32 +19,39 @@ void rtc_change_rate(unsigned char rate) {
     unsigned long flags;
     // rate must be above 2 and not over 15
     rate &= 0x0F;
+    // disable interrupt
     cli_and_save(flags);
 
-    // get initial value of register A
+    // disable NMI and get initial value of register A
     NMI_disable_select_register(0xA);
+    // read the current value of register A
     char prev = inb(0x71);
 
     // write only our rate to A. Note, rate is the bottom 4 bits.
     NMI_disable_select_register(0xA);
     outb((prev & 0xF0) | rate, 0x71);
-
+    
+    // enable NMI
     NMI_enable();
     restore_flags(flags);
 }
 
 static void init_rtc() {
     unsigned long flags;
+
+    // disable interrupt
     cli_and_save(flags);
     set_irq_handler(RTC_IRQ, &rtc_handler);
 
     NMI_disable_select_register(0xB);
     // read the current value of register B
     char prev = inb(0x71);
-
+    
+    // disable NMI and get initial value of register B
     NMI_disable_select_register(0xB);
     outb(prev | 0x40, 0x71);
 
+    // enable NMI
     NMI_enable();
     restore_flags(flags);
 
