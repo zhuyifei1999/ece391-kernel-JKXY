@@ -304,13 +304,13 @@ uint32_t strlen(const int8_t *s) {
     return len;
 }
 
-/* void* memset(void* s, int32_t c, uint32_t n);
- * Inputs:    void* s = pointer to memory
+/* void *memset(void *s, int32_t c, uint32_t n);
+ * Inputs:    void *s = pointer to memory
  *          int32_t c = value to set memory to
  *         uint32_t n = number of bytes to set
  * Return Value: new string
  * Function: set n consecutive bytes of pointer s to value c */
-void* memset(void* s, int32_t c, uint32_t n) {
+void *memset(void *s, int32_t c, uint32_t n) {
     c &= 0xFF;
     asm volatile ("                 \n\
             .memset_top:            \n\
@@ -346,14 +346,14 @@ void* memset(void* s, int32_t c, uint32_t n) {
     return s;
 }
 
-/* void* memset_word(void* s, int32_t c, uint32_t n);
+/* void *memset_word(void *s, int32_t c, uint32_t n);
  * Description: Optimized memset_word
- * Inputs:    void* s = pointer to memory
+ * Inputs:    void *s = pointer to memory
  *          int32_t c = value to set memory to
  *         uint32_t n = number of bytes to set
  * Return Value: new string
  * Function: set lower 16 bits of n consecutive memory locations of pointer s to value c */
-void* memset_word(void* s, int32_t c, uint32_t n) {
+void *memset_word(void *s, int32_t c, uint32_t n) {
     asm volatile ("                 \n\
             movw    %%ds, %%dx      \n\
             movw    %%dx, %%es      \n\
@@ -367,13 +367,13 @@ void* memset_word(void* s, int32_t c, uint32_t n) {
     return s;
 }
 
-/* void* memset_dword(void* s, int32_t c, uint32_t n);
- * Inputs:    void* s = pointer to memory
+/* void *memset_dword(void *s, int32_t c, uint32_t n);
+ * Inputs:    void *s = pointer to memory
  *          int32_t c = value to set memory to
  *         uint32_t n = number of bytes to set
  * Return Value: new string
  * Function: set n consecutive memory locations of pointer s to value c */
-void* memset_dword(void* s, int32_t c, uint32_t n) {
+void *memset_dword(void *s, int32_t c, uint32_t n) {
     asm volatile ("                 \n\
             movw    %%ds, %%dx      \n\
             movw    %%dx, %%es      \n\
@@ -387,13 +387,13 @@ void* memset_dword(void* s, int32_t c, uint32_t n) {
     return s;
 }
 
-/* void* memcpy(void* dest, const void* src, uint32_t n);
- * Inputs:      void* dest = destination of copy
- *         const void* src = source of copy
+/* void *memcpy(void *dest, const void *src, uint32_t n);
+ * Inputs:      void *dest = destination of copy
+ *         const void *src = source of copy
  *              uint32_t n = number of byets to copy
  * Return Value: pointer to dest
  * Function: copy n bytes of src to dest */
-void* memcpy(void* dest, const void* src, uint32_t n) {
+void *memcpy(void *dest, const void *src, uint32_t n) {
     asm volatile ("                 \n\
             .memcpy_top:            \n\
             testl   %%ecx, %%ecx    \n\
@@ -432,14 +432,14 @@ void* memcpy(void* dest, const void* src, uint32_t n) {
     return dest;
 }
 
-/* void* memmove(void* dest, const void* src, uint32_t n);
+/* void *memmove(void *dest, const void *src, uint32_t n);
  * Description: Optimized memmove (used for overlapping memory areas)
- * Inputs:      void* dest = destination of move
- *         const void* src = source of move
+ * Inputs:      void *dest = destination of move
+ *         const void *src = source of move
  *              uint32_t n = number of byets to move
  * Return Value: pointer to dest
  * Function: move n bytes of src to dest */
-void* memmove(void* dest, const void* src, uint32_t n) {
+void *memmove(void *dest, const void *src, uint32_t n) {
     asm volatile ("                             \n\
             movw    %%ds, %%dx                  \n\
             movw    %%dx, %%es                  \n\
