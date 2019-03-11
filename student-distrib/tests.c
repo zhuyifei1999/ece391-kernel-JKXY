@@ -5,64 +5,31 @@
 
 #if RUN_TESTS
 
-// TODO: replace these by atomic variable
-
-// Guard against re-entry if tests are run again by interrupt handlers
+// Guard against re-entry during interrupt
+// TODO: replace by atomic variable
 static volatile bool tests_running = false;
-volatile bool _test_status = TEST_PASS;
+static volatile bool test_status = TEST_PASS;
 
-static volatile struct intr_info saved_context;
-
-// This is like an syscall for tests
-static void intr_tests(struct intr_info *info) {
-    switch (info->eax) {
-        case 0: // test failed, unwind stack
-            _test_status = TEST_FAIL;
-            info->eax = 2;
-            intr_tests(info);
-            break;
-        case 1: // save current execution context for future unwinding
-            saved_context = *info;
-            info->eax = 0; // return 0 to indicate this is first run
-            // return 1 to next time indicate that is is a result from stack unwinding
-            saved_context.eax = 1;
-            break;
-        case 2: // do stack unwinding
-            *info = saved_context;
-            break;
-    }
+static void intr_test_failure(struct intr_info *info) {
+    test_status = TEST_FAIL;
 }
 
-bool _test_wrapper(initcall_t *fn) {
-    _test_status = TEST_PASS;
+
+bool test_wrapper(initcall_t *fn) {
+    test_status = TEST_PASS;
 
     struct intr_action oldaction = intr_getaction(INTR_TEST);
     intr_setaction(INTR_TEST, (struct intr_action){
-        .handler = &intr_tests } );
+        .handler = &intr_test_failure } );
 
-    if (!_test_setjmp() && _test_status == TEST_PASS)
-        (*fn)();
+    (*fn)();
 
     intr_setaction(INTR_TEST, oldaction);
-    return _test_status;
-}
-
-// The non-macro version of test_fail just calls the macro
-void (_test_fail_unwind)(void) {
-    _test_fail_unwind();
-}
-
-void _test_longjmp(struct intr_info *info) {
-    if (info) {
-        info->eax = 2;
-        intr_tests(info);
-    } else {
-        asm volatile ("mov $2, %%eax; int %0" : : "i" (INTR_TEST) : "eax");
-    }
+    return test_status;
 }
 
 /* Test suite entry point */
-void launch_tests() {
+void launch_tests(){
     // Test must run with interrupts enabled, but this is critical section
     cli();
     if (tests_running)

@@ -17,7 +17,7 @@ static void irq_handler(struct intr_info *info) {
     }
 }
 
-// setup irq with given handler and enable the irq line
+//  setup irq with given handler and enable the irq line
 void set_irq_handler(unsigned int irq_num, intr_handler_t *handler) {
     irq_handlers[irq_num] = handler;
     intr_setaction(irq_num + INTR_IRQ_MIN, (struct intr_action){

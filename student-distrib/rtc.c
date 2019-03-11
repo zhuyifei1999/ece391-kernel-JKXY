@@ -2,23 +2,28 @@
 #include "lib.h"
 #include "initcall.h"
 #include "rtc.h"
-
 // some source from https://wiki.osdev.org/RTC
-
-// handle RTC interrupt
-static void rtc_handler(struct intr_info *info) {
+static uint32_t rtc_ret, rtc_irq_count;
+static void rtc_handler(struct intr_info *info)
+{
     // diacard register C to we get interrupts again
+    unsigned long flags;
+    cli_and_save(flags);
     NMI_disable_select_register(0xC);
     inb(0x71);
+    rtc_irq_count++;
+    NMI_disable_select_register(0x00);
+    rtc_ret = inb(0x71);
     NMI_enable();
-
+    restore_flags(flags);
     // TODO: Remove after checkpoint 1. Provided in lib.c
     void test_interrupts(void);
-    test_interrupts();
+    //test_interrupts();
 }
 
 // TODO: Document frequency formula (Hz) = 32768 >> (rate - 1)
-void rtc_change_rate(unsigned char rate) {
+void rtc_change_rate(unsigned char rate)
+{
     unsigned long flags;
     // rate must be above 2 and not over 15
     rate &= 0x0F;
@@ -39,8 +44,8 @@ void rtc_change_rate(unsigned char rate) {
     restore_flags(flags);
 }
 
-// initialize RTC
-static void init_rtc() {
+static void init_rtc()
+{
     unsigned long flags;
 
     // disable interrupt
@@ -64,3 +69,39 @@ static void init_rtc() {
     rtc_change_rate(15);
 }
 DEFINE_INITCALL(init_rtc, early);
+
+#include "tests.h"
+#if RUN_TESTS
+/* Rtc Test
+ *
+ * Test whether rtc interrupt interval is 500 ms
+ * Inputs: None
+ * Outputs: None
+ * Side Effects: None
+ */
+static void rtc_test()
+{
+    int prev_time;
+    int i = 0;
+    prev_time = rtc_ret;
+    int time_passed = 0;
+    int rtc_irq_count_init = rtc_irq_count;
+    while (i < 25)
+    {
+        if (rtc_ret != prev_time)
+        {
+            time_passed++;
+            prev_time = rtc_ret;
+        }
+        if ((rtc_irq_count - rtc_irq_count_init) == i)
+        {
+            printf("    time_passed = %d s , rtc_interrupt_count = %d \n", time_passed, i);
+            i++;
+        }
+    }
+    int interval = (time_passed * 1000) / (i - 1);
+    printf("\n    rtc_interrupt_interval = %d ms\n", interval);
+    TEST_ASSERT(450 < interval && interval < 550);
+}
+DEFINE_TEST(rtc_test);
+#endif
