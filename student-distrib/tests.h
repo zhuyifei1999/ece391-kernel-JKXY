@@ -21,9 +21,11 @@
 #define TEST_OUTPUT(fn, result)    \
     printf("[TEST %s] Result = %s\n", #fn, (result) ? "PASS" : "FAIL")
 
-#define tests_assert_fail() do { \
+#define test_fail() do { \
     asm volatile("int %0" : : "i" (INTR_TEST)); \
 } while (0)
+
+bool test_wrapper(initcall_t *fn);
 
 #define DEFINE_TEST(fn) \
 static void tests_ ## fn() { \
@@ -32,6 +34,8 @@ static void tests_ ## fn() { \
     TEST_OUTPUT(fn, result); \
 } \
 DEFINE_INITCALL(tests_ ## fn, tests)
+
+#define TEST_ASSERT(condition) do { if (!(condition)) test_fail(); } while (0)
 
 // test launcher
 void launch_tests();

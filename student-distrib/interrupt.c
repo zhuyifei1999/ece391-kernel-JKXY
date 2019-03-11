@@ -104,10 +104,7 @@ DEFINE_INITCALL(init_IDT, early);
 static void idt_entry_test() {
     int i;
     for (i = 0; i < 10; ++i){
-        if ((idt[i].offset_15_00 == NULL) &&
-            (idt[i].offset_31_16 == NULL)) {
-            tests_assert_fail();
-        }
+        TEST_ASSERT(idt[i].offset_15_00 || idt[i].offset_31_16);
     }
 }
 DEFINE_TEST(idt_entry_test);

@@ -11,7 +11,9 @@ static void rtc_handler(struct intr_info *info) {
     inb(0x71);
     NMI_enable();
 
-    printf("RTC\n");
+    // TODO: Remove after checkpoint 1. Provided in lib.c
+    void test_interrupts(void);
+    test_interrupts();
 }
 
 // TODO: Document frequency formula (Hz) = 32768 >> (rate - 1)
@@ -30,7 +32,7 @@ void rtc_change_rate(unsigned char rate) {
     // write only our rate to A. Note, rate is the bottom 4 bits.
     NMI_disable_select_register(0xA);
     outb((prev & 0xF0) | rate, RTC_IMR_PORT);
-    
+
     // enable NMI
     NMI_enable();
     restore_flags(flags);
@@ -46,7 +48,7 @@ static void init_rtc() {
     NMI_disable_select_register(0xB);
     // read the current value of register B
     char prev = inb(RTC_IMR_PORT);
-    
+
     // disable NMI and get initial value of register B
     NMI_disable_select_register(0xB);
     outb(prev | 0x40, RTC_IMR_PORT);

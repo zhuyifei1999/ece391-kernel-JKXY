@@ -47,7 +47,7 @@ void i8259_init(void) {
     outb_p(ICW4, SLAVE_8259_IMR_PORT);
 
     /* wait for 8259A to initialize */
-    udelay(100);        
+    udelay(100);
 
     // restore original masking
     outb(master_mask, MASTER_8259_IMR_PORT);
