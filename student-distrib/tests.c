@@ -16,18 +16,18 @@ static volatile struct intr_info saved_context;
 // This is like an syscall for tests
 static void intr_tests(struct intr_info *info) {
     switch (info->eax) {
-        case 0: // test failed, unwind stack
+        case _TEST_SYS_FAIL: // test failed, unwind stack
             _test_status = TEST_FAIL;
             info->eax = 2;
             intr_tests(info);
             break;
-        case 1: // save current execution context for future unwinding
+        case _TEST_SYS_SETJMP: // save current execution context for future unwinding
             saved_context = *info;
             info->eax = 0; // return 0 to indicate this is first run
             // return 1 to next time indicate that is is a result from stack unwinding
             saved_context.eax = 1;
             break;
-        case 2: // do stack unwinding
+        case _TEST_SYS_LONGJMP: // do stack unwinding
             *info = saved_context;
             break;
     }
@@ -52,7 +52,7 @@ void _test_fail_longjmp(struct intr_info *info) {
         info->eax = 0;
         intr_tests(info);
     } else {
-        asm volatile ("mov $0, %%eax; int %0" : : "i" (INTR_TEST) : "eax");
+        asm volatile ("mov %0, %%eax; int %1" : : "i"(_TEST_SYS_FAIL), "i" (INTR_TEST) : "eax");
     }
 }
 
@@ -61,7 +61,7 @@ void _test_longjmp(struct intr_info *info) {
         info->eax = 2;
         intr_tests(info);
     } else {
-        asm volatile ("mov $2, %%eax; int %0" : : "i" (INTR_TEST) : "eax");
+        asm volatile ("mov %0, %%eax; int %1" : : "i"(_TEST_SYS_LONGJMP), "i" (INTR_TEST) : "eax");
     }
 }
 
