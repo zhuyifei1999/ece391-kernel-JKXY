@@ -1,6 +1,7 @@
 #include "irq.h"
 #include "lib.h"
 #include "initcall.h"
+#include "tests.h"
 
 #define KEYBOARD_IRQ 1
 
@@ -145,3 +146,43 @@ static void init_keyboard() {
     set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
 }
 DEFINE_INITCALL(init_keyboard, early);
+
+
+#if RUN_TESTS
+/* keyborad Entry Test
+ *
+ * Asserts that first 10 IDT entries are not NULL
+ * Inputs: None
+ * Outputs: None
+ * Side Effects: None
+ * Coverage: keyboard scancode match
+ */
+static void keyboard_test() {
+    int i;
+    char c;
+    unsigned char test_scancode_lib[5] = { 0x11 , 0x13 , 0x1e, 0x1f , 0x20 };
+    unsigned char test_output_lib[10] = { 'w', 'r', 'a', 's', 'd', 'W', 'R', 'A', 'S', 'D'};
+    //testcase both shift and caps are 1 
+    shift = 1;
+    caps = 1;
+    for (i = 0; i < 5; i++) {
+        c = (shift ? upper_keyboard_map : lower_keyboard_map)[test_scancode_lib[i]];
+        TEST_ASSERT(c == test_output_lib[i]); 
+    }
+    //testcase both shift and caps are 0 
+    shift = 0;
+    caps = 0;
+    for (i = 0; i < 5; i++) {
+        c = (shift ? upper_keyboard_map : lower_keyboard_map)[test_scancode_lib[i]];
+        TEST_ASSERT(c == test_output_lib[i]); 
+    }
+    //testcase shift is 1 
+    shift = 1;
+    for (i = 0; i < 5; i++) {
+        c = (shift ? upper_keyboard_map : lower_keyboard_map)[test_scancode_lib[i]];
+        TEST_ASSERT(c == test_output_lib[i+5]); 
+    }
+
+}
+DEFINE_TEST(keyboard_test);
+#endif
