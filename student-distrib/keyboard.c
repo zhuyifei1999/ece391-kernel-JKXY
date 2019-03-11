@@ -100,6 +100,19 @@ static unsigned char upper_keyboard_map[128] = {
 static bool shift, ctrl, alt;
 static bool caps;
 
+// get the character given a scancode and the status of shift and caps
+static char scancode_to_char(unsigned char scancode, bool shift, bool caps) {
+    char c = (shift ? upper_keyboard_map : lower_keyboard_map)[scancode];
+    if (c) {
+        // swap the caps if the caps lock is on
+        if (caps && ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))) {
+            c = (shift ? lower_keyboard_map : upper_keyboard_map)[scancode];
+        }
+    };
+    return c;
+}
+
+// handle keyboard interrupt
 static void keyboard_handler(struct intr_info *info) {
     while (inb(0x64) & 1) {
         char raw_scancode = inb(0x60);
@@ -122,12 +135,8 @@ static void keyboard_handler(struct intr_info *info) {
         } else {
             // or else display it if it's not attached to the controls
             if (pressed && !ctrl && !alt) {
-                char c = (shift ? upper_keyboard_map : lower_keyboard_map)[scancode];
+                char c = scancode_to_char(scancode, shift, caps);
                 if (c) {
-                    // swap the caps if the caps lock is on
-                    if (caps && ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z'))) {
-                        c = (shift ? lower_keyboard_map : upper_keyboard_map)[scancode];
-                    }
                     putc(c);
                 } else {
                     printf("Key: 0x%x\n", scancode);
@@ -142,6 +151,7 @@ static void keyboard_handler(struct intr_info *info) {
     }
 }
 
+// keyboard initializatin
 static void init_keyboard() {
     set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
 }
@@ -149,40 +159,37 @@ DEFINE_INITCALL(init_keyboard, early);
 
 
 #if RUN_TESTS
-/* keyborad Entry Test
+/* keyboard Entry Test
  *
- * Asserts that first 10 IDT entries are not NULL
- * Inputs: None
- * Outputs: None
- * Side Effects: None
+ * Asserts that scancode caps-ing works correctly
  * Coverage: keyboard scancode match
  */
 static void keyboard_test() {
     int i;
-    char c;
     unsigned char test_scancode_lib[5] = { 0x11 , 0x13 , 0x1e, 0x1f , 0x20 };
     unsigned char test_output_lib[10] = { 'w', 'r', 'a', 's', 'd', 'W', 'R', 'A', 'S', 'D'};
-    //testcase both shift and caps are 1 
+    bool caps, shift;
+
+    // testcase both shift and caps are 1
     shift = 1;
     caps = 1;
     for (i = 0; i < 5; i++) {
-        c = (shift ? upper_keyboard_map : lower_keyboard_map)[test_scancode_lib[i]];
-        TEST_ASSERT(c == test_output_lib[i]); 
+        TEST_ASSERT(scancode_to_char(test_scancode_lib[i], shift, caps) == test_output_lib[i]);
     }
-    //testcase both shift and caps are 0 
+    return;
+
+    // testcase both shift and caps are 0
     shift = 0;
     caps = 0;
     for (i = 0; i < 5; i++) {
-        c = (shift ? upper_keyboard_map : lower_keyboard_map)[test_scancode_lib[i]];
-        TEST_ASSERT(c == test_output_lib[i]); 
-    }
-    //testcase shift is 1 
-    shift = 1;
-    for (i = 0; i < 5; i++) {
-        c = (shift ? upper_keyboard_map : lower_keyboard_map)[test_scancode_lib[i]];
-        TEST_ASSERT(c == test_output_lib[i+5]); 
+        TEST_ASSERT(scancode_to_char(test_scancode_lib[i], shift, caps) == test_output_lib[i]);
     }
 
+    // testcase shift is 1
+    shift = 1;
+    for (i = 0; i < 5; i++) {
+        TEST_ASSERT(scancode_to_char(test_scancode_lib[i], shift, caps) == test_output_lib[i+5]);
+    }
 }
 DEFINE_TEST(keyboard_test);
 #endif

@@ -12,6 +12,7 @@
 // #define likely(x)	__builtin_expect(!!(x), 1)
 // #define unlikely(x) __builtin_expect(!!(x), 0)
 
+// memory barrier
 #define barrier() asm volatile("mfence": : :"memory")
 
 #define noreturn __attribute__((__noreturn__))

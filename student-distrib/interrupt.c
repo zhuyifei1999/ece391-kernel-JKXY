@@ -95,9 +95,6 @@ DEFINE_INITCALL(init_IDT, early);
 /* IDT Entry Test
  *
  * Asserts that first 10 IDT entries are not NULL
- * Inputs: None
- * Outputs: None
- * Side Effects: None
  * Coverage: IDT definition
  */
 static void idt_entry_test() {
