@@ -61,6 +61,7 @@ void init_page()
 }
 
 #include "tests.h"
+#if RUN_TESTS
 /* Paging Test
  *
  * print Values contained in paging structures
@@ -95,8 +96,6 @@ static void paging_content_test()
 }
 DEFINE_TEST(paging_content_test);
 
-#include "tests.h"
-#if RUN_TESTS
 /* Page fault tests, good accesses
  *
  * Asserts that mapped pages do not generate any faults

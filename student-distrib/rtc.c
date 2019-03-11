@@ -23,7 +23,7 @@ static void rtc_handler(struct intr_info *info) {
 
     // TODO: Remove after checkpoint 1. Provided in lib.c
     void test_interrupts(void);
-    //test_interrupts();
+    test_interrupts();
 }
 
 // TODO: Document frequency formula (Hz) = 32768 >> (rate - 1)
