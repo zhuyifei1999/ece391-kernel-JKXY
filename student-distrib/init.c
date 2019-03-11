@@ -20,7 +20,7 @@
    pointed by ADDR. */
 asmlinkage noreturn
 void entry(unsigned long magic, unsigned long addr) {
-    multiboot_info_t *mbi;
+    struct multiboot_info *mbi;
 
     /* Clear the screen. */
     clear();
@@ -32,7 +32,7 @@ void entry(unsigned long magic, unsigned long addr) {
     }
 
     /* Set MBI to the address of the Multiboot information structure. */
-    mbi = (multiboot_info_t *) addr;
+    mbi = (struct multiboot_info *) addr;
 
     /* Print out the flags. */
     printf("flags = 0x%#x\n", (unsigned)mbi->flags);
@@ -52,7 +52,7 @@ void entry(unsigned long magic, unsigned long addr) {
     if (CHECK_FLAG(mbi->flags, 3)) {
         int mod_count = 0;
         int i;
-        module_t *mod = (module_t *)mbi->mods_addr;
+        struct multiboot_module *mod = (struct multiboot_module *)mbi->mods_addr;
         while (mod_count < mbi->mods_count) {
             printf("Module %d loaded at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_start);
             printf("Module %d ends at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_end);
@@ -73,7 +73,7 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Is the section header table of ELF valid? */
     if (CHECK_FLAG(mbi->flags, 5)) {
-        elf_section_header_table_t *elf_sec = &(mbi->elf_sec);
+        struct multiboot_elf_section_header_table *elf_sec = &(mbi->elf_sec);
         printf("elf_sec: num = %u, size = 0x%#x, addr = 0x%#x, shndx = 0x%#x\n",
                 (unsigned)elf_sec->num, (unsigned)elf_sec->size,
                 (unsigned)elf_sec->addr, (unsigned)elf_sec->shndx);
@@ -81,12 +81,12 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Are mmap_* valid? */
     if (CHECK_FLAG(mbi->flags, 6)) {
-        memory_map_t *mmap;
+        struct multiboot_memory_map *mmap;
         printf("mmap_addr = 0x%#x, mmap_length = 0x%x\n",
                 (unsigned)mbi->mmap_addr, (unsigned)mbi->mmap_length);
-        for (mmap = (memory_map_t *)mbi->mmap_addr;
+        for (mmap = (struct multiboot_memory_map *)mbi->mmap_addr;
                 (unsigned long)mmap < mbi->mmap_addr + mbi->mmap_length;
-                mmap = (memory_map_t *)((unsigned long)mmap + mmap->size + sizeof (mmap->size)))
+                mmap = (struct multiboot_memory_map *)((unsigned long)mmap + mmap->size + sizeof (mmap->size)))
             printf("    size = 0x%x, base_addr = 0x%#x%#x\n    type = 0x%x,  length    = 0x%#x%#x\n",
                     (unsigned)mmap->size,
                     (unsigned)mmap->base_addr_high,
@@ -98,7 +98,7 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Construct an LDT entry in the GDT */
     {
-        seg_desc_t the_ldt_desc;
+        struct seg_desc the_ldt_desc;
         the_ldt_desc.granularity = 0x0;
         the_ldt_desc.opsize      = 0x1;
         the_ldt_desc.reserved    = 0x0;
@@ -115,7 +115,7 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Construct a TSS entry in the GDT */
     {
-        seg_desc_t the_tss_desc;
+        struct seg_desc the_tss_desc;
         the_tss_desc.granularity   = 0x0;
         the_tss_desc.opsize        = 0x0;
         the_tss_desc.reserved      = 0x0;

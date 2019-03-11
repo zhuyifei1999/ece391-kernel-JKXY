@@ -27,7 +27,7 @@ struct intr_action intr_getaction(uint8_t intr_num) {
     /* we are just resolving address of the symbol here, prototype doesn't matter */ \
     extern void (*ISR_ ## intr ## _ ## suffix)(void); \
     uint32_t addr = (uint32_t)&ISR_ ## intr ## _ ## suffix; \
-    idt_desc_t *entry = &idt[intr]; \
+    struct idt_desc *entry = &idt[intr]; \
     entry->offset_15_00 = addr; \
     entry->offset_31_16 = addr >> 16; \
     entry->seg_selector = KERNEL_CS; \
