@@ -132,6 +132,11 @@ static void keyboard_handler(struct intr_info *info) {
                     printf("Key: 0x%x\n", scancode);
                 }
             }
+
+            // TODO: Remove this after checkpoint 1. CTRL-C cause a #PF
+            if (pressed && ctrl && lower_keyboard_map[scancode] == 'c') {
+                puts(NULL);
+            }
         }
     }
 }

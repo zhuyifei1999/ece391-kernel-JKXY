@@ -152,10 +152,6 @@ void entry(unsigned long magic, unsigned long addr) {
 
     init_page();
 
-    asm volatile ("int $0x80;");
-
-    // puts(NULL);
-
 #if RUN_TESTS
     /* Run tests */
     launch_tests();
@@ -163,7 +159,5 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Execute the first program ("shell") ... */
 
-    for (;;) asm volatile ("pause");
-
-    // abort();
+    for (;;) asm volatile ("hlt");
 }
