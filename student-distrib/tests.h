@@ -23,9 +23,8 @@
 #define TEST_OUTPUT(fn, result)    \
     printf("[TEST %s] Result = %s\n", #fn, (result) ? "PASS" : "FAIL")
 
-// make both a macro version and a non-macro version
-// _test_fail_unwind actually won't return, but we need to figure out how to tell GCC so
-extern void _test_fail_unwind(void);
+// these unwind / longjmp functions actually won't return, but we need to
+// figure out how to tell GCC so
 #define _test_fail_unwind() do { \
     asm volatile ("mov $0, %%eax; int %0" : : "i" (INTR_TEST) : "eax"); \
 } while (0)
@@ -37,6 +36,7 @@ static inline __attribute__((always_inline, returns_twice)) int _test_setjmp(voi
 }
 
 extern void _test_longjmp(struct intr_info *info);
+extern void _test_fail_longjmp(struct intr_info *info);
 
 volatile bool _test_status;
 
@@ -58,7 +58,7 @@ DEFINE_INITCALL(tests_ ## fn, tests)
 #define TEST_ASSERT_NOINTR(intr, code) do { \
     struct intr_action oldaction = intr_getaction(intr); \
     intr_setaction(intr, (struct intr_action){ \
-        .handler = (intr_handler_t *)&_test_fail_unwind } ); \
+        .handler = (intr_handler_t *)&_test_fail_longjmp } ); \
     code; \
     intr_setaction(intr, oldaction); \
 } while (0)

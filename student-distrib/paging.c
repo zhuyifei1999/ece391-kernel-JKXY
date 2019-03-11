@@ -124,6 +124,10 @@ DEFINE_TEST(page_fault_good);
 static void page_fault_bad() {
     volatile char a;
     TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({
+        // NULL pointer dereference
+        a = *(char *)NULL;
+    }));
+    TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({
         // before first byte of kernel
         a = *(char *)(KERNEL_ADDR - 1);
     }));

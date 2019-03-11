@@ -47,9 +47,13 @@ bool _test_wrapper(initcall_t *fn) {
     return _test_status;
 }
 
-// The non-macro version of test_fail just calls the macro
-void (_test_fail_unwind)(void) {
-    _test_fail_unwind();
+void _test_fail_longjmp(struct intr_info *info) {
+    if (info) {
+        info->eax = 0;
+        intr_tests(info);
+    } else {
+        asm volatile ("mov $0, %%eax; int %0" : : "i" (INTR_TEST) : "eax");
+    }
 }
 
 void _test_longjmp(struct intr_info *info) {

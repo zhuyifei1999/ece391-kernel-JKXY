@@ -75,12 +75,9 @@ DEFINE_INITCALL(init_rtc, early);
 
 #include "tests.h"
 #if RUN_TESTS
-/* Rtc Test
+/* RTC Test
  *
  * Test whether rtc interrupt interval is 500 ms
- * Inputs: None
- * Outputs: None
- * Side Effects: None
  */
 static void rtc_test() {
     int prev_time = rtc_ret;
@@ -97,6 +94,8 @@ static void rtc_test() {
             printf("    time_passed = %d s , rtc_interrupt_count = %d \n", time_passed, i);
             i++;
         }
+
+        asm volatile ("hlt" : : : "memory");
     }
 
     int interval = (time_passed * 1000) / (i - 1);
