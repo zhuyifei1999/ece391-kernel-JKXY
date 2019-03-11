@@ -10,6 +10,7 @@
 } \
 DEFINE_INITCALL(init_exc_ ## fn, early)
 
+// create stub exception handler
 #define STUB_EXC_HANDLER(fn_name, intr, mnemonic) \
 static void fn_name(struct intr_info *info) { \
     printf(mnemonic ": 0x%x", info->error_code); \
@@ -17,6 +18,7 @@ static void fn_name(struct intr_info *info) { \
 } \
 DEFINE_EXC_HANDLER(fn_name, intr)
 
+// initialize stub exception handlers
 STUB_EXC_HANDLER(divide_by_zero, INTR_EXC_DIVIDE_BY_ZERO_ERROR, "#DE");
 STUB_EXC_HANDLER(bound_range_exceeded, INTR_EXC_BOUND_RANGE_EXCEEDED, "#BR");
 STUB_EXC_HANDLER(invalid_opcode, INTR_EXC_INVALID_OPCODE, "#UD");
