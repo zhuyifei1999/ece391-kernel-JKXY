@@ -15,7 +15,7 @@
 #define VIDEO_ADDR  0xB8000     // vedio memory address
 
 struct page_dirctory {          // contains of page directory, 32 bits long
-    uint8_t  present       : 1; 
+    uint8_t  present       : 1;
     uint32_t rw            : 1;
     uint32_t user          : 1; // If the bit is set, then the page may be accessed by all
     uint32_t write_through : 1;
@@ -24,7 +24,7 @@ struct page_dirctory {          // contains of page directory, 32 bits long
     uint32_t reserved      : 1;
     uint32_t size          : 1;  // Page Size
     uint32_t ignored       : 1;
-    uint32_t avail         : 3; 
+    uint32_t avail         : 3;
     uint32_t addr    : 20;      // address of page table (4kB aligned)
 } __attribute__ ((packed));
 
