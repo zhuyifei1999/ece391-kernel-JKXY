@@ -54,7 +54,7 @@ void init_page() {
         "movl %%eax, %%cr0;"
         :                     /* no outputs */
         : "r"(page_directory) /* put page directory address into cr3 */
-        : "eax"               /* clobbered register */
+        : "eax", "cc"         /* clobbered register */
     );
     restore_flags(flags); // restore interrupts
 }
