@@ -100,7 +100,7 @@ static void rtc_test() {
 
     unsigned int init_count;
 
-    int expected_freq = RTC_RATE_TO_FREQ(rtc_get_rate());
+    int expected_freq = rtc_rate_to_freq(rtc_get_rate());
     printf("Expected RTC frequency = %d Hz\n", expected_freq);
 
     init_second = get_second();

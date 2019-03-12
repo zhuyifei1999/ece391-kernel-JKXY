@@ -7,7 +7,7 @@
 
 // frequency formula: (Hz) =
 
-#define RTC_RATE_TO_FREQ(rate) (32768 >> ((rate) - 1))
+#define rtc_rate_to_freq(rate) (32768 >> ((rate) - 1))
 
 // change the frequency of rtc interrupts
 void rtc_set_rate(unsigned char rate);
