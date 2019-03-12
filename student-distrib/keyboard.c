@@ -142,22 +142,6 @@ static void keyboard_handler(struct intr_info *info) {
                     printf("Key: 0x%x\n", scancode);
                 }
             }
-
-            // TODO: Remove this after checkpoint 1. This if for exception handler demo
-            if (pressed && ctrl && upper_keyboard_map[scancode] == 'P') {
-                // CTRL-P cause a #PF
-                puts(NULL);
-            } else if (pressed && ctrl && upper_keyboard_map[scancode] == 'G') {
-                // CTRL-G cause a #GP by calling unmapped interrupt
-                asm volatile ("int $0xFF");
-            } else if (pressed && ctrl && upper_keyboard_map[scancode] == 'Z') {
-                // CTRL-Z cause a #DE
-                volatile int a = 0;
-                a = 1 / a;
-            } else if (pressed && ctrl && upper_keyboard_map[scancode] == 'U') {
-                // CTRL-U cause a #DE
-                asm volatile ("ud2");
-            }
         }
     }
 }

@@ -5,7 +5,7 @@
 
 // some source from https://wiki.osdev.org/RTC
 
-static uint32_t rtc_ret, rtc_irq_count;
+static uint32_t rtc_irq_count;
 static void rtc_handler(struct intr_info *info) {
     unsigned long flags;
     cli_and_save(flags);
@@ -15,32 +15,23 @@ static void rtc_handler(struct intr_info *info) {
     inb(RTC_IMR_PORT);
     rtc_irq_count++;
 
-    // register 0 is seconds register
-    NMI_disable_select_register(0x0);
-    rtc_ret = inb(RTC_IMR_PORT);
-
     NMI_enable();
     restore_flags(flags);
-
-    // TODO: Remove after checkpoint 1. Provided in lib.c
-    void test_interrupts(void);
-    test_interrupts();
 }
 
-// TODO: Document frequency formula (Hz) = 32768 >> (rate - 1)
-void rtc_change_rate(unsigned char rate) {
+void rtc_set_rate(unsigned char rate) {
     unsigned long flags;
+    cli_and_save(flags);
+
     // rate must be above 2 and not over 15
     rate &= 0x0F;
-    // disable interrupt
-    cli_and_save(flags);
 
     // disable NMI and get initial value of register A
     NMI_disable_select_register(0xA);
     // read the current value of register A
     char prev = inb(RTC_IMR_PORT);
 
-    // write only our rate to A. Note, rate is the bottom 4 bits.
+    // write only our rate to A. rate is the bottom 4 bits.
     NMI_disable_select_register(0xA);
     outb((prev & 0xF0) | rate, RTC_IMR_PORT);
 
@@ -48,11 +39,25 @@ void rtc_change_rate(unsigned char rate) {
     restore_flags(flags);
 }
 
+unsigned char rtc_get_rate() {
+    unsigned long flags;
+    cli_and_save(flags);
+
+    // disable NMI and get initial value of register A
+    NMI_disable_select_register(0xA);
+    // read the current value of register A. rate is the bottom 4 bits.
+    char rate = inb(RTC_IMR_PORT) & 0xF;
+
+    NMI_enable();
+    restore_flags(flags);
+
+    return rate;
+}
+
 static void init_rtc() {
     unsigned long flags;
-
-    // disable interrupt
     cli_and_save(flags);
+
     set_irq_handler(RTC_IRQ, &rtc_handler);
 
     NMI_disable_select_register(0xB);
@@ -66,9 +71,8 @@ static void init_rtc() {
     NMI_enable();
     restore_flags(flags);
 
-    // FIXME: This is min frequency for demo in Checkpoint 1 so
-    // we don't flood the screen
-    rtc_change_rate(15);
+    // initialize to default 1024Hz
+    rtc_set_rate(6);
 }
 DEFINE_INITCALL(init_rtc, early);
 
@@ -78,30 +82,43 @@ DEFINE_INITCALL(init_rtc, early);
  *
  * Test whether rtc interrupt interval is 500 ms
  */
+static unsigned char get_second() {
+    unsigned long flags;
+    cli_and_save(flags);
+
+    // register 0 is seconds register
+    NMI_disable_select_register(0x0);
+    unsigned char seconds = inb(RTC_IMR_PORT);
+
+    NMI_enable();
+    restore_flags(flags);
+    return seconds;
+}
 testfunc
 static void rtc_test() {
-    int prev_time = rtc_ret;
-    int i = 0;
-    int time_passed = 0;
-    int rtc_irq_count_init = rtc_irq_count;
+    unsigned char init_second, test_second;
 
-    while (i < 25) {
-        if (rtc_ret != prev_time) {
-            time_passed++;
-            prev_time = rtc_ret;
-        }
-        if ((rtc_irq_count - rtc_irq_count_init) == i) {
-            printf("    time_passed = %d s , rtc_interrupt_count = %d \n", time_passed, i);
-            i++;
-        }
+    unsigned int init_count;
 
+    int expected_freq = RTC_RATE_TO_FREQ(rtc_get_rate());
+    printf("Expected RTC frequency = %d Hz\n", expected_freq);
+
+    init_second = get_second();
+    while ((test_second = get_second()) == init_second) {
+        asm volatile ("hlt" : : : "memory");
+    }
+    init_count = rtc_irq_count;
+
+    while (get_second() == test_second) {
         asm volatile ("hlt" : : : "memory");
     }
 
-    int interval = (time_passed * 1000) / (i - 1);
+    int actual_freq = rtc_irq_count - init_count;
 
-    printf("\n    rtc_interrupt_interval = %d ms\n", interval);
-    TEST_ASSERT(450 < interval && interval < 550);
+    printf("RTC interrupt frequency = %d Hz\n", actual_freq);
+
+    // The allowed range is 0.9 - 1.1 times expected value
+    TEST_ASSERT((expected_freq * 9 / 10) < actual_freq && actual_freq < (expected_freq * 11 / 10));
 }
 DEFINE_TEST(rtc_test);
 #endif

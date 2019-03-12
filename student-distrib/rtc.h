@@ -5,7 +5,12 @@
 #define RTC_IMR_PORT    0x71
 #define RTC_IRQ         8
 
+// frequency formula: (Hz) =
+
+#define RTC_RATE_TO_FREQ(rate) (32768 >> ((rate) - 1))
+
 // change the frequency of rtc interrupts
-void rtc_change_rate(unsigned char rate);
+void rtc_set_rate(unsigned char rate);
+unsigned char rtc_get_rate();
 
 #endif
