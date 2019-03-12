@@ -6,7 +6,7 @@
 #include "x86_desc.h"
 #include "lib.h"
 #include "initcall.h"
-#include "abort.h"
+#include "panic.h"
 #include "debug.h"
 #include "tests.h"
 #include "paging.h"
@@ -26,8 +26,7 @@ void entry(unsigned long magic, unsigned long addr) {
 
     /* Am I booted by a Multiboot-compliant boot loader? */
     if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
-        printf("Invalid magic number: 0x%#x\n", (unsigned)magic);
-        abort();
+        panic("Invalid magic number: 0x%#x\n", (unsigned)magic);
     }
 
     /* Set MBI to the address of the Multiboot information structure. */
@@ -66,8 +65,7 @@ void entry(unsigned long magic, unsigned long addr) {
     }
     /* Bits 4 and 5 are mutually exclusive! */
     if (CHECK_FLAG(mbi->flags, 4) && CHECK_FLAG(mbi->flags, 5)) {
-        printf("Both bits 4 and 5 are set.\n");
-        abort();
+        panic("Both bits 4 and 5 are set.\n");
     }
 
     /* Is the section header table of ELF valid? */

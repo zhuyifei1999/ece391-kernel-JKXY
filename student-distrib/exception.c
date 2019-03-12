@@ -1,8 +1,9 @@
 #include "types.h"
 #include "interrupt.h"
 #include "lib.h"
-#include "abort.h"
+#include "panic.h"
 #include "initcall.h"
+#include "compiler.h"
 
 #define DEFINE_EXC_HANDLER(fn, intr) static void init_exc_ ## fn() { \
     intr_setaction(intr, (struct intr_action){                       \
@@ -11,11 +12,10 @@
 DEFINE_INITCALL(init_exc_ ## fn, early)
 
 // create stub exception handler
-#define STUB_EXC_HANDLER(mnemonic, fn_name, intr) \
-static void fn_name(struct intr_info *info) {     \
-    printf(mnemonic ": 0x%x", info->error_code);  \
-    abort();                                      \
-}                                                 \
+#define STUB_EXC_HANDLER(mnemonic, fn_name, intr)      \
+static noreturn void fn_name(struct intr_info *info) { \
+    panic(mnemonic ": 0x%x", info->error_code);        \
+}                                                      \
 DEFINE_EXC_HANDLER(fn_name, intr)
 
 // initialize stub exception handlers
