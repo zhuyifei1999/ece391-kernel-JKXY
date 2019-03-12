@@ -25,9 +25,9 @@
    reserved by Intel */
 #define INTR_TEST 0x0F
 
-#define _TEST_HEADER(fn)     \
+#define _TEST_HEADER(fn)         \
     printf("[TEST %s] Running %s at %s\n", #fn, #fn, __FILE__)
-#define _TEST_OUTPUT(fn, result)    \
+#define _TEST_OUTPUT(fn, result) \
     printf("[TEST %s] Result = %s\n", #fn, (result) ? "PASS" : "FAIL")
 
 // these unwind / longjmp functions actually won't return, but we need to
@@ -58,38 +58,38 @@ bool _test_wrapper(initcall_t *fn);
 #define testfunc __attribute__((unused, section(".text.tests")))
 
 // define a test. this will add the test to initcall list
-#define DEFINE_TEST(fn) \
-static void tests_ ## fn() { \
-    _TEST_HEADER(fn); \
+#define DEFINE_TEST(fn)               \
+static void tests_ ## fn() {          \
+    _TEST_HEADER(fn);                 \
     bool result = _test_wrapper(&fn); \
-    _TEST_OUTPUT(fn, result); \
-} \
+    _TEST_OUTPUT(fn, result);         \
+}                                     \
 DEFINE_INITCALL(tests_ ## fn, tests)
 
 // test fail if a condition does not hold
-#define TEST_ASSERT(condition) do { \
+#define TEST_ASSERT(condition) do {        \
     if (!(condition)) _test_fail_unwind(); \
 } while (0)
 
 // test fail if interrupt is raised before code exits
-#define TEST_ASSERT_NOINTR(intr, code) do { \
-    struct intr_action oldaction = intr_getaction(intr); \
-    intr_setaction(intr, (struct intr_action){ \
+#define TEST_ASSERT_NOINTR(intr, code) do {                   \
+    struct intr_action oldaction = intr_getaction(intr);      \
+    intr_setaction(intr, (struct intr_action){                \
         .handler = (intr_handler_t *)&_test_fail_longjmp } ); \
-    code; \
-    intr_setaction(intr, oldaction); \
+    code;                                                     \
+    intr_setaction(intr, oldaction);                          \
 } while (0)
 
 // test fail if interrupt is not raised before code exits
-#define TEST_ASSERT_INTR(intr, code) do { \
+#define TEST_ASSERT_INTR(intr, code) do {                \
     struct intr_action oldaction = intr_getaction(intr); \
-    intr_setaction(intr, (struct intr_action){ \
+    intr_setaction(intr, (struct intr_action){           \
         .handler = (intr_handler_t *)&_test_longjmp } ); \
-    if (!_test_setjmp() && _test_status == TEST_PASS) { \
-        code; \
-        _test_status = TEST_FAIL; \
-    } \
-    intr_setaction(intr, oldaction); \
+    if (!_test_setjmp() && _test_status == TEST_PASS) {  \
+        code;                                            \
+        _test_status = TEST_FAIL;                        \
+    }                                                    \
+    intr_setaction(intr, oldaction);                     \
 } while (0)
 
 // test launcher

@@ -23,18 +23,17 @@ struct intr_action intr_getaction(uint8_t intr_num) {
     return intr_actions[intr_num];
 }
 
-#define _init_IDT_entry(intr, _type, _dpl, suffix) do { \
-    /* we are just resolving address of the symbol here, prototype doesn't matter */ \
-    extern void (*ISR_ ## intr ## _ ## suffix)(void); \
+#define _init_IDT_entry(intr, _type, _dpl, suffix) do {     \
+    extern void (*ISR_ ## intr ## _ ## suffix)(void);       \
     uint32_t addr = (uint32_t)&ISR_ ## intr ## _ ## suffix; \
-    struct idt_desc *entry = &idt[intr]; \
-    entry->offset_15_00 = addr; \
-    entry->offset_31_16 = addr >> 16; \
-    entry->seg_selector = KERNEL_CS; \
-    entry->size = 1; /* 32 bit handler */ \
-    entry->dpl = _dpl; \
-    entry->present = 1; \
-    entry->type = _type; \
+    struct idt_desc *entry = &idt[intr];                    \
+    entry->offset_15_00    = addr;                          \
+    entry->offset_31_16    = addr >> 16;                    \
+    entry->seg_selector    = KERNEL_CS;                     \
+    entry->size            = 1; /* 32 bit handler */        \
+    entry->dpl             = _dpl;                          \
+    entry->present         = 1;                             \
+    entry->type            = _type;                         \
 } while (0);
 #define init_IDT_entry(intr, _type, _dpl, suffix) _init_IDT_entry(intr, _type, _dpl, suffix)
 

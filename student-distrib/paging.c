@@ -7,9 +7,9 @@
  */
 __attribute__((aligned(LEN_4K))) static struct page_table video_page_table[LEN_1K] = {
     [PAGE_TABLE_IDX(VIDEO_ADDR)] = {
-        .present = 1,                   // it presents
-        .rw = 1,                        // can be read and write
-        .addr = MEM_4K_IDX(VIDEO_ADDR), // address of 4kb page
+        .present = 1,                      // it presents
+        .rw      = 1,                      // can be read and write
+        .addr    = MEM_4K_IDX(VIDEO_ADDR), // address of 4kb page
     }};
 
 /*  One Global Page dirctory
@@ -19,15 +19,15 @@ __attribute__((aligned(LEN_4K))) static struct page_dirctory page_directory[LEN_
     [PAGE_DIR_IDX(VIDEO_ADDR)] = {
         // actually 0
         .present = 1,
-        .rw = 1,
+        .rw      = 1,
     },
     [PAGE_DIR_IDX(KERNEL_ADDR)] = {
         // actually 1
         .present = 1,
-        .user = 0, // only kernel has access
-        .rw = 1,
-        .size = 1,                       // size = 1 means it points to a 4MB memory space rather than a page table
-        .addr = MEM_4K_IDX(KERNEL_ADDR), // set address to a 4MB page (aligned to 4kb)
+        .user    = 0, // only kernel has access
+        .rw      = 1,
+        .size    = 1, // size = 1 means it points to a 4MB memory space rather than a page table
+        .addr    = MEM_4K_IDX(KERNEL_ADDR), // set address to a 4MB page (aligned to 4kb)
     }};
 
 /*  init_page
@@ -45,10 +45,10 @@ void init_page() {
     // cr4 enables (Page Size Extension) PSE
     // cr0 enables paging
     asm volatile(
-        "movl %0, %%cr3;" //load CR3 with the address of the page directory
+        "movl %0, %%cr3;"         // load CR3 with the address of the page directory
         "movl %%cr4, %%eax;"
         "orl $0x00000010, %%eax;"
-        "movl %%eax, %%cr4;" // enable PSE (4 MiB pages) of %cr4
+        "movl %%eax, %%cr4;"      // enable PSE (4 MiB pages) of %cr4
         "movl %%cr0, %%eax;"
         "orl $0x80000000, %%eax;" // set the paging (PG) bits of %CR0
         "movl %%eax, %%cr0;"
@@ -56,7 +56,7 @@ void init_page() {
         : "r"(page_directory) /* put page directory address into cr3 */
         : "eax"               /* clobbered register */
     );
-    restore_flags(flags); //// restore interrupts
+    restore_flags(flags); // restore interrupts
 }
 
 #include "tests.h"
