@@ -1,7 +1,7 @@
-#include "irq.h"
-#include "lib.h"
-#include "initcall.h"
 #include "rtc.h"
+#include "../irq.h"
+#include "../lib.h"
+#include "../initcall.h"
 
 // some source from https://wiki.osdev.org/RTC
 
@@ -76,7 +76,7 @@ static void init_rtc() {
 }
 DEFINE_INITCALL(init_rtc, early);
 
-#include "tests.h"
+#include "../tests.h"
 #if RUN_TESTS
 /* RTC Test
  *

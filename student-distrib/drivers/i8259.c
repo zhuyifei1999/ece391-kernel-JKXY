@@ -3,9 +3,9 @@
  */
 
 #include "i8259.h"
-#include "lib.h"
-#include "delay.h"
-#include "initcall.h"
+#include "../lib.h"
+#include "../delay.h"
+#include "../initcall.h"
 
 /* Interrupt masks to determine which interrupts are enabled and disabled */
 uint8_t master_mask = 0xff & ~(1 << SLAVE_IRQ); /* IRQs 0-7  */

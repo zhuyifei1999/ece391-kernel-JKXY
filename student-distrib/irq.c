@@ -1,5 +1,5 @@
 #include "irq.h"
-#include "i8259.h"
+#include "drivers/i8259.h"
 #include "interrupt.h"
 #include "lib.h"
 
@@ -22,5 +22,5 @@ void set_irq_handler(unsigned int irq_num, intr_handler_t *handler) {
     irq_handlers[irq_num] = handler;
     intr_setaction(irq_num + INTR_IRQ_MIN, (struct intr_action){
         .handler = &irq_handler });
-    enable_irq(irq_num);
+    i8259_enable_irq(irq_num);
 }
