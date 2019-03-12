@@ -12,11 +12,12 @@ static void rtc_handler(struct intr_info *info) {
 
     // discard register C to we get interrupts again
     NMI_disable_select_register(0xC);
-    inb(0x71);
+    inb(RTC_IMR_PORT);
     rtc_irq_count++;
 
-    NMI_disable_select_register(0x00);
-    rtc_ret = inb(0x71);
+    // register 0 is seconds register
+    NMI_disable_select_register(0x0);
+    rtc_ret = inb(RTC_IMR_PORT);
 
     NMI_enable();
     restore_flags(flags);
@@ -43,7 +44,6 @@ void rtc_change_rate(unsigned char rate) {
     NMI_disable_select_register(0xA);
     outb((prev & 0xF0) | rate, RTC_IMR_PORT);
 
-    // enable NMI
     NMI_enable();
     restore_flags(flags);
 }
@@ -59,11 +59,10 @@ static void init_rtc() {
     // read the current value of register B
     char prev = inb(RTC_IMR_PORT);
 
-    // disable NMI and get initial value of register B
+    // disable NMI and enable RTC in register B
     NMI_disable_select_register(0xB);
     outb(prev | 0x40, RTC_IMR_PORT);
 
-    // enable NMI
     NMI_enable();
     restore_flags(flags);
 

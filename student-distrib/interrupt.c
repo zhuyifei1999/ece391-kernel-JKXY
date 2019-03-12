@@ -24,6 +24,7 @@ struct intr_action intr_getaction(uint8_t intr_num) {
 }
 
 #define _init_IDT_entry(intr, _type, _dpl, suffix) do {     \
+    /* function prototype don't matter here */              \
     extern void (*ISR_ ## intr ## _ ## suffix)(void);       \
     uint32_t addr = (uint32_t)&ISR_ ## intr ## _ ## suffix; \
     struct idt_desc *entry = &idt[intr];                    \
