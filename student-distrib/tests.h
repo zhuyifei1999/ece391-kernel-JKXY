@@ -11,7 +11,7 @@
 #include "types.h"
 #include "compiler.h"
 
-// anything prefixed with "_test" are for internal use only. just because they
+// anything prefixed with "_test_" are for internal use only. just because they
 // are exported doesn't mean you can call them.
 
 #define TEST_PASS true

@@ -9,7 +9,7 @@
 #include "panic.h"
 #include "debug.h"
 #include "tests.h"
-#include "paging.h"
+#include "mm/paging.h"
 
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */
@@ -147,7 +147,12 @@ void entry(unsigned long magic, unsigned long addr) {
     printf("Enabling Interrupts\n");
     sti();
 
-    init_page();
+    init_page(mbi);
+
+    #include "mm/kmalloc.h"
+    printf("Dynamic memory allocated at 0x%#x\n", (uint32_t)kmalloc(10));
+    printf("Dynamic memory allocated at 0x%#x\n", (uint32_t)alloc_pages(7, 0, GFP_USER));
+    printf("Dynamic memory allocated at 0x%#x\n", (uint32_t)alloc_pages(1, 2, GFP_USER));
 
 #if RUN_TESTS
     /* Run tests */
