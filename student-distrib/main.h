@@ -5,6 +5,6 @@
 
 extern struct task_struct *init_task;
 
-noreturn void switch_to_init_task(void);
+noreturn void exec_init_task(void);
 
 #endif

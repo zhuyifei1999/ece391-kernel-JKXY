@@ -85,8 +85,8 @@ static void init_IDT() {
     init_IDT_entry(INTR_TEST, IDT_TYPE_TRAP, KERNEL_DPL, nocode);
 #endif
 
-    init_IDT_entry(INTR_SYSCALL,   IDT_TYPE_TRAP, USER_DPL, nocode);
-    init_IDT_entry(INTR_SCHEDULER, IDT_TYPE_TRAP, KERNEL_DPL, nocode);
+    init_IDT_entry(INTR_SYSCALL,   IDT_TYPE_TRAP,      USER_DPL,   nocode);
+    init_IDT_entry(INTR_SCHEDULER, IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
 
     lidt(idt_desc_ptr);
 }

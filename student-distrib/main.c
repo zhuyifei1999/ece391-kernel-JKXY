@@ -7,7 +7,7 @@
 
 struct task_struct *init_task;
 
-static int init_task_fn(void *args) {
+static int main(void *args) {
     init_task = current;
     strcpy(init_task->comm, "swapper");
     init_task->ppid = 0;
@@ -29,10 +29,10 @@ static int init_task_fn(void *args) {
 }
 
 noreturn
-void switch_to_init_task(void) {
+void exec_init_task(void) {
     struct task_struct *task = kernel_thread(&init_task_fn, NULL);
     wake_up_process(task);
     schedule();
-    // The scheduiling will corrupt this stack. Boot context is unschedulable
+    // The scheduling will corrupt this stack. Boot context is unschedulable
     panic("Boot context reschduled.\n");
 }

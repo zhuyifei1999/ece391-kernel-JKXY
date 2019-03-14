@@ -8,7 +8,7 @@
 #include "initcall.h"
 #include "panic.h"
 #include "mm/paging.h"
-#include "init_task.h"
+#include "main.h"
 
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */
@@ -142,5 +142,5 @@ void entry(unsigned long magic, unsigned long addr) {
 
     init_page(mbi);
 
-    switch_to_init_task();
+    exec_init_task();
 }

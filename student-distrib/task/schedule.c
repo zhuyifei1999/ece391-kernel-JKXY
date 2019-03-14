@@ -6,6 +6,7 @@
 static void schedule_handler(struct intr_info *info) {
     current->return_regs = info;
     struct task_struct *task = (struct task_struct *)info->eax;
+    // TODO: For userspace, update TSS, page directory, flush TLB
     asm volatile (
         "mov %0,%%esp;"
         "jmp ISR_return;"
@@ -26,9 +27,11 @@ static void switch_to(struct task_struct *task) {
 }
 
 void schedule(void) {
+    // TODO: change to atomic variables
     static int pid = 0;
 
     while (1) {
+        cli();
         struct task_struct *task = tasks[pid++];
         if (pid > MAXPID)
             pid = 0;
@@ -37,6 +40,7 @@ void schedule(void) {
             switch_to(task);
             break;
         }
+        sti();
     }
 }
 

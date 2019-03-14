@@ -10,6 +10,7 @@
 struct task_struct *tasks[MAXPID];
 
 static uint16_t _next_pid() {
+    // TODO: change to atomic variables
     static uint16_t pid = 0;
     unsigned long flags;
 
