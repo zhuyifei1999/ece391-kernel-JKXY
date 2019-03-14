@@ -2,6 +2,7 @@
 #define _PAGING_H
 
 #include "../types.h"
+#include "../compiler.h"
 
 #define PAGE_IDX(val)       ((val) >> 12) // get the 4k aligned address of input memory address
 #define PAGE_DIR_IDX(val)   ((val) >> 22) // get the index in page directory of input memory address (high 10 bits)
@@ -131,7 +132,7 @@ typedef struct page_table_entry page_table_t[NUM_ENTRIES];
 
 void init_page();
 
-static inline __attribute__((always_inline))
+static inline __always_inline
 // struct page_directory_entry (*current_page_directory())[NUM_ENTRIES] {
 page_directory_t *current_page_directory() {
     page_directory_t *ret;

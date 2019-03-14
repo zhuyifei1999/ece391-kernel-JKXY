@@ -37,7 +37,8 @@
 } while (0)
 
 // returns 0 when context saved, returns 1 when context restored
-static inline __attribute__((always_inline, returns_twice)) int _test_setjmp(void) {
+__attribute__((returns_twice))
+static inline __always_inline int _test_setjmp(void) {
     int ret;
     asm volatile ("mov %1, %%eax; int %2" : "=a" (ret) : "i"(_TEST_SYS_SETJMP), "i" (INTR_TEST));
     return ret;

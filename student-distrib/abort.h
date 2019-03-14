@@ -16,7 +16,7 @@
 
 #include "compiler.h"
 
-static noreturn inline __attribute__((always_inline))
+static noreturn inline __always_inline
 void abort(void) {
     asm volatile ("cli");
     for (;;) asm volatile ("hlt");

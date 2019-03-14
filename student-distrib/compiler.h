@@ -22,5 +22,7 @@
 
 #define asmlinkage __attribute__((regparm(0)))
 
+#define __always_inline __attribute__((always_inline))
+
 #endif
 #endif
