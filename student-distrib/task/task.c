@@ -5,9 +5,11 @@
 #include "../x86_desc.h"
 #include "../lib.h"
 #include "../panic.h"
-#include "schedule.h"
+#include "../initcall.h"
+#include "sched.h"
 
-struct task_struct *tasks[MAXPID];
+// struct task_struct *tasks[MAXPID];
+struct linked_list tasks[PID_BUCKETS];
 
 static uint16_t _next_pid() {
     // TODO: change to atomic variables
@@ -33,13 +35,15 @@ static uint16_t next_pid() {
 }
 
 struct task_struct *get_task_from_pid(uint16_t pid) {
-    if (pid > MAXPID || !tasks[pid])
+    if (pid > MAXPID)
         return ERR_PTR(-ESRCH);
-    return tasks[pid];
-}
-
-void wake_up_process(struct task_struct *task) {
-    task->state = TASK_RUNNING;
+    struct list_node *node;
+    for_each(&tasks[pid & (PID_BUCKETS - 1)], node) {
+        struct task_struct *task = node->value;
+        if (task->pid == pid)
+            return task;
+    }
+    return ERR_PTR(-ESRCH);
 }
 
 // TODO: When we get userspace, merge with generic clone()
@@ -54,7 +58,7 @@ struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
         .ppid      = current->pid,
         .comm      = "kthread",
         .mm        = NULL,
-        .state     = TASK_SLEEP,
+        .state     = TASK_RUNNING,
         .subsystem = SUBSYSTEM_ECE391,
     };
 
@@ -71,7 +75,7 @@ struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
 
     task->return_regs = regs;
 
-    tasks[task->pid] = task;
+    list_insert_back(&tasks[task->pid & (PID_BUCKETS - 1)], task);
 
     return task;
 }
@@ -92,3 +96,11 @@ asmlinkage noreturn
 void kthread_execute(int (*fn)(void *data), void *data) {
     do_exit((*fn)(data));
 }
+
+static void init_tasks() {
+    int i;
+    for (i = 0; i < PID_BUCKETS; i++) {
+        list_init(&tasks[i]);
+    }
+}
+DEFINE_INITCALL(init_tasks, early);

@@ -1,6 +1,10 @@
-#include "schedule.h"
+#include "sched.h"
 #include "../interrupt.h"
 #include "../initcall.h"
+#include "../panic.h"
+#include "../lib.h"
+
+struct linked_list schedule_queue;
 
 // Actually, this won't return, but jump directly to ISR return
 static void schedule_handler(struct intr_info *info) {
@@ -21,33 +25,34 @@ static void switch_to(struct task_struct *task) {
     asm volatile (
         "int %1;"
         :
-        : "a"(task), "i"(INTR_SCHEDULER)
+        : "a"(task), "i"(INTR_SCHED)
         : "memory"
     );
 }
 
 void schedule(void) {
     // TODO: change to atomic variables
-    static int pid = 0;
+    if (current->state == TASK_RUNNING)
+        list_insert_back(&schedule_queue, current);
 
-    while (1) {
-        cli();
-        struct task_struct *task = tasks[pid++];
-        if (pid > MAXPID)
-            pid = 0;
-
-        if (task && task->state == TASK_RUNNING) {
-            switch_to(task);
-            break;
-        }
-        sti();
-    }
+    switch_to(list_pop_front(&schedule_queue));
 }
 
-static void init_scheduler() {
-    intr_setaction(INTR_SCHEDULER, (struct intr_action){
+void wake_up_process(struct task_struct *task) {
+    if (task->state != TASK_RUNNING)
+        panic("Can't schedule task %s at 0x%#x, task is not running\n",
+              task->comm,
+              (uint32_t)&task);
+
+    list_insert_back(&schedule_queue, task);
+}
+
+static void init_sched() {
+    list_init(&schedule_queue);
+
+    intr_setaction(INTR_SCHED, (struct intr_action){
         .handler = &schedule_handler } );
 
     // TODO: Do periodic scheduling
 }
-DEFINE_INITCALL(init_scheduler, early);
+DEFINE_INITCALL(init_sched, early);

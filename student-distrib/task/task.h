@@ -5,17 +5,21 @@
 #include "../mm/paging.h"
 #include "../compiler.h"
 #include "../interrupt.h"
+#include "../structure/list.h"
 
 #define MAXPID 32767  // See paging.h for explanation
 #define LOOPPID 16    // When MAXPID is reached, loop from here
+
+#define PID_BUCKETS 16 // number of buckets for PID
 
 struct mm_struct {
     page_directory_t *page_directory;
 };
 
 enum task_state {
-    TASK_SLEEP,
     TASK_RUNNING,
+    TASK_INTERRUPTABLE,
+    TASK_UNINTERRUPTABLE,
     TASK_ZOMBIE,
 };
 
@@ -56,9 +60,7 @@ struct task_struct *get_current(void) {
 
 #define current (get_current())
 
-extern struct task_struct *tasks[MAXPID];
-
-void wake_up_process(struct task_struct *task);
+extern struct linked_list tasks[PID_BUCKETS];
 
 struct task_struct *kernel_thread(int (*fn)(void *data), void *data);
 struct task_struct *get_task_from_pid(uint16_t pid);
