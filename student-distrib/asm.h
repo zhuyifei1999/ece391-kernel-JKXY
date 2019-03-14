@@ -3,8 +3,9 @@
 
 #ifdef ASM
 
-#define ENTRY(symbol) \
-.globl symbol;        \
+#define ENTRY(symbol)    \
+.globl symbol;           \
+.type symbol, @function; \
 symbol
 
 #endif

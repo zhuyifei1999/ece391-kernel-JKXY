@@ -6,12 +6,13 @@
 
 ENTRY(entry_task):
     test    %eax,%eax
-    je      userspace
+    je      1f
     // kthread
     push    %ebx
     push    %eax
     call    kthread_execute
     // won't return
 
-userspace:
+    // userspace
+1:
     // TODO

@@ -12,6 +12,10 @@ static int kernel_main(void *args) {
     strcpy(init_task->comm, "swapper");
     init_task->ppid = 0;
 
+    // if the schedule queue has anything, it's the boot context which
+    // wouldn't work if rescheduled.
+    list_pop_front(&schedule_queue);
+
     // Initialize drivers
     DO_INITCALL(drivers);
 
