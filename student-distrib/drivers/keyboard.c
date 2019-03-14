@@ -149,7 +149,7 @@ static void keyboard_handler(struct intr_info *info) {
 static void init_keyboard() {
     set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
 }
-DEFINE_INITCALL(init_keyboard, early);
+DEFINE_INITCALL(init_keyboard, drivers);
 
 #include "../tests.h"
 #if RUN_TESTS

@@ -4,17 +4,16 @@
 
 #include "interrupt.h"
 #include "x86_desc.h"
+#include "asm.h"
 
 .text
 
 // XXX: according to https://stackoverflow.com/a/12241105 there is no better
 // way to know which interrupt is being handled
 .macro  MAKE_ISR intr
-.globl  ISR_\intr\()_nocode
-ISR_\intr\()_nocode:
+ENTRY(ISR_\intr\()_nocode):
     pushl   $0
-.globl  ISR_\intr\()_hascode
-ISR_\intr\()_hascode:
+ENTRY(ISR_\intr\()_hascode):
     pushl   $\intr
     jmp     ISR_common
 .endm
@@ -25,6 +24,7 @@ ISR_common:
     cld
     call    do_interrupt
     add     $4,%esp
+ENTRY(ISR_return):
     popal
     add     $8,%esp
     iret

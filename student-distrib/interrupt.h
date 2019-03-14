@@ -23,9 +23,9 @@ struct intr_info {
     uint32_t eip;
     uint16_t cs;
     uint32_t eflags;
-    // QEMU interrupt does not seem to save ss:esp
-    // uint32_t esp;
-    // uint16_t ss;
+    // ss:esp is only saved on TSS / CS changes
+    uint32_t esp;
+    uint16_t ss;
 };
 
 // list source: https://wiki.osdev.org/Exceptions

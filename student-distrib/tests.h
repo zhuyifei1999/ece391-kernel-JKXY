@@ -40,7 +40,14 @@
 __attribute__((returns_twice))
 static inline __always_inline int _test_setjmp(void) {
     int ret;
-    asm volatile ("mov %1, %%eax; int %2" : "=a" (ret) : "i"(_TEST_SYS_SETJMP), "i" (INTR_TEST));
+    // pushing twice to make room for the unused ss:esp, but it breaks
+    asm volatile (
+        // "sub $8,%%esp;"
+        "mov %1, %%eax;"
+        "int %2;"
+        // "add $8,%%esp;"
+        : "=a" (ret)
+        : "i"(_TEST_SYS_SETJMP), "i" (INTR_TEST));
     return ret;
 }
 

@@ -7,9 +7,8 @@
 #include "lib.h"
 #include "initcall.h"
 #include "panic.h"
-#include "debug.h"
-#include "tests.h"
 #include "mm/paging.h"
+#include "init_task.h"
 
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */
@@ -137,29 +136,11 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Do early initialization calls */
     DO_INITCALL(early);
 
-    /* Initialize devices, memory, filesystem, enable device interrupts on the
-     * PIC, any other initialization stuff... */
-
     /* Enable interrupts */
-    /* Do not enable the following until after you have set up your
-     * IDT correctly otherwise QEMU will triple fault and simple close
-     * without showing you any output */
     printf("Enabling Interrupts\n");
     sti();
 
     init_page(mbi);
 
-    #include "mm/kmalloc.h"
-    printf("Dynamic memory allocated at 0x%#x\n", (uint32_t)kmalloc(10));
-    printf("Dynamic memory allocated at 0x%#x\n", (uint32_t)alloc_pages(7, 0, GFP_USER));
-    printf("Dynamic memory allocated at 0x%#x\n", (uint32_t)alloc_pages(1, 2, GFP_USER));
-
-#if RUN_TESTS
-    /* Run tests */
-    launch_tests();
-#endif
-
-    /* Execute the first program ("shell") ... */
-
-    for (;;) asm volatile ("hlt");
+    switch_to_init_task();
 }

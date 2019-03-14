@@ -74,7 +74,7 @@ static void init_rtc() {
     // initialize to default 1024Hz
     rtc_set_rate(6);
 }
-DEFINE_INITCALL(init_rtc, early);
+DEFINE_INITCALL(init_rtc, drivers);
 
 #include "../tests.h"
 #if RUN_TESTS

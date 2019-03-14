@@ -6,6 +6,7 @@
 #include "multiboot.h"
 #include "x86_desc.h"
 #include "abort.h"
+#include "asm.h"
 
 .text
     # Multiboot header (required for GRUB to boot us)
@@ -14,11 +15,10 @@
     .long -(MULTIBOOT_HEADER_MAGIC + MULTIBOOT_HEADER_FLAGS)
 
 # Entrypoint to the kernel
-.globl start, _start
 
 .align 4
-start:
-_start:
+ENTRY(start):
+ENTRY(_start):
     # Make sure interrupts are off
     cli
 
