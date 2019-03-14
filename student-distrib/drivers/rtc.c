@@ -94,7 +94,7 @@ static unsigned char get_second() {
     restore_flags(flags);
     return seconds;
 }
-testfunc
+__testfunc
 static void rtc_test() {
     unsigned char init_second, test_second;
 

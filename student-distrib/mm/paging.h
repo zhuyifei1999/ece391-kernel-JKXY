@@ -62,6 +62,8 @@
  * >0 = number of userspace processes mapping this memory
  * -1 = used by kernel, globally
  * -2 = unavailable
+ * Because the maximum 16 bit integer is 32767 ((1<<16)-1), we only support up
+ * to that number of processes.
  *
  * PAGE TABLES are global page tables for Kernel Heap
  */

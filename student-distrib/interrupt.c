@@ -97,7 +97,7 @@ DEFINE_INITCALL(init_IDT, early);
  * Asserts that first 10 IDT entries are not NULL
  * Coverage: IDT definition
  */
-testfunc
+__testfunc
 static void idt_entry_test() {
     int i;
     for (i = 0; i < 10; ++i){
@@ -111,7 +111,7 @@ DEFINE_TEST(idt_entry_test);
  * Asserts that interrupts occur and we can register the handlers properly
  * Coverage: Interrupt handlers can be registered
  */
-testfunc
+__testfunc
 static void idt_exc_registry() {
     TEST_ASSERT_INTR(INTR_IRQ2, ({
         asm volatile ("int %0" : : "i"(INTR_IRQ2));
@@ -131,7 +131,7 @@ DEFINE_TEST(idt_exc_registry);
  * Asserts uninitialized IDT entries cause a #GP and we can register a handler
  * Coverage: #GP handler can be registered, IDT for 0xFF is not initialized
  */
-testfunc
+__testfunc
 static void idt_uninitialized_GP() {
     TEST_ASSERT_INTR(INTR_EXC_GENERAL_PROTECTION_FAULT, ({
         asm volatile ("int $0xFF");
