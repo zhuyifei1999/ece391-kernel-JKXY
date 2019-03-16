@@ -1,7 +1,8 @@
 #ifndef _LIST_H
 #define _LIST_H
 
-#include "../types.h"
+#include "../lib/stdint.h"
+#include "../lib/stdbool.h"
 
 // This doublely linked list uses sentinel nodes for both first node
 // and last node

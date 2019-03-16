@@ -1,11 +1,12 @@
 #ifndef _TASK_H
 #define _TASK_H
 
-#include "../types.h"
+#include "../lib/stdint.h"
 #include "../mm/paging.h"
 #include "../compiler.h"
 #include "../interrupt.h"
 #include "../structure/list.h"
+#include "../structure/array.h"
 
 #define MAXPID 32767  // See paging.h for explanation
 #define LOOPPID 16    // When MAXPID is reached, loop from here

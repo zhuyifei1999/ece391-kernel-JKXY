@@ -1,5 +1,7 @@
 #include "paging.h"
-#include "../lib.h"
+#include "../lib/cli.h"
+#include "../lib/stdbool.h"
+#include "../lib/string.h"
 #include "../panic.h"
 #include "../multiboot.h"
 #include "../compiler.h"
@@ -534,7 +536,7 @@ static void paging_content_test() {
 
     printf("################################################\n");
 }
-DEFINE_TEST(paging_content_test);
+// DEFINE_TEST(paging_content_test);
 
 /* Page fault tests, good accesses
  *

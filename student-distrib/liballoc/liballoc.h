@@ -14,7 +14,7 @@
 // If we are told to not define our own size_t, then we skip the define.
 //#define _HAVE_UINTPTR_T
 //typedef    unsigned long    uintptr_t;
-#include "../types.h"
+#include "../lib/stdint.h"
 
 typedef uint32_t size_t;
 typedef uint32_t uintptr_t;

@@ -42,7 +42,7 @@ if (ALIGNMENT > 1) {                                                 \
 #define LIBALLOC_DEAD  0xdeaddead
 
 #if defined DEBUG || defined INFO
-#include "../lib.h"
+#include "../lib/stdio.h"
 
 #ifdef DEBUG
 #define debug_printf(...) printf(__VA_ARGS__)

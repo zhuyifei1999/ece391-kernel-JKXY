@@ -8,7 +8,9 @@
 // test infrastructure, supported by initcall & interrupts
 #include "initcall.h"
 #include "interrupt.h"
-#include "types.h"
+#include "lib/stdint.h"
+#include "lib/stdio.h"
+#include "lib/stdbool.h"
 #include "compiler.h"
 
 // anything prefixed with "_test_" are for internal use only. just because they

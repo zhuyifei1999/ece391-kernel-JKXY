@@ -3,7 +3,7 @@
 #include "../mm/paging.h"
 #include "../eflags.h"
 #include "../x86_desc.h"
-#include "../lib.h"
+#include "../lib/cli.h"
 #include "../panic.h"
 #include "../initcall.h"
 #include "sched.h"
@@ -38,7 +38,7 @@ struct task_struct *get_task_from_pid(uint16_t pid) {
     if (pid > MAXPID)
         return ERR_PTR(-ESRCH);
     struct list_node *node;
-    for_each(&tasks[pid & (PID_BUCKETS - 1)], node) {
+    list_for_each(&tasks[pid & (PID_BUCKETS - 1)], node) {
         struct task_struct *task = node->value;
         if (task->pid == pid)
             return task;

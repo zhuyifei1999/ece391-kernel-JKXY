@@ -4,10 +4,12 @@
  * vim:ts=4 noexpandtab
  */
 
-#ifndef _TYPES_H
-#define _TYPES_H
+#ifndef _STDINT_H
+#define _STDINT_H
 
+#ifndef NULL
 #define NULL 0
+#endif
 
 #ifndef ASM
 
@@ -21,10 +23,6 @@ typedef unsigned short uint16_t;
 typedef char int8_t;
 typedef unsigned char uint8_t;
 
-typedef _Bool bool;
-#define true 1
-#define false 0
-
 #endif /* ASM */
 
-#endif /* _TYPES_H */
+#endif /* _STDINT_H */

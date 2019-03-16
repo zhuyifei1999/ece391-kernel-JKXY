@@ -5,7 +5,7 @@
 
 #include "compiler.h"
 #include "abort.h"
-#include "lib.h"
+#include "lib/stdio.h"
 
 // this will print a panic message and call abort
 #define panic(...) do {                   \

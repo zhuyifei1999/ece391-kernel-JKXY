@@ -1,9 +1,17 @@
 #include "rtc.h"
 #include "../irq.h"
-#include "../lib.h"
+#include "../lib/cli.h"
+#include "../lib/io.h"
 #include "../initcall.h"
 
 // some source from https://wiki.osdev.org/RTC
+
+// enable NMI
+#define NMI_enable() outb(inb(0x70) & 0x7F, 0x70)
+
+// disable NMI
+#define NMI_disable() outb(inb(0x70) | 0x80, 0x70)
+#define NMI_disable_select_register(reg) outb((reg) | 0x80, 0x70)
 
 static uint32_t rtc_irq_count;
 static void rtc_handler(struct intr_info *info) {

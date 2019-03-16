@@ -1,4 +1,4 @@
-#include "lib.h"
+#include "lib/stdio.h"
 #include "interrupt.h"
 #include "x86_desc.h"
 #include "initcall.h"
@@ -29,13 +29,15 @@ struct intr_action intr_getaction(uint8_t intr_num) {
     extern void (*ISR_ ## intr ## _ ## suffix)(void);       \
     uint32_t addr = (uint32_t)&ISR_ ## intr ## _ ## suffix; \
     struct idt_desc *entry = &idt[intr];                    \
-    entry->offset_15_00 = addr;                             \
-    entry->offset_31_16 = addr >> 16;                       \
-    entry->seg_selector = KERNEL_CS;                        \
-    entry->size         = 1; /* 32 bit handler */           \
-    entry->dpl          = _dpl;                             \
-    entry->present      = 1;                                \
-    entry->type         = _type;                            \
+    *entry = (struct idt_desc){                             \
+        .offset_15_00 = addr,                               \
+        .offset_31_16 = addr >> 16,                         \
+        .seg_selector = KERNEL_CS,                          \
+        .size         = 1, /* 32 bit handler */             \
+        .dpl          = _dpl,                               \
+        .present      = 1,                                  \
+        .type         = _type,                              \
+    };                                                      \
 } while (0);
 #define init_IDT_entry(intr, _type, _dpl, suffix) _init_IDT_entry(intr, _type, _dpl, suffix)
 
