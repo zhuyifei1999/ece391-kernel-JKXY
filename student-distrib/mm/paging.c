@@ -11,8 +11,8 @@
 __attribute__((aligned(PAGE_SIZE_SMALL)))
 static page_table_t zero_page_table = {
     [PAGE_TABLE_IDX(VIDEO_ADDR)] = {
-        .present = 1,                      // it presents
-        .rw      = 1,                      // can be read and write
+        .present = 1,
+        .rw      = 1,                    // can be read and write
         .global  = 1,
         .addr    = PAGE_IDX(VIDEO_ADDR), // address of 4kb page
     },
@@ -79,7 +79,7 @@ static inline bool addition_is_safe(uint32_t a, uint32_t b) {
  */
 void init_page(struct multiboot_info __physaddr *mbi) {
     unsigned long flags;
-    cli_and_save(flags); // close interrupts
+    cli_and_save(flags);
 
     int i;
 
@@ -432,7 +432,11 @@ out:
     return ret;
 }
 
-void *request_page(void *page, uint32_t num, uint32_t gfp_flags) {
+void *request_page(void *page, void __physaddr *phys, uint32_t num, uint32_t gfp_flags) {
+    if (!(gfp_flags & GFP_USER))
+        return NULL; // There is no reason for the kernel to request a specific page
+
+
     return NULL;  // TODO
 }
 

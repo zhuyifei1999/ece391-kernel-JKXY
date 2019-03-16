@@ -1,6 +1,8 @@
 #include "list.h"
 #include "../lib.h"
 #include "../mm/kmalloc.h"
+#include "../err.h"
+#include "../errno.h"
 
 void list_init(struct linked_list *list) {
     *list = (struct linked_list){
@@ -17,15 +19,18 @@ void list_init(struct linked_list *list) {
     };
 }
 
-void list_insert_front(struct linked_list *list, void *value) {
+int32_t list_insert_front(struct linked_list *list, void *value) {
     unsigned long flags;
 
     if (!value)
-        return;
+        return -EINVAL;
+
+    struct list_node *node = kmalloc(sizeof(*node));
+    if (!node)
+        return -ENOMEM;
 
     cli_and_save(flags);
 
-    struct list_node *node = kmalloc(sizeof(*node));
     *node = (struct list_node){
         .value = value,
         .prev = &list->first,
@@ -36,16 +41,20 @@ void list_insert_front(struct linked_list *list, void *value) {
     node->next->prev = node;
 
     restore_flags(flags);
+    return 0;
 }
-void list_insert_back(struct linked_list *list, void *value) {
+int32_t list_insert_back(struct linked_list *list, void *value) {
     unsigned long flags;
 
     if (!value)
-        return;
+        return -EINVAL;
+
+    struct list_node *node = kmalloc(sizeof(*node));
+    if (!node)
+        return -ENOMEM;
 
     cli_and_save(flags);
 
-    struct list_node *node = kmalloc(sizeof(*node));
     *node = (struct list_node){
         .value = value,
         .prev = list->last.prev,
@@ -56,6 +65,7 @@ void list_insert_back(struct linked_list *list, void *value) {
     node->next->prev = node;
 
     restore_flags(flags);
+    return 0;
 }
 
 void *list_pop_front(struct linked_list *list) {
@@ -97,9 +107,12 @@ void *list_pop_back(struct linked_list *list) {
     return value;
 }
 
+bool list_isempty(struct linked_list *list) {
+    return list->first.next == &list->last;
+}
 bool list_contains(struct linked_list *list, void *value) {
     struct list_node *node;
-    for_each(list, node) {
+    list_for_each(list, node) {
         if (node->value == value)
             return true;
     }
@@ -111,7 +124,7 @@ void list_remove(struct linked_list *list, void *value) {
     cli_and_save(flags);
 
     struct list_node *node;
-    for_each(list, node) {
+    list_for_each(list, node) {
         if (node->value == value) {
             node->next->prev = node->prev;
             node->prev->next = node->next;

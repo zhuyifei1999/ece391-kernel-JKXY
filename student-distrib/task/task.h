@@ -16,6 +16,11 @@ struct mm_struct {
     page_directory_t *page_directory;
 };
 
+struct files_struct {
+    uint16_t next_fd;
+    struct array files;
+};
+
 enum task_state {
     TASK_RUNNING,
     TASK_INTERRUPTABLE,
@@ -33,6 +38,7 @@ struct task_struct {
     uint16_t ppid;
     char comm[16];
     struct mm_struct *mm;
+    struct files_struct files;
     struct intr_info *return_regs;
     enum task_state state;
     enum subsystem subsystem;

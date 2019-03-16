@@ -2,6 +2,7 @@
 #include "task/sched.h"
 #include "initcall.h"
 #include "panic.h"
+#include "structure/list.h"
 #include "tests.h"
 #include "lib.h"
 
@@ -27,8 +28,9 @@ static int kernel_main(void *args) {
     printf("init_task running with PID %d", current->pid);
 
     for (;;) {
+        while (list_isempty(schedule_queue))
+            asm volatile ("hlt" : : : "memory");
         schedule();
-        asm volatile ("hlt" : : : "memory");
     }
 }
 
