@@ -4,8 +4,8 @@
 #include "../err.h"
 #include "../errno.h"
 
-void list_init(struct linked_list *list) {
-    *list = (struct linked_list){
+void list_init(struct list *list) {
+    *list = (struct list){
         .first = {
             .value = NULL,
             .prev = NULL,
@@ -19,7 +19,7 @@ void list_init(struct linked_list *list) {
     };
 }
 
-int32_t list_insert_front(struct linked_list *list, void *value) {
+int32_t list_insert_front(struct list *list, void *value) {
     unsigned long flags;
 
     if (!value)
@@ -43,7 +43,7 @@ int32_t list_insert_front(struct linked_list *list, void *value) {
     restore_flags(flags);
     return 0;
 }
-int32_t list_insert_back(struct linked_list *list, void *value) {
+int32_t list_insert_back(struct list *list, void *value) {
     unsigned long flags;
 
     if (!value)
@@ -68,7 +68,7 @@ int32_t list_insert_back(struct linked_list *list, void *value) {
     return 0;
 }
 
-void *list_pop_front(struct linked_list *list) {
+void *list_pop_front(struct list *list) {
     unsigned long flags;
 
     if (list->first.next == &list->last)
@@ -87,7 +87,7 @@ void *list_pop_front(struct linked_list *list) {
 
     return value;
 }
-void *list_pop_back(struct linked_list *list) {
+void *list_pop_back(struct list *list) {
     unsigned long flags;
 
     if (list->first.next == &list->last)
@@ -107,10 +107,10 @@ void *list_pop_back(struct linked_list *list) {
     return value;
 }
 
-bool list_isempty(struct linked_list *list) {
+bool list_isempty(struct list *list) {
     return list->first.next == &list->last;
 }
-bool list_contains(struct linked_list *list, void *value) {
+bool list_contains(struct list *list, void *value) {
     struct list_node *node;
     list_for_each(list, node) {
         if (node->value == value)
@@ -119,7 +119,7 @@ bool list_contains(struct linked_list *list, void *value) {
 
     return false;
 }
-void list_remove(struct linked_list *list, void *value) {
+void list_remove(struct list *list, void *value) {
     unsigned long flags;
     cli_and_save(flags);
 

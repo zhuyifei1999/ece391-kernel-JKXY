@@ -6,7 +6,7 @@
 
 #define INTR_SCHED 0x81
 
-extern struct linked_list schedule_queue;
+extern struct list schedule_queue;
 
 void schedule(void);
 

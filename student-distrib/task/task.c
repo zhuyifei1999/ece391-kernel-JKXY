@@ -9,7 +9,7 @@
 #include "sched.h"
 
 // struct task_struct *tasks[MAXPID];
-struct linked_list tasks[PID_BUCKETS];
+struct list tasks[PID_BUCKETS];
 
 static uint16_t _next_pid() {
     // TODO: change to atomic variables
