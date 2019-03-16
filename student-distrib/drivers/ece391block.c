@@ -1,3 +1,4 @@
+/*
 #include "ece391block.h"
 #include "../errno.h"
 
@@ -49,3 +50,4 @@ int32_t ece391block_seek(struct file *file, int32_t offset, enum seek_whence whe
     current_seek = new_seek;
     return new_seek - addr_start;
 }
+*/

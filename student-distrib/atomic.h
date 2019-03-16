@@ -1,15 +1,15 @@
 #ifndef _ATOMIC_H
 #define _ATOMIC_H
 
-#include "lib.h"
-#include "types.h"
+#include "lib/cli.h"
+#include "lib/stdint.h"
 #include "compiler.h"
 
 // This is typedef-ed because this should never be accessed outside of accessor
 // methods
 typedef struct {
     int32_t val;
-} atomic_t __attribute__("packed");
+} atomic_t;
 
 static inline __always_inline int32_t atomic_read(atomic_t *var) {
     return *(volatile int32_t *)var;

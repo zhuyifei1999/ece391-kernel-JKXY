@@ -212,6 +212,11 @@ int32_t strncmp(const int8_t *s1, const int8_t *s2, uint32_t n) {
     return 0;
 }
 
+// strcmp without limit
+int32_t strcmp(const int8_t *s1, const int8_t *s2) {
+    return strncmp(s1,s2, (uint32_t)-1);
+}
+
 /* int8_t *strcpy(int8_t *dest, const int8_t *src)
  * Inputs:      int8_t *dest = destination string of copy
  *         const int8_t *src = source string of copy
@@ -244,4 +249,14 @@ int8_t *strncpy(int8_t *dest, const int8_t *src, uint32_t n) {
         i++;
     }
     return dest;
+}
+
+// Find char in string. if not found, return NULL
+char *strchr(char *s, char c) {
+    while (*s) {
+        if (*s == c)
+            return s;
+        s++;
+    }
+    return NULL;
 }

@@ -1,7 +1,7 @@
 #ifndef _FILE_H
 #define _FILE_H
 
-#include "../types.h"
+#include "../lib/stdint.h"
 #include "../atomic.h"
 
 // #define O_RDONLY 0x0
@@ -13,6 +13,8 @@
 #define O_TRUNC 0x200
 #define O_APPEND 0x400
 #define O_CLOEXEC 0x80000
+
+#define AT_FDCWD -100 // Means openat should use CWD
 
 struct inode;
 struct file;
@@ -34,7 +36,7 @@ struct file_operations {
 };
 
 struct inode_operations {
-    // struct file_operations * default_file_ops;
+    struct file_operations * default_file_ops;
     int32_t (*create) (struct inode *,const char *,int32_t,int32_t,struct inode **);
     int32_t (*lookup) (struct inode *,const char *,int32_t,struct inode **);
     int32_t (*link) (struct inode *,struct inode *,const char *,int32_t);
@@ -49,13 +51,13 @@ struct inode_operations {
     // int32_t (*readpage) (struct inode *, struct page *);
     // int32_t (*writepage) (struct inode *, struct page *);
     // int32_t (*bmap) (struct inode *,int32_t);
-    // void (*truncate) (struct inode *);
+    void (*truncate) (struct inode *);
     // int32_t (*permission) (struct inode *, int32_t);
     // int32_t (*smap) (struct inode *,int32_t);
 };
 
 struct inode {
-    atomic_t count;
+    atomic_t refcount;
     void *vendor;
     const struct inode_operations *op;
 
@@ -83,22 +85,23 @@ struct inode {
 };
 
 struct file {
-    atomic_t count;
+    atomic_t refcount;
+    void *vendor;
     const struct file_operations *op;
 
-    struct path path;
+    struct path *path;
     uint32_t flags;
-    uint32_t mode;
+    // uint32_t mode;
     uint32_t pos;
     // struct fown_struct owner;
     // uint32_t uid, gid;
     // struct file_ra_state ra;
 
-    void *vendor;
 
     // struct address_space *mapping;
 };
 
-struct file *filp_open(char *path, uint32_t flags);
+struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, int16_t mode);
+struct file *filp_open(char *path, uint32_t flags, int16_t mode);
 
 #endif

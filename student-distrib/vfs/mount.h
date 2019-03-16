@@ -1,24 +1,20 @@
 #ifndef _MOUNT_H
 #define _MOUNT_H
 
+#include "superblock.h"
 #include "../structure/list.h"
-#include "../types.h"
+#include "../lib/stdint.h"
 
-struct dentry;
 struct path;
-struct file;
+struct inode;
 
-struct vfsmount {
-    struct dentry *root;
-};
-
-struct mounttable_entry {
-    struct vfsmount mnt;
-    struct path path;
+struct mount {
+    struct inode *root;
+    struct path *path;
 };
 
 extern struct list mounttable;
 
-int32_t do_mount(struct file *dev, struct struct super_block_operations *sb_op, struct path *path);
+int32_t do_mount(struct file *dev, struct super_block_operations *sb_op, struct path *path);
 
 #endif

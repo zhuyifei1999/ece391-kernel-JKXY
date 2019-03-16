@@ -68,6 +68,19 @@ int32_t list_insert_back(struct list *list, void *value) {
     return 0;
 }
 
+void *list_peek_front(struct list *list) {
+    if (list->first.next == &list->last)
+        return NULL;
+
+    return list->first.next->value;
+}
+void *list_peek_back(struct list *list) {
+    if (list->first.next == &list->last)
+        return NULL;
+
+    return list->last.prev->value;
+}
+
 void *list_pop_front(struct list *list) {
     unsigned long flags;
 
@@ -107,6 +120,11 @@ void *list_pop_back(struct list *list) {
     return value;
 }
 
+void list_destroy(struct list *list) {
+    while (!list_isempty(list)) {
+        list_pop_back(list);
+    }
+}
 bool list_isempty(struct list *list) {
     return list->first.next == &list->last;
 }

@@ -4,6 +4,7 @@
 #include "panic.h"
 #include "structure/list.h"
 #include "tests.h"
+#include "vfs/file.h"
 #include "lib/string.h"
 #include "lib/stdio.h"
 
@@ -13,6 +14,9 @@ static int kernel_main(void *args) {
     init_task = current;
     strcpy(init_task->comm, "swapper");
     init_task->ppid = 0;
+
+    // TODO: do root mount
+    // init_task->cwd = filp_open('/', O_RDWR, 0);
 
     // if the schedule queue has anything, it's the boot context which
     // wouldn't work if rescheduled.
