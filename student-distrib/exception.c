@@ -1,6 +1,4 @@
-#include "types.h"
 #include "interrupt.h"
-#include "lib.h"
 #include "panic.h"
 #include "initcall.h"
 #include "compiler.h"

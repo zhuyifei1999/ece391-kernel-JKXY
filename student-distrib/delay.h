@@ -1,6 +1,8 @@
 #ifndef _DELAY_H
 #define _DELAY_H
 
+#include "lib/stdint.h"
+
 /*
  * io_delay
  *   DESCRIPTION: delay for about 1 us

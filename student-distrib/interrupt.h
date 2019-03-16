@@ -5,7 +5,7 @@
 
 #ifndef ASM
 
-#include "types.h"
+#include "lib/stdint.h"
 #include "x86_desc.h"
 #include "compiler.h"
 

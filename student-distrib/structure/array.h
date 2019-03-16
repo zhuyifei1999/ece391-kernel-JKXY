@@ -1,7 +1,7 @@
 #ifndef _ARRAY_H
 #define _ARRAY_H
 
-#include "../types.h"
+#include "../lib/stdint.h"
 
 struct array {
     uint32_t size;

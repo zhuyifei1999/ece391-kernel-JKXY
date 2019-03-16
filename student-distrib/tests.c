@@ -1,6 +1,7 @@
 #include "tests.h"
 #include "x86_desc.h"
-#include "lib.h"
+#include "lib/cli.h"
+#include "lib/stdio.h"
 #include "interrupt.h"
 
 #if RUN_TESTS

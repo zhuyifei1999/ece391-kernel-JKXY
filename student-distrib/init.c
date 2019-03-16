@@ -4,7 +4,8 @@
 
 #include "multiboot.h"
 #include "x86_desc.h"
-#include "lib.h"
+#include "lib/stdio.h"
+#include "lib/cli.h"
 #include "initcall.h"
 #include "panic.h"
 #include "mm/paging.h"

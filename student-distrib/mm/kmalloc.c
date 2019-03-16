@@ -1,6 +1,6 @@
 // Functions needed by liballoc
 
-#include "../lib.h"
+#include "../lib/cli.h"
 #include "paging.h"
 
 void liballoc_lock(unsigned long *flags) {

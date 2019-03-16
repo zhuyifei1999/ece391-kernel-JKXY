@@ -1,7 +1,7 @@
 #ifndef _PAGING_H
 #define _PAGING_H
 
-#include "../types.h"
+#include "../lib/stdint.h"
 #include "../compiler.h"
 
 #define PAGE_IDX(val)       ((val) >> 12) // get the 4k aligned address of input memory address

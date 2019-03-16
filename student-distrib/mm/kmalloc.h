@@ -3,7 +3,7 @@
 #ifndef _KMALLOC_H
 #define _KMALLOC_H
 
-#include "../types.h"
+#include "../lib/stdint.h"
 
 #ifndef ASM
 

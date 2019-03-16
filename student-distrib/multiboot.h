@@ -13,7 +13,7 @@
 #ifndef ASM
 
 /* Types */
-#include "types.h"
+#include "lib/stdint.h"
 
 /* The Multiboot header. */
 struct multiboot_header {

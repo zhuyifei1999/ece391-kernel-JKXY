@@ -1,7 +1,7 @@
 #ifndef _ECE391BLOCK_H
 #define _ECE391BLOCK_H
 
-#include "../types.h"
+#include "../lib/stdint.h"
 
 enum seek_whence {
     SEEK_SET,

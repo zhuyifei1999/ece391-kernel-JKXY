@@ -1,7 +1,7 @@
 #include "irq.h"
 #include "drivers/i8259.h"
 #include "interrupt.h"
-#include "lib.h"
+#include "lib/stdio.h"
 
 // set up the array to function pointer
 static intr_handler_t *irq_handlers[IRQ_NUM];

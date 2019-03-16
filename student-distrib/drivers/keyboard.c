@@ -1,5 +1,7 @@
 #include "../irq.h"
-#include "../lib.h"
+#include "../lib/stdio.h"
+#include "../lib/stdbool.h"
+#include "../lib/io.h"
 #include "../initcall.h"
 
 #define KEYBOARD_IRQ 1

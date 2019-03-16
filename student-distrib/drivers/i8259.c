@@ -3,7 +3,8 @@
  */
 
 #include "i8259.h"
-#include "../lib.h"
+#include "../lib/io.h"
+#include "../lib/cli.h"
 #include "../delay.h"
 #include "../initcall.h"
 

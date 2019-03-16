@@ -4,7 +4,8 @@
 // Adapted from <include/linux/err.h>
 
 #include "errno.h"
-#include "types.h"
+#include "lib/stdint.h"
+#include "lib/stdbool.h"
 
 #define IS_ERR_VALUE(x) ((uint32_t)(void *)(x) >= (uint32_t)-MAX_ERRNO)
 

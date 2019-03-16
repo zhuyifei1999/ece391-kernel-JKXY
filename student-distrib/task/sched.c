@@ -2,7 +2,6 @@
 #include "../interrupt.h"
 #include "../initcall.h"
 #include "../panic.h"
-#include "../lib.h"
 
 struct linked_list schedule_queue;
 

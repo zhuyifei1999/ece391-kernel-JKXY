@@ -4,7 +4,8 @@
 #include "panic.h"
 #include "structure/list.h"
 #include "tests.h"
-#include "lib.h"
+#include "lib/string.h"
+#include "lib/stdio.h"
 
 struct task_struct *init_task;
 
@@ -28,7 +29,7 @@ static int kernel_main(void *args) {
     printf("init_task running with PID %d", current->pid);
 
     for (;;) {
-        while (list_isempty(schedule_queue))
+        while (list_isempty(&schedule_queue))
             asm volatile ("hlt" : : : "memory");
         schedule();
     }

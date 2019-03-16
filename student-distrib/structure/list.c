@@ -1,5 +1,5 @@
 #include "list.h"
-#include "../lib.h"
+#include "../lib/cli.h"
 #include "../mm/kmalloc.h"
 #include "../err.h"
 #include "../errno.h"
