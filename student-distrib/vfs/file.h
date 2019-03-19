@@ -53,8 +53,8 @@ struct file;
 
 struct file_operations {
     int32_t (*seek)(struct file *, int32_t, int32_t);
-    int32_t (*read)(struct file *, char *, int32_t);
-    int32_t (*write)(struct file *, const char *, int32_t);
+    int32_t (*read)(struct file *, char *, uint32_t);
+    int32_t (*write)(struct file *, const char *, uint32_t);
     // int32_t (*readdir)(struct file *, void *, filldir_t); // TODO: define filldir_t
     // int32_t (*select)(struct file *, int32_t, select_table *);
     // int32_t (*ioctl)(struct file *, unsigned int32_t, unsigned long);
@@ -69,16 +69,16 @@ struct file_operations {
 
 struct inode_operations {
     struct file_operations *default_file_ops;
-    int32_t (*create)(struct inode *,const char *,int32_t,int32_t,struct inode **);
-    int32_t (*lookup)(struct inode *,const char *,int32_t,struct inode **);
-    int32_t (*link)(struct inode *,struct inode *,const char *,int32_t);
-    int32_t (*unlink)(struct inode *,const char *,int32_t);
-    int32_t (*symlink)(struct inode *,const char *,int32_t,const char *);
-    int32_t (*mkdir)(struct inode *,const char *,int32_t,int32_t);
-    int32_t (*rmdir)(struct inode *,const char *,int32_t);
-    int32_t (*mknod)(struct inode *,const char *,int32_t,int32_t,int32_t);
-    int32_t (*rename)(struct inode *,const char *,int32_t,struct inode *,const char *,int32_t);
-    int32_t (*readlink)(struct inode *,char *,int32_t);
+    int32_t (*create)(struct inode *,const char *,uint32_t,uint16_t,struct inode **);
+    int32_t (*lookup)(struct inode *,const char *,uint32_t,struct inode **);
+    // int32_t (*link)(struct inode *,struct inode *,const char *,int32_t);
+    // int32_t (*unlink)(struct inode *,const char *,int32_t);
+    // int32_t (*symlink)(struct inode *,const char *,int32_t,const char *);
+    // int32_t (*mkdir)(struct inode *,const char *,int32_t,int32_t);
+    // int32_t (*rmdir)(struct inode *,const char *,int32_t);
+    // int32_t (*mknod)(struct inode *,const char *,int32_t,int32_t,int32_t);
+    // int32_t (*rename)(struct inode *,const char *,int32_t,struct inode *,const char *,int32_t);
+    // int32_t (*readlink)(struct inode *,char *,int32_t);
     // int32_t (*follow_link)(struct inode *,struct inode *,int32_t,int32_t,struct inode **);
     // int32_t (*readpage)(struct inode *, struct page *);
     // int32_t (*writepage)(struct inode *, struct page *);
@@ -98,13 +98,14 @@ struct inode {
     uint32_t nlink;
     // uint32_t uid;
     // uint32_t gid;
+    uint32_t rdev;
     uint32_t size;
     // struct timespec atime;
     // struct timespec mtime;
     // struct timespec ctime;
     // uint32_t blocks;
     // unsigned short bytes;
-    // umode_t mode;
+    uint16_t mode;
     struct super_block *sb;
     // struct address_space *mapping;
     // struct address_space data;
@@ -138,8 +139,17 @@ struct file {
 void fill_default_file_op(struct file_operations *file_op);
 void fill_default_ino_op(struct inode_operations *ino_op);
 
-struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, int16_t mode);
-struct file *filp_open(char *path, uint32_t flags, int16_t mode);
-struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, int16_t mode);
+struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode);
+struct file *filp_open(char *path, uint32_t flags, uint16_t mode);
+struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode);
+
+int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence);
+int32_t default_file_read(struct file *file, char *buf, uint32_t nbytes);
+int32_t default_file_write(struct file *file, const char *buf, uint32_t nbytes);
+int32_t default_file_open(struct file *file, struct inode *inode);
+void default_file_release(struct file *file);
+int32_t default_ino_create(struct inode *inode, const char *name, uint32_t flags, uint16_t mode, struct inode **next);
+int32_t default_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next);
+void default_ino_truncate(struct inode *inode);
 
 #endif

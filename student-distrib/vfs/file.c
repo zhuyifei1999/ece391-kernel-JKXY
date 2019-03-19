@@ -19,7 +19,7 @@ void inode_decref(struct inode *inode) {
     (*inode->sb->op->put_inode)(inode);
 }
 
-struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, int16_t mode) {
+struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
     struct path *path_rel = path_fromstr(path);
     if (IS_ERR(path_rel))
         return ERR_CAST(path_rel);
@@ -123,11 +123,11 @@ out_rel:
     return ret;
 }
 
-struct file *filp_open(char *path, uint32_t flags, int16_t mode) {
+struct file *filp_open(char *path, uint32_t flags, uint16_t mode) {
     return filp_openat(AT_FDCWD, path, flags, mode);
 }
 
-struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, int16_t mode) {
+struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     struct file_operations *file_op = get_dev_file_op(mode, dev);
     if (!file_op)
         return ERR_PTR(-ENXIO);
@@ -143,6 +143,8 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, int16_t mode) {
         ret = ERR_CAST(inode);
         goto out_destroy_path;
     }
+    inode->rdev = dev;
+    inode->mode = mode;
 
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
@@ -174,8 +176,9 @@ out_destroy_path:
 }
 
 
-static int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
+int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
     int32_t new_pos;
+    uint32_t size = file->inode->size;
 
     switch (whence) {
     case SEEK_SET:
@@ -185,49 +188,49 @@ static int32_t default_file_seek(struct file *file, int32_t offset, int32_t when
         new_pos = file->pos + offset;
         break;
     case SEEK_END:
-        new_pos = file->inode->size + offset;
+        new_pos = size + offset;
         break;
     default:
         return -EINVAL;
     }
 
-    if (new_pos >= file->inode->size || new_pos < 0)
+    if (new_pos >= size || new_pos < 0)
         return -EINVAL;
     file->pos = new_pos;
     return new_pos;
 }
-static int32_t default_file_read(struct file *file, char *buf, int32_t nbytes) {
+int32_t default_file_read(struct file *file, char *buf, uint32_t nbytes) {
     return -EINVAL;
 }
-static int32_t default_file_write(struct file *file, const char *buf, int32_t nbytes) {
+int32_t default_file_write(struct file *file, const char *buf, uint32_t nbytes) {
     return -EINVAL;
 }
-static int32_t default_file_open(struct file *file, struct inode *inode) {
+int32_t default_file_open(struct file *file, struct inode *inode) {
     file->pos = 0;
     file->inode = inode;
     atomic_inc(&inode->refcount);
     return 0;
 }
-static void default_file_release(struct file *file) {
+void default_file_release(struct file *file) {
     inode_decref(file->inode);
 }
 
-static int32_t default_ino_create(struct inode *inode, const char *name, int32_t flags, int32_t mode, struct inode **next) {
+int32_t default_ino_create(struct inode *inode, const char *name, uint32_t flags, uint16_t mode, struct inode **next) {
     return -EROFS;
 }
-static int32_t default_ino_lookup(struct inode *inode, const char *name, int32_t flags, struct inode **next) {
+int32_t default_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next) {
     return -ENOENT;
 }
 // TODO:
-// static int32_t default_ino_link(struct inode *inode, struct inode *, const char *, int32_t);
-// static int32_t default_ino_unlink(struct inode *inode, const char *, int32_t);
-// static int32_t default_ino_symlink(struct inode *inode, const char *, int32_t, const char *);
-// static int32_t default_ino_mkdir(struct inode *inode, const char *, int32_t, int32_t);
-// static int32_t default_ino_rmdir(struct inode *inode, const char *, int32_t);
-// static int32_t default_ino_mknod(struct inode *inode, const char *, int32_t, int32_t, int32_t);
-// static int32_t default_ino_rename(struct inode *inode, const char *, int32_t, struct inode *, const char *, int32_t);
-// static int32_t default_ino_readlink(struct inode *inode, char *, int32_t);
-static void default_ino_truncate(struct inode *inode) {
+// int32_t default_ino_link(struct inode *inode, struct inode *, const char *, int32_t);
+// int32_t default_ino_unlink(struct inode *inode, const char *, int32_t);
+// int32_t default_ino_symlink(struct inode *inode, const char *, int32_t, const char *);
+// int32_t default_ino_mkdir(struct inode *inode, const char *, int32_t, int32_t);
+// int32_t default_ino_rmdir(struct inode *inode, const char *, int32_t);
+// int32_t default_ino_mknod(struct inode *inode, const char *, int32_t, int32_t, int32_t);
+// int32_t default_ino_rename(struct inode *inode, const char *, int32_t, struct inode *, const char *, int32_t);
+// int32_t default_ino_readlink(struct inode *inode, char *, int32_t);
+void default_ino_truncate(struct inode *inode) {
 }
 
 void fill_default_file_op(struct file_operations *file_op) {

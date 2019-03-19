@@ -8,6 +8,7 @@
 #include "lib/cli.h"
 #include "initcall.h"
 #include "panic.h"
+#include "block/initrd_b.h"
 #include "mm/paging.h"
 #include "main.h"
 
@@ -61,6 +62,8 @@ void entry(unsigned long magic, unsigned long addr) {
             printf("\n");
             mod_count++;
             mod++;
+
+            load_initrd_addr((void *)mod->mod_start, mod->mod_end - mod->mod_start);
         }
     }
     /* Bits 4 and 5 are mutually exclusive! */
