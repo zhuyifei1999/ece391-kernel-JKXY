@@ -83,11 +83,38 @@ static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes)
     }
 }
 
+int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next) {
+    struct ece391fs_boot_block *boot_block = inode->sb->vendor;
+    int i;
+    for (i = 0; i < boot_block->num_dentry; i++) {
+        struct ece391fs_dentry *dentry = &boot_block->dentries[i];
+        if (!strncmp(dentry->name, name, sizeof(dentry->name))) {
+            *next = kmalloc(sizeof(**next));
+            if (!next)
+                return -ENOMEM;
+            **next = (struct inode) {
+                .sb = inode->sb,
+                .vendor = dentry,
+            };
+            atomic_set(&(*next)->refcount, 1);
+
+            int32_t res = (*inode->sb->op->read_inode)(*next);
+            if (res < 0) {
+                kfree(*next);
+                return res;
+            }
+            return 0;
+        }
+    }
+    return -ENOENT;
+}
+
 struct file_operations ece391fs_file_op = {
     .read = &ece391fs_file_read,
 };
 struct inode_operations ece391fs_ino_op = {
     .default_file_ops = &ece391fs_file_op,
+    .lookup = &ece391fs_ino_lookup,
 };
 
 static int32_t ece391fs_init(struct super_block *sb, struct file *dev) {
