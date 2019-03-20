@@ -238,6 +238,9 @@ int32_t filp_close(struct file *file) {
 }
 
 int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
+    if ((file->inode->mode & S_IFMT) != S_IFREG)
+        return -ESPIPE;
+
     int32_t new_pos;
     uint32_t size = file->inode->size;
 
