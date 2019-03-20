@@ -33,6 +33,8 @@ static int kernel_main(void *args) {
     struct file *initrd_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
     do_mount(initrd_block, get_sb_op_by_name("ece391fs"), &root_path);
 
+    init_task->cwd = filp_open("/", 0, 0);
+
 #if RUN_TESTS
     /* Run tests */
     launch_tests();

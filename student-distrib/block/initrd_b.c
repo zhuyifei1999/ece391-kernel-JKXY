@@ -4,7 +4,6 @@
 #include "../vfs/device.h"
 #include "../errno.h"
 #include "../initcall.h"
-#include "../tests.h"
 
 struct initrd_entry {
     char *start_addr;
@@ -72,6 +71,7 @@ static void init_initrd_block() {
 }
 DEFINE_INITCALL(init_initrd_block, drivers);
 
+#include "../tests.h"
 #if RUN_TESTS
 #define TEST_BUF_SIZE 16
 #define INITRD_SIZE 0x7c000

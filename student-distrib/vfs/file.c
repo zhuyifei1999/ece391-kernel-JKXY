@@ -28,7 +28,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
 
     char *first_component = list_peek_front(&path_rel->components);
     struct path *path_premount;
-    if (first_component) {
+    if (*first_component) {
         // relative path
         struct file *rel;
         if (dfd == AT_FDCWD) {
@@ -68,6 +68,10 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
 
     struct list_node *node;
     list_for_each(&path_dest->components, node) {
+        char *component = node->value;
+        if (!*component)
+            continue;
+
         struct inode *next_inode;
         int32_t res = (*inode->op->lookup)(inode, node->value, flags, &next_inode);
         // create the file if asked to

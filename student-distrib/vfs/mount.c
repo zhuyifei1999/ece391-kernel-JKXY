@@ -14,6 +14,9 @@ int32_t do_mount(struct file *dev, struct super_block_operations *sb_op, struct 
     if (!super_block)
         return -ENOMEM;
     int32_t res;
+    *super_block = (struct super_block){
+        .op = sb_op,
+    };
     res = (*sb_op->init)(super_block, dev);
     if (res < 0)
         goto err_free_sb;
