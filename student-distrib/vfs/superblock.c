@@ -8,24 +8,24 @@
 
 struct list sb_op_registry;
 
-static int32_t default_sb_init(struct super_block *sb, struct file *dev) {
+int32_t default_sb_init(struct super_block *sb, struct file *dev) {
     // sb->op set by caller
     sb->dev = dev;
     atomic_inc(&dev->refcount);
     return 0;
 }
-static int32_t default_sb_read_inode(struct inode *inode) {
+int32_t default_sb_read_inode(struct inode *inode) {
     return -ENOENT;
 }
-static int32_t default_sb_write_inode(struct inode *inode) {
+int32_t default_sb_write_inode(struct inode *inode) {
     return -EROFS;
 }
-static void default_sb_put_inode(struct inode *inode) {
+void default_sb_put_inode(struct inode *inode) {
     kfree(inode);
 }
-static void default_sb_put_super(struct super_block *sb) {
+void default_sb_put_super(struct super_block *sb) {
 }
-static int32_t default_sb_write_super(struct super_block *sb) {
+int32_t default_sb_write_super(struct super_block *sb) {
     return -EROFS;
 }
 

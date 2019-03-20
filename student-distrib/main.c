@@ -5,6 +5,10 @@
 #include "structure/list.h"
 #include "tests.h"
 #include "vfs/file.h"
+#include "vfs/device.h"
+#include "vfs/superblock.h"
+#include "vfs/path.h"
+#include "vfs/mount.h"
 #include "lib/string.h"
 #include "lib/stdio.h"
 
@@ -24,6 +28,10 @@ static int kernel_main(void *args) {
 
     // Initialize drivers
     DO_INITCALL(drivers);
+
+    // device (1, 0) is 0th initrd
+    struct file *initrd_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
+    do_mount(initrd_block, get_sb_op_by_name("ece391fs"), &root_path);
 
 #if RUN_TESTS
     /* Run tests */

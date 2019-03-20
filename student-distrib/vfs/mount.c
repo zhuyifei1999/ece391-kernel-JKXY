@@ -21,7 +21,7 @@ int32_t do_mount(struct file *dev, struct super_block_operations *sb_op, struct 
     struct inode *root = kmalloc(sizeof(*root));
     if (!root) {
         res = -ENOMEM;
-        goto err_free_sb;
+        goto err_put_sb;
     }
     *root = (struct inode) {
         .sb = super_block,
@@ -63,6 +63,9 @@ err_destoy_path:
 err_free_root:
     kfree(root);
 
+err_put_sb:
+    (*sb_op->put_super)(super_block);
+
 err_free_sb:
     kfree(super_block);
 
@@ -73,4 +76,4 @@ out:
 static void init_mount() {
     list_init(&mounttable);
 }
-DEFINE_INITCALL(init_mount, devices);
+DEFINE_INITCALL(init_mount, drivers);

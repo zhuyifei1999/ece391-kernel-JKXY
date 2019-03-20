@@ -179,17 +179,49 @@ out_destroy_path:
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
     return (*file->op->seek)(file, offset, whence);
 }
-int32_t filp_read(struct file *file, char *buf, uint32_t nbytes) {
+int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
+    char *buf_char = buf;
+
     if ((file->flags & O_WRONLY))
         return -EINVAL;
-    return (*file->op->read)(file, buf, nbytes);
+
+    return (*file->op->read)(file, buf_char, nbytes);
+
+    // int32_t bytes_read = 0;
+    // while (nbytes) {
+    //     int32_t res = (*file->op->read)(file, buf_char, nbytes);
+    //     if (res < 0)
+    //         return res;
+    //     else if (!res)
+    //         break;
+    //     nbytes -= res;
+    //     bytes_read += res;
+    //     buf_char += res;
+    // }
+    // return bytes_read;
 }
-int32_t filp_write(struct file *file, const char *buf, uint32_t nbytes) {
+int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes) {
+    const char *buf_char = buf;
+
     if (!(file->flags & O_WRONLY) && !(file->flags & O_RDWR))
         return -EINVAL;
     if (file->flags & O_APPEND)
         filp_seek(file, 0, SEEK_END);
-    return (*file->op->write)(file, buf, nbytes);
+
+    return (*file->op->write)(file, buf_char, nbytes);
+
+    // int32_t bytes_written = 0;
+    // while (nbytes) {
+    //     int32_t res = (*file->op->write)(file, buf_char, nbytes);
+    //     if (res < 0)
+    //         return res;
+    //     else if (!res)
+    //         break;
+    //     nbytes -= res;
+    //     bytes_written += res;
+    //     buf_char += res;
+    // }
+    // return bytes_written;
 }
 int32_t filp_close(struct file *file) {
     int32_t refcount = atomic_dec(&file->refcount);

@@ -27,9 +27,17 @@ struct super_block_operations {
 struct super_block {
     struct super_block_operations *op;
     struct file *dev;
+    void *vendor;
 };
 
 extern struct list sb_op_registry;
+
+int32_t default_sb_init(struct super_block *sb, struct file *dev);
+int32_t default_sb_read_inode(struct inode *inode);
+int32_t default_sb_write_inode(struct inode *inode);
+void default_sb_put_inode(struct inode *inode);
+void default_sb_put_super(struct super_block *sb);
+int32_t default_sb_write_super(struct super_block *sb);
 
 int32_t register_sb_op(struct super_block_operations *sb_op);
 
