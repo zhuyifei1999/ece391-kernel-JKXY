@@ -192,10 +192,14 @@ int32_t filp_write(struct file *file, const char *buf, uint32_t nbytes) {
     return (*file->op->write)(file, buf, nbytes);
 }
 int32_t filp_close(struct file *file) {
-    // TODO
+    int32_t refcount = atomic_dec(&file->refcount);
+    if (refcount)
+        return 0;
+
+    (*file->op->release)(file);
+    kfree(file);
     return 0;
 }
-
 
 int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
     int32_t new_pos;
@@ -233,6 +237,7 @@ int32_t default_file_open(struct file *file, struct inode *inode) {
     return 0;
 }
 void default_file_release(struct file *file) {
+    path_destroy(file->path);
     inode_decref(file->inode);
 }
 

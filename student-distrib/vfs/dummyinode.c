@@ -42,4 +42,4 @@ static void init_dummyinode() {
     fill_default_ino_op(&dummy_ino_op);
     register_sb_op(&dummy_sb_op);
 }
-DEFINE_INITCALL(init_dummyinode, devices);
+DEFINE_INITCALL(init_dummyinode, drivers);
