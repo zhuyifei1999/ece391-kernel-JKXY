@@ -33,7 +33,7 @@ bool list_contains(struct list *list, void *value);
 void list_remove(struct list *list, void *value);
 
 #define list_for_each(list, node) for ( \
-    node = &(list)->first;              \
+    node = (list)->first.next;          \
     node->value;                        \
     node = node->next                   \
 )

@@ -3,6 +3,8 @@
 
 #include "../structure/list.h"
 
+// Path is an immutable object from the mount point to the file
+
 struct mount;
 
 struct path {

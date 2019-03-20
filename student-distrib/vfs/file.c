@@ -154,6 +154,7 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     *ret = (struct file){
         .op = file_op,
         .path = path_dest,
+        // TODO: change flags according to mode
         .flags = flags,
     };
     atomic_set(&ret->refcount, 1);
@@ -173,6 +174,26 @@ out_destroy_path:
         path_destroy(path_dest);
 
     return ret;
+}
+
+int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
+    return (*file->op->seek)(file, offset, whence);
+}
+int32_t filp_read(struct file *file, char *buf, uint32_t nbytes) {
+    if ((file->flags & O_WRONLY))
+        return -EINVAL;
+    return (*file->op->read)(file, buf, nbytes);
+}
+int32_t filp_write(struct file *file, const char *buf, uint32_t nbytes) {
+    if (!(file->flags & O_WRONLY) && !(file->flags & O_RDWR))
+        return -EINVAL;
+    if (file->flags & O_APPEND)
+        filp_seek(file, 0, SEEK_END);
+    return (*file->op->write)(file, buf, nbytes);
+}
+int32_t filp_close(struct file *file) {
+    // TODO
+    return 0;
 }
 
 

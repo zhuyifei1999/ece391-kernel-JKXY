@@ -4,6 +4,7 @@
 #include "../vfs/device.h"
 #include "../errno.h"
 #include "../initcall.h"
+#include "../tests.h"
 
 struct initrd_entry {
     char *start_addr;
@@ -69,4 +70,24 @@ void load_initrd_addr(char *start_addr, uint32_t size) {
 static void init_initrd_block() {
     register_dev(S_IFBLK, MKDEV(INITRD_DEV_MAJOR, 0), &initrd_dev_op);
 }
-DEFINE_INITCALL(init_initrd_block, drovers);
+DEFINE_INITCALL(init_initrd_block, drivers);
+
+#if RUN_TESTS
+#define TEST_BUF_SIZE 16
+#define INITRD_SIZE 0x7c000
+#include "../err.h"
+// test that reading initrd works as expected
+__testfunc
+static void initrd_block_test() {
+    struct file *dev = filp_open_anondevice(MKDEV(INITRD_DEV_MAJOR, 0), 0, S_IFBLK | 0666);
+    char buf[TEST_BUF_SIZE];
+    TEST_ASSERT(!IS_ERR(dev));
+    TEST_ASSERT(filp_read(dev, buf, TEST_BUF_SIZE) == TEST_BUF_SIZE);
+    TEST_ASSERT(!strncmp(buf, "\x11\0\0\0\x40\0\0\0\x3b\0\0\0\0\0\0\0", TEST_BUF_SIZE));
+    TEST_ASSERT(filp_seek(dev, -TEST_BUF_SIZE, SEEK_END) == INITRD_SIZE - TEST_BUF_SIZE);
+    TEST_ASSERT(filp_read(dev, buf, TEST_BUF_SIZE) == TEST_BUF_SIZE);
+    TEST_ASSERT(!strncmp(buf, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", TEST_BUF_SIZE));
+    TEST_ASSERT(!filp_close(dev));
+}
+DEFINE_TEST(initrd_block_test);
+#endif

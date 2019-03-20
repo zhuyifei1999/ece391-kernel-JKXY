@@ -59,11 +59,10 @@ void entry(unsigned long magic, unsigned long addr) {
             for (i = 0; i < 16; i++) {
                 printf("0x%x ", *((char *)(mod->mod_start+i)));
             }
+            load_initrd_addr((void *)mod->mod_start, mod->mod_end - mod->mod_start);
             printf("\n");
             mod_count++;
             mod++;
-
-            load_initrd_addr((void *)mod->mod_start, mod->mod_end - mod->mod_start);
         }
     }
     /* Bits 4 and 5 are mutually exclusive! */

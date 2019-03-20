@@ -143,6 +143,11 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
 struct file *filp_open(char *path, uint32_t flags, uint16_t mode);
 struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode);
 
+int32_t filp_seek(struct file *file, int32_t offset, int32_t whence);
+int32_t filp_read(struct file *file, char *buf, uint32_t nbytes);
+int32_t filp_write(struct file *file, const char *buf, uint32_t nbytes);
+int32_t filp_close(struct file *file);
+
 int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence);
 int32_t default_file_read(struct file *file, char *buf, uint32_t nbytes);
 int32_t default_file_write(struct file *file, const char *buf, uint32_t nbytes);
