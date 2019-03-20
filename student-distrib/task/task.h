@@ -7,6 +7,7 @@
 #include "../interrupt.h"
 #include "../structure/list.h"
 #include "../structure/array.h"
+#include "../vfs/file.h"
 
 #define MAXPID 32767  // See paging.h for explanation
 #define LOOPPID 16    // When MAXPID is reached, loop from here
@@ -39,6 +40,7 @@ struct task_struct {
     uint16_t ppid;
     char comm[16];
     struct mm_struct *mm;
+    struct file *cwd;
     struct files_struct files;
     struct intr_info *return_regs;
     enum task_state state;
@@ -67,7 +69,7 @@ struct task_struct *get_current(void) {
 
 #define current (get_current())
 
-extern struct linked_list tasks[PID_BUCKETS];
+extern struct list tasks[PID_BUCKETS];
 
 struct task_struct *kernel_thread(int (*fn)(void *data), void *data);
 struct task_struct *get_task_from_pid(uint16_t pid);

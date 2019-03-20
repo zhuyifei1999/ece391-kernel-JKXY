@@ -8,6 +8,7 @@
 #include "lib/cli.h"
 #include "initcall.h"
 #include "panic.h"
+#include "block/initrd_b.h"
 #include "mm/paging.h"
 #include "main.h"
 
@@ -58,6 +59,7 @@ void entry(unsigned long magic, unsigned long addr) {
             for (i = 0; i < 16; i++) {
                 printf("0x%x ", *((char *)(mod->mod_start+i)));
             }
+            load_initrd_addr((void *)mod->mod_start, mod->mod_end - mod->mod_start);
             printf("\n");
             mod_count++;
             mod++;

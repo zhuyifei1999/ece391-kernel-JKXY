@@ -11,11 +11,11 @@ static inline int8_t bsr(uint32_t in) {
         return -1;
 
     uint32_t out;
-    asm volatile ("bsrl %1,%0" : "=r"(out) : "m"(in) : "cc");
+    asm volatile ("bsrl %1,%0" : "=r"(out) : "rm"(in) : "cc");
     return out;
 }
 
-void *array_get(struct array *arr, uint32_t index, void *value) {
+void *array_get(struct array *arr, uint32_t index) {
     if (index >= arr->size)
         return NULL;
 

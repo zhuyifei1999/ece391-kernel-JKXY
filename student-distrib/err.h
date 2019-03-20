@@ -25,4 +25,10 @@ static inline bool IS_ERR_OR_NULL(const void *ptr) {
 	return (!ptr) || IS_ERR_VALUE((uint32_t)ptr);
 }
 
+// cast away the pointer type in errors
+static inline void * ERR_CAST(const void *ptr) {
+	/* cast away the const */
+	return (void *) ptr;
+}
+
 #endif

@@ -3,7 +3,7 @@
 #include "../initcall.h"
 #include "../panic.h"
 
-struct linked_list schedule_queue;
+struct list schedule_queue;
 
 // Actually, this won't return, but jump directly to ISR return
 static void schedule_handler(struct intr_info *info) {

@@ -9,7 +9,7 @@ struct array {
 };
 
 uint32_t array_set(struct array *arr, uint32_t index, void *value);
-void *array_get(struct array *arr, uint32_t index, void *value);
+void *array_get(struct array *arr, uint32_t index);
 void array_destroy(struct array *arr);
 
 #define array_for_each(arr, index) for ( \

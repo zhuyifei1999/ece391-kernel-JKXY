@@ -4,6 +4,11 @@
 #include "panic.h"
 #include "structure/list.h"
 #include "tests.h"
+#include "vfs/file.h"
+#include "vfs/device.h"
+#include "vfs/superblock.h"
+#include "vfs/path.h"
+#include "vfs/mount.h"
 #include "lib/string.h"
 #include "lib/stdio.h"
 
@@ -14,12 +19,21 @@ static int kernel_main(void *args) {
     strcpy(init_task->comm, "swapper");
     init_task->ppid = 0;
 
+    // TODO: do root mount
+    // init_task->cwd = filp_open('/', O_RDWR, 0);
+
     // if the schedule queue has anything, it's the boot context which
     // wouldn't work if rescheduled.
     list_pop_front(&schedule_queue);
 
     // Initialize drivers
     DO_INITCALL(drivers);
+
+    // device (1, 0) is 0th initrd
+    struct file *initrd_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
+    do_mount(initrd_block, get_sb_op_by_name("ece391fs"), &root_path);
+
+    init_task->cwd = filp_open("/", 0, 0);
 
 #if RUN_TESTS
     /* Run tests */
