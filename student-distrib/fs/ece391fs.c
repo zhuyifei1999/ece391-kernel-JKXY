@@ -28,35 +28,61 @@ struct ece391fs_boot_block {
     }  __attribute__((packed)) dentries[];
 } __attribute__((packed));
 
+// These are just here so that are are acting according to the specs, even
+// for in-kernel static functions...
+static int32_t ece391fs_read_dentry_by_name(struct super_block *sb, const char *fname, struct ece391fs_dentry **dentry) {
+    struct ece391fs_boot_block *boot_block = sb->vendor;
+    int i;
+    for (i = 0; i < boot_block->num_dentry; i++) {
+        struct ece391fs_dentry *dentry_read = &boot_block->dentries[i];
+        if (!strncmp(dentry_read->name, fname, sizeof(dentry_read->name))) {
+            *dentry = dentry_read;
+            return 1;
+        }
+    }
+    return -ENOENT;
+}
+static int32_t ece391fs_read_dentry_by_index(struct super_block *sb, uint32_t index, struct ece391fs_dentry **dentry) {
+    struct ece391fs_boot_block *boot_block = sb->vendor;
+    if (index >= boot_block->num_dentry)
+        return 0;
+    *dentry = &boot_block->dentries[index];
+    return 1;
+}
+static int32_t ece391fs_read_data(struct super_block *sb, uint32_t inode, uint32_t offset, char *buf, uint32_t length) {
+    struct ece391fs_boot_block *boot_block = sb->vendor;
+    uint32_t inode_block_pos = (inode + 1) * BLOCK_SIZE;
+    uint32_t block_id;
+    int32_t res;
+    res = filp_seek(sb->dev,
+        inode_block_pos + (offset / BLOCK_SIZE + 1) * sizeof(uint32_t), SEEK_SET);
+    if (res < 0)
+        return res;
+    res = filp_read(sb->dev, &block_id, sizeof(block_id));
+    if (res < 0)
+        return res;
+
+    res = filp_seek(sb->dev,
+        (boot_block->num_inode + block_id + 1) * BLOCK_SIZE + offset % BLOCK_SIZE, SEEK_SET);
+    if (res < 0)
+        return res;
+    if (length > BLOCK_SIZE - (offset % BLOCK_SIZE))
+        length = BLOCK_SIZE - (offset % BLOCK_SIZE);
+    res = filp_read(sb->dev, buf, length);
+    return res;
+}
+
 static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes) {
-    struct ece391fs_boot_block *boot_block = file->inode->sb->vendor;
     switch (file->inode->mode & S_IFMT) {
     case S_IFREG:;
-        uint32_t inode_block_pos = (file->inode->ino + 1) * BLOCK_SIZE;
         // maximum to read
         if (nbytes > file->inode->size - file->pos)
             nbytes = file->inode->size - file->pos;
 
         uint32_t read = nbytes;
         while (nbytes) {
-            uint32_t block_id;
             int32_t res;
-            res = filp_seek(file->inode->sb->dev,
-                inode_block_pos + (file->pos / BLOCK_SIZE + 1) * sizeof(uint32_t), SEEK_SET);
-            if (res < 0)
-                return res;
-            res = filp_read(file->inode->sb->dev, &block_id, sizeof(block_id));
-            if (res < 0)
-                return res;
-
-            res = filp_seek(file->inode->sb->dev,
-                (boot_block->num_inode + block_id + 1) * BLOCK_SIZE + file->pos % BLOCK_SIZE, SEEK_SET);
-            if (res < 0)
-                return res;
-            uint32_t toread = nbytes;
-            if (toread > BLOCK_SIZE - (file->pos % BLOCK_SIZE))
-                toread = BLOCK_SIZE - (file->pos % BLOCK_SIZE);
-            res = filp_read(file->inode->sb->dev, buf, toread);
+            res = ece391fs_read_data(file->inode->sb, file->inode->ino, file->pos, buf, nbytes);
             if (res < 0)
                 return res;
             nbytes -= res;
@@ -64,12 +90,17 @@ static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes)
             file->pos += res;
         }
         return read;
-    case S_IFDIR:
+    case S_IFDIR:;
         // TODO: Should be handled by VFS
         // TODO: only for ece391 subsystem
-        if (file->pos >= boot_block->num_dentry)
+        struct ece391fs_dentry *dentry;
+        int32_t res;
+        res = ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry);
+        if (!res)
             return 0;
-        struct ece391fs_dentry *dentry = &boot_block->dentries[file->pos++];
+
+        file->pos++;
+
         char *name = dentry->name;
         uint8_t len = strlen(name);
 
@@ -86,29 +117,27 @@ static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes)
 }
 
 int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next) {
-    struct ece391fs_boot_block *boot_block = inode->sb->vendor;
-    int i;
-    for (i = 0; i < boot_block->num_dentry; i++) {
-        struct ece391fs_dentry *dentry = &boot_block->dentries[i];
-        if (!strncmp(dentry->name, name, sizeof(dentry->name))) {
-            *next = kmalloc(sizeof(**next));
-            if (!next)
-                return -ENOMEM;
-            **next = (struct inode) {
-                .sb = inode->sb,
-                .vendor = dentry,
-            };
-            atomic_set(&(*next)->refcount, 1);
+    struct ece391fs_dentry *dentry;
+    int32_t res;
+    res = ece391fs_read_dentry_by_name(inode->sb, name, &dentry);
+    if (res < 0)
+        return res;
 
-            int32_t res = (*inode->sb->op->read_inode)(*next);
-            if (res < 0) {
-                kfree(*next);
-                return res;
-            }
-            return 0;
-        }
+    *next = kmalloc(sizeof(**next));
+    if (!next)
+        return -ENOMEM;
+    **next = (struct inode) {
+        .sb = inode->sb,
+        .vendor = dentry,
+    };
+    atomic_set(&(*next)->refcount, 1);
+
+    res = (*inode->sb->op->read_inode)(*next);
+    if (res < 0) {
+        kfree(*next);
+        return res;
     }
-    return -ENOENT;
+    return 0;
 }
 
 struct file_operations ece391fs_file_op = {
