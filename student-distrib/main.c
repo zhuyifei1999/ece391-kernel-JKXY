@@ -25,7 +25,8 @@ static int kselftest(void *args) {
 static int kernel_main(void *args) {
     init_task = current;
     strcpy(init_task->comm, "swapper");
-    init_task->ppid = 0;
+
+    printf("init_task running with PID %d\n", current->pid);
 
     // Initialize drivers
     DO_INITCALL(drivers);
@@ -43,7 +44,7 @@ static int kernel_main(void *args) {
     do_wait(kselftest_thread);
 #endif
 
-    printf("init_task running with PID %d\n", current->pid);
+    printf("init_task idling with PID %d\n", current->pid);
 
     for (;;) {
         while (list_isempty(&schedule_queue))

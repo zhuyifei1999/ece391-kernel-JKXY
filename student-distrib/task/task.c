@@ -64,12 +64,7 @@ struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
             .subsystem = SUBSYSTEM_ECE391,
         };
     } else {
-        struct file *cwd_dup = filp_dup(current->cwd);
-        if (IS_ERR(cwd_dup)) {
-            task = ERR_CAST(cwd_dup);
-            goto err_free_pages;
-        }
-
+        atomic_inc(&current->cwd->refcount);
         *task = (struct task_struct) {
             .pid       = next_pid(),
             .ppid      = current->pid,
@@ -77,7 +72,7 @@ struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
             .mm        = NULL,
             .state     = TASK_RUNNING,
             .subsystem = SUBSYSTEM_ECE391,
-            .cwd       = cwd_dup,
+            .cwd       = current->cwd,
         };
     }
 
@@ -95,11 +90,6 @@ struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
     task->return_regs = regs;
 
     list_insert_back(&tasks[task->pid & (PID_BUCKETS - 1)], task);
-
-    return task;
-
-err_free_pages:
-    free_pages(stack, TASK_STACK_PAGES, 0);
 
     return task;
 }
@@ -130,6 +120,9 @@ int do_wait(struct task_struct *task) {
     // the kernel and practically ignores signals anyways
     while (task->state != TASK_ZOMBIE)
         schedule();
+
+    uint16_t pid = task->pid;
+    list_remove(&tasks[pid & (PID_BUCKETS - 1)], task);
 
     int exitcode = task->exitcode;
     // align to page boundary and free

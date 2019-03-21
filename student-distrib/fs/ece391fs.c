@@ -187,7 +187,7 @@ static int32_t ece391fs_read_inode(struct inode *inode) {
 
     switch (dentry->type) {
     case 0: // RTC device
-        inode->rdev = MKDEV(252, 0); // Device (252, 0) is 0th RTC
+        inode->rdev = MKDEV(10, 135); // Device (10, 135) is RTC
         inode->mode = S_IFCHR | 0666; // char device rw for all
         break;
     case 1: // Root directory

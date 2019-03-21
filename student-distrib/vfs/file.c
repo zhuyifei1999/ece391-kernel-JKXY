@@ -240,37 +240,6 @@ int32_t filp_close(struct file *file) {
     kfree(file);
     return 0;
 }
-struct file *filp_dup(struct file *file) {
-    struct path *path_dest = path_clone(&root_path);
-    if (IS_ERR(path_dest))
-        return ERR_CAST(path_dest);
-
-    struct file *ret = kmalloc(sizeof(*ret));
-    if (!ret) {
-        ret = ERR_PTR(-ENOMEM);
-        goto out_destroy_path;
-    }
-
-    memcpy(ret, file, sizeof(*ret));
-    ret->vendor = NULL;
-    ret->path = path_dest;
-    atomic_set(&ret->refcount, 1);
-
-    int32_t res = (*ret->op->open)(ret, ret->inode);
-    if (res < 0) {
-        kfree(ret);
-        ret = ERR_PTR(res);
-        goto out_destroy_path;
-    }
-
-    atomic_inc(&ret->inode->refcount);
-
-out_destroy_path:
-    if (IS_ERR(ret))
-        path_destroy(path_dest);
-
-    return ret;
-}
 
 int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
     if ((file->inode->mode & S_IFMT) != S_IFREG)
