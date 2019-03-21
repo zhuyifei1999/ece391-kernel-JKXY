@@ -11,6 +11,7 @@
 #include "vfs/path.h"
 #include "vfs/mount.h"
 #include "lib/string.h"
+#include "drivers/terminal.h"
 #include "lib/stdio.h"
 
 struct task_struct *swapper_task;
@@ -41,6 +42,14 @@ static int kernel_main(void *args) {
     struct task_struct *kthreadd_task = kernel_thread(&kthreadd, NULL);
     wake_up_process(kthreadd_task);
     schedule();
+
+    terminal_open();
+    int32_t cnt;
+    uint8_t buf[1024];
+    terminal_read(buf, 200);
+    terminal_write(buf, 200);
+    terminal_read(buf, 200);
+    terminal_write(buf, 200);
 
 #if RUN_TESTS
     // start the tests in a seperate kthread

@@ -9,5 +9,7 @@ void putc(uint8_t c);
 int32_t puts(int8_t *s);
 
 void clear(void);
-
+void backup_cursor();
+void restore_cursor();
+void backspace();
 #endif
