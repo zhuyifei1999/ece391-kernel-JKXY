@@ -198,7 +198,7 @@ static int32_t ece391fs_read_inode(struct inode *inode) {
         inode->mode = S_IFCHR | 0666; // char device rw for all
         break;
     case 1: // Root directory
-        inode->mode = S_IFDIR | 0777; // directory rwx for all
+        inode->mode = S_IFDIR | 0555; // directory rx for all
         break;
     case 2:; // Regular file
         uint32_t size;
@@ -211,7 +211,7 @@ static int32_t ece391fs_read_inode(struct inode *inode) {
             return res;
 
         inode->size = size;
-        inode->mode = S_IFREG | 0777; // regular file rwx for all
+        inode->mode = S_IFREG | 0555; // regular file rx for all
         break;
     }
     return 0;
