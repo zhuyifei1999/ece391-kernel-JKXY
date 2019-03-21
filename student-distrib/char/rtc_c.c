@@ -35,10 +35,10 @@ static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
     current->state = TASK_UNINTERRUPTIBLE;
     while (private->counter_div == init_counter_div)
         schedule();
-    private->counter_div = 0;
-
-    private->task = NULL;
     current->state = TASK_RUNNING;
+
+    private->counter_div = 0;
+    private->task = NULL;
     return 0;
 }
 

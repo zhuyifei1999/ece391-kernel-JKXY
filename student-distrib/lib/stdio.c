@@ -26,23 +26,10 @@ static inline void update_cursor(void) {
     outb((unsigned char)(cursor_loc>>8), 0x3D5);
 }
 
-void backspace(){
+void backspace() {
     unsigned long flags;
     cli_and_save(flags);
-    if(screen_x==0){
-        if(screen_y == 0)
-            return;
-        else{
-            screen_y--;
-            screen_x = 79;            
-        }
-    }
-    else{
-        screen_x--;
-    }
-    int32_t i = (NUM_COLS * screen_y + screen_x);
-    *(uint8_t *)(video_mem + (i << 1)) = ' ';
-    *(uint8_t *)(video_mem + (i << 1) + 1) = ATTRIB;    
+
     update_cursor();
     restore_flags(flags);
 }
@@ -217,11 +204,16 @@ void putc(uint8_t c) {
             screen_y++;
         screen_x = 0;
     } else if (c == '\b') {
-        if (screen_x) {
+        if (!screen_x) {
+            if (screen_y) {
+                screen_y--;
+                screen_x = NUM_COLS - 1;
+            }
+        } else {
             screen_x--;
-            video_mem[(NUM_COLS * screen_y + screen_x) * 2] = ' ';
-            video_mem[(NUM_COLS * screen_y + screen_x) * 2 + 1] = ATTRIB;
         }
+        video_mem[(NUM_COLS * screen_y + screen_x) * 2] = ' ';
+        video_mem[(NUM_COLS * screen_y + screen_x) * 2 + 1] = ATTRIB;
     } else if (c == '\t') {
         // TODO
         return putc(' ');

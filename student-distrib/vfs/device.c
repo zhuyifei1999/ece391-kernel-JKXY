@@ -27,8 +27,14 @@ struct file_operations *get_dev_file_op(uint32_t type, uint32_t dev) {
     struct list_node *node;
     list_for_each(&dev_registry, node) {
         struct dev_registry_entry *entry = node->value;
-        if (entry->type == (type & S_IFMT) && entry->dev == dev)
-            return entry->file_op;
+        if (entry->type == (type & S_IFMT)) {
+            // Exact match
+            if (entry->dev == dev)
+                return entry->file_op;
+            // wildcard for all devices in this major
+            if (MINOR(entry->dev) == MINORMASK && MAJOR(entry->dev) == MAJOR(dev))
+                return entry->file_op;
+        }
     }
     return NULL;
 }

@@ -2,13 +2,23 @@
 #include "./keyboard.h"
 #include "../irq.h"
 #include "../lib/stdio.h"
+#include "../lib/stdint.h"
 #include "../lib/stdbool.h"
 #include "../lib/cli.h"
 #include "../lib/io.h"
 #include "../initcall.h"
+
 #define KEYBOARD_IRQ 1
 
-// function keys map, 0x80 t0 0xFF
+/*
+ * MSB shows:
+ * as IO value, whether the key is pressed (=false), or unpressed (=true)
+ * as scancode key, whether we should read caps (=true), or not (=false)
+ * as scancode value, whether the key is ASCII (=false), or special key (=true)
+ */
+#define MSB 0x80
+
+// function keys map, 0x80 to 0xFF, unassigned have 0xFF
 #define DO_BKSP 0x80
 #define DO_GUI 0xFF
 #define DO_APPS 0xFF
@@ -35,6 +45,7 @@
 #define DO_LARROW 0xFF
 #define DO_DARROW 0xFF
 #define DO_RARROW 0xFF
+
 static unsigned char scancode_map[256] = {
     [0x1E]='a',[0x9E]='A',
     [0x30]='b',[0xB0]='B',
@@ -78,7 +89,7 @@ static unsigned char scancode_map[256] = {
     [0x2B]='\\',[0xAB]='|',
     [0x39]=' ',[0xB9]=' ',
     [0x0F]='\t',[0x8F]='\t',
-    [0x1C]='\n',[0x9C]='\n', //enter
+    [0x1C]='\n',[0x9C]='\n', // enter
     [0x1A]='[',[0x9A]='{',
     [0x1B]=']',[0x9B]='}',
     [0x27]=';',[0xA7]=':',
@@ -86,7 +97,7 @@ static unsigned char scancode_map[256] = {
     [0x33]=',',[0xB3]='<',
     [0x34]='.',[0xB4]='>',
     [0x35]='/',[0xB5]='?',
-    [0x0E]=DO_BKSP,[0x8E]=DO_BKSP, //function key
+    [0x0E]=DO_BKSP,[0x8E]=DO_BKSP, // function key
     [0x5B]=DO_GUI,[0xDB]=DO_GUI,
     [0x5C]=DO_GUI,[0xDC]=DO_GUI,
     [0x5D]=DO_APPS,[0xDD]=DO_APPS,
@@ -123,101 +134,87 @@ static unsigned char scancode_map[256] = {
 #define ALT 0x38
 
 #define BUFFER_SIZE 128
-unsigned char is_shift, is_ctrl, is_alt, is_caps, scancode_mapped, buffer_end;
+
+unsigned char buffer_end;
+bool has_shift, has_ctrl, has_alt, has_caps;
 unsigned char keyboard_buffer[BUFFER_SIZE];
 
-bool keyboard_buffer_is_full(){
-    return buffer_end == BUFFER_SIZE;
-}
-bool keyboard_buffer_is_empty(){
-    return buffer_end==0;
-}
-void keyboard_buffer_insert(unsigned char a){
-    if(keyboard_buffer_is_full()){
+void keyboard_buffer_insert(unsigned char a) {
+    if (buffer_end == BUFFER_SIZE) {
+        // full
         return;
-    }
-    else{
+    } else {
         keyboard_buffer[buffer_end] = a;
-        buffer_end ++;
-        terminal_update_keyboard(1,a);
+        buffer_end++;
+        tty_keyboard(a);
     }
 }
-unsigned char keyboard_buffer_delete(){
-    if(keyboard_buffer_is_empty()){
-        return 0;
-    }
-    else{
+void keyboard_buffer_delete() {
+    if (buffer_end) {
         buffer_end--;
-        terminal_update_keyboard(-1,NULL);
-        return keyboard_buffer[buffer_end];
+        tty_keyboard(-1, NULL);
     }
 }
-void keyboard_buffer_clear(){
+void keyboard_buffer_clear() {
     buffer_end = 0;
 }
-void do_function(unsigned char scancode_mapped);
 
+static void do_function(unsigned char scancode_mapped);
 
 void keyboard_handler(struct intr_info *info) {
     unsigned char scancode;
-    while (inb(0x64) & 1) {
+    while (inb(0x64) & 1) { // the LSB is whether there are more scancodes to read
         scancode = inb(0x60);
-       // printf("%x\t",scancode);
-        if(scancode==0xE0 || scancode==0xE1)
+        // These are scancode prefixes. We ignore them
+        if (scancode == 0xE0 || scancode == 0xE1)
             continue;
-        switch(scancode){
-            case LSHIFT:
-                is_shift = 1;
-                continue;
-            case RSHIFT:
-                is_shift = 1;
-                continue;
-            case LSHIFT|0x80:
-                is_shift = 0;
-                continue;
-            case RSHIFT|0x80:
-                is_shift=0;
-                continue;
-            case CTRL:
-                is_ctrl=1;
-                continue;
-            case CTRL|0x80:
-                is_ctrl=0;
-                continue;
-            case ALT:
-                is_alt=1;
-                continue;
-            case ALT|0x80:
-                is_alt=0;
-                continue;
-            case CAPS:
-                is_caps = !is_caps;
-                continue;
-            default:
-                if(scancode>=0x80)
-                    continue;   // release key does not matter
-                scancode_mapped = scancode_map[scancode];
-                if(scancode_mapped==0)
-                    continue;   // do nothing
-                break;
-        }
-        if(!is_ctrl && !is_alt && scancode_mapped < 0x80){        // ascii
-            if(keyboard_buffer_is_full()){
-                continue;
+        switch (scancode) {
+        case LSHIFT:
+        case RSHIFT:
+            has_shift = true;
+            break;
+        case LSHIFT | MSB:
+        case RSHIFT | MSB:
+            has_shift = false;
+            break;
+        case CTRL:
+            has_ctrl = true;
+            break;
+        case CTRL | MSB:
+            has_ctrl = false;
+            break;
+        case ALT:
+            has_alt = true;
+            break;
+        case ALT | MSB:
+            has_alt = false;
+            break;
+        case CAPS:
+            has_caps = !is_caps;
+            break;
+        default:
+            if (scancode >= MSB)
+                continue; // release key does not matter
+            unsigned char scancode_mapped = scancode_map[scancode];
+            if (scancode_mapped == 0)
+                continue; // unknowwn key, do nothing
+            if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii
+                if (keyboard_buffer_is_full()) {
+                    continue;
+                }
+                if (has_shift ^ has_caps) // upper case
+                    scancode_mapped = scancode_map[scancode | MSB];
+
+                keyboard_buffer_insert(scancode_mapped);
+            } else { // function key
+                do_function(scancode_mapped);
             }
-            if(is_shift ^ is_caps)         // upper case
-                scancode_mapped = scancode_map[scancode|0x80];
-            
-            keyboard_buffer_insert(scancode_mapped);
-        }
-        else{       // function key
-            do_function(scancode_mapped);
         }
     }
 }
 
-void do_function(unsigned char scancode_mapped){
-    switch(scancode_mapped){
+static void do_function(unsigned char scancode_mapped) {
+    switch (scancode_mapped) {
         case DO_BKSP:
             keyboard_buffer_delete();
             break;
@@ -225,4 +222,3 @@ void do_function(unsigned char scancode_mapped){
             break;
     }
 }
-
