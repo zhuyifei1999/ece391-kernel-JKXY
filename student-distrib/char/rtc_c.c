@@ -120,13 +120,13 @@ DEFINE_INITCALL(init_rtc_char, drivers);
 #include "../err.h"
 // test that reading rtc char device works as expected
 static void rtc_char_expect_rate(struct file *dev, uint8_t rate) {
-    printf("RTC rate = %d\n", rate);
+    test_printf("RTC rate = %d\n", rate);
 
     uint8_t init_second, test_second;
     init_second = rtc_get_second();
 
     uint32_t freq = rtc_rate_to_freq(rate);
-    printf("Expected RTC frequency = %d Hz\n", freq);
+    test_printf("Expected RTC frequency = %d Hz\n", freq);
 
     int junk;
     while ((test_second = rtc_get_second()) == init_second) {
@@ -139,7 +139,7 @@ static void rtc_char_expect_rate(struct file *dev, uint8_t rate) {
         TEST_ASSERT(filp_read(dev, &junk, 0) == 0);
     }
 
-    printf("RTC interrupt frequency = %d Hz\n", count);
+    test_printf("RTC interrupt frequency = %d Hz\n", count);
     // The allowed range is 0.9 - 1.1 times expected value
     TEST_ASSERT((freq * 9 / 10) <= count && count <= (freq * 11 / 10));
 }

@@ -127,7 +127,7 @@ static void rtc_test() {
     uint32_t init_count;
 
     uint16_t expected_freq = rtc_rate_to_freq(rtc_get_rate());
-    printf("Expected RTC frequency = %d Hz\n", expected_freq);
+    test_printf("Expected RTC frequency = %d Hz\n", expected_freq);
 
     init_second = rtc_get_second();
     while ((test_second = rtc_get_second()) == init_second) {
@@ -140,7 +140,7 @@ static void rtc_test() {
     }
 
     uint16_t actual_freq = rtc_irq_count - init_count;
-    printf("RTC interrupt frequency = %d Hz\n", actual_freq);
+    test_printf("RTC interrupt frequency = %d Hz\n", actual_freq);
     // The allowed range is 0.9 - 1.1 times expected value
     TEST_ASSERT((expected_freq * 9 / 10) <= actual_freq && actual_freq <= (expected_freq * 11 / 10));
 }

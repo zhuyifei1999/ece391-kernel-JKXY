@@ -14,7 +14,6 @@ struct list tasks[PID_BUCKETS];
 static struct list free_tasks;
 
 static uint16_t _next_pid() {
-    // TODO: change to atomic variables
     static uint16_t pid = 0;
     unsigned long flags;
 

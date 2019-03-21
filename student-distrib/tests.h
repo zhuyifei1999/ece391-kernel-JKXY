@@ -5,7 +5,7 @@
 
 #if RUN_TESTS
 
-// test infrastructure, supported by initcall & interrupts
+// test infrastructure, supported by initcall, interrupts, list, and magic
 #include "initcall.h"
 #include "interrupt.h"
 #include "lib/stdint.h"
@@ -26,11 +26,6 @@
 /* Use exception #15 for assertions, otherwise
    reserved by Intel */
 #define INTR_TEST 0x0F
-
-#define _TEST_HEADER(fn)         \
-    printf("[TEST %s] Running %s at %s\n", #fn, #fn, __FILE__)
-#define _TEST_OUTPUT(fn, result) \
-    printf("[TEST %s] Result = %s\n", #fn, (result) ? "PASS" : "FAIL")
 
 // these unwind / longjmp functions actually won't return, but we need to
 // figure out how to tell GCC so
@@ -58,31 +53,50 @@ static inline __always_inline int _test_setjmp(void) {
 extern void _test_longjmp(struct intr_info *info);
 extern void _test_fail_longjmp(struct intr_info *info);
 
-volatile bool _test_status;
+extern volatile bool _test_status;
+extern bool _test_verbose;
+extern char *_test_current_name;
+extern char *_test_failmsg;
 
-bool _test_wrapper(initcall_t *fn);
+bool _test_wrapper(initcall_t *wrap_fn, initcall_t *fn);
 
 /****** BEGIN GENERAL CLIENT MACROS & FUNCTIONS ******/
 
 // function attributes fot rest functions
 #define __testfunc __attribute__((unused, section(".tests.text")))
 
+#define test_printf(...) do {                     \
+    if (_test_verbose) {                          \
+        printf("[Test %s] ", _test_current_name); \
+        printf(__VA_ARGS__);                      \
+    }                                             \
+} while (0)
+
 // define a test. this will add the test to initcall list
-#define DEFINE_TEST(fn)               \
-static void tests_ ## fn() {          \
-    _TEST_HEADER(fn);                 \
-    bool result = _test_wrapper(&fn); \
-    _TEST_OUTPUT(fn, result);         \
-}                                     \
+#define DEFINE_TEST(fn)       \
+static void tests_ ## fn() {  \
+    _test_current_name = #fn; \
+    _test_wrapper(&tests_ ## fn, &fn);       \
+}                             \
 DEFINE_INITCALL(tests_ ## fn, tests)
 
+// source: https://stackoverflow.com/a/2670913
+// two macros ensures any macro passed will
+// be expanded before being stringified
+#define STRINGIZE_DETAIL(x) #x
+#define STRINGIZE(x) STRINGIZE_DETAIL(x)
+
 // test fail if a condition does not hold
-#define TEST_ASSERT(condition) do {        \
-    if (!(condition)) _test_fail_unwind(); \
+#define TEST_ASSERT(condition) do { \
+    if (!(condition)) {             \
+        test_printf("Assertion " #condition " failed at " __FILE__ ":" STRINGIZE(__LINE__) "\n"); \
+        _test_fail_unwind();        \
+    }                               \
 } while (0)
 
 // test fail if interrupt is raised before code exits
 #define TEST_ASSERT_NOINTR(intr, code) do {                   \
+    _test_failmsg = "Assertion for no interrupt " #intr " failed at " __FILE__ ":" STRINGIZE(__LINE__) "\n"; \
     struct intr_action oldaction = intr_getaction(intr);      \
     intr_setaction(intr, (struct intr_action){                \
         .handler = (intr_handler_t *)&_test_fail_longjmp } ); \
@@ -98,6 +112,7 @@ DEFINE_INITCALL(tests_ ## fn, tests)
     if (!_test_setjmp() && _test_status == TEST_PASS) {  \
         code;                                            \
         _test_status = TEST_FAIL;                        \
+        test_printf("Assertion for interrupt " #intr " failed at " __FILE__ ":" STRINGIZE(__LINE__) "\n"); \
     }                                                    \
     intr_setaction(intr, oldaction);                     \
 } while (0)

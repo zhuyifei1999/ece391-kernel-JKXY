@@ -32,7 +32,6 @@ static void switch_to(struct task_struct *task) {
 }
 
 void schedule(void) {
-    // TODO: change to atomic variables
     if (!is_boot_context() && current->state == TASK_RUNNING)
         list_insert_back(&schedule_queue, current);
 

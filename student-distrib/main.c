@@ -18,8 +18,7 @@ struct task_struct *swapper_task;
 
 #if RUN_TESTS
 static int kselftest(void *args) {
-    strcpy(kthreadd_task->comm, "kselftest");
-    printf("kselftest running with PID %d\n", current->pid);
+    strcpy(current->comm, "kselftest");
     launch_tests();
     return 0;
 }
@@ -43,13 +42,13 @@ static int kernel_main(void *args) {
     wake_up_process(kthreadd_task);
     schedule();
 
-    terminal_open();
-    int32_t cnt;
-    uint8_t buf[1024];
-    terminal_read(buf, 200);
-    terminal_write(buf, 200);
-    terminal_read(buf, 200);
-    terminal_write(buf, 200);
+    // terminal_open();
+    // int32_t cnt;
+    // uint8_t buf[1024];
+    // terminal_read(buf, 200);
+    // terminal_write(buf, 200);
+    // terminal_read(buf, 200);
+    // terminal_write(buf, 200);
 
 #if RUN_TESTS
     // start the tests in a seperate kthread

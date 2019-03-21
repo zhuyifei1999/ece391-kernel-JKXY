@@ -1,16 +1,22 @@
 #include "tests.h"
 #include "x86_desc.h"
+#include "structure/list.h"
 #include "lib/cli.h"
 #include "lib/stdio.h"
+#include "task/task.h"
 #include "interrupt.h"
 
 #if RUN_TESTS
 
-// TODO: replace these by atomic variable
-
-// Guard against re-entry if tests are run again by interrupt handlers
+// Guard against re-entry
 static volatile bool tests_running = false;
 volatile bool _test_status = TEST_PASS;
+char *_test_current_name;
+char *_test_failmsg;
+bool _test_verbose = false;
+static volatile int test_passed, test_failed;
+
+static struct list failed_tests;
 
 static volatile struct intr_info saved_context;
 
@@ -34,7 +40,7 @@ static void intr_tests(struct intr_info *info) {
     }
 }
 
-bool _test_wrapper(initcall_t *fn) {
+bool _test_wrapper(initcall_t *wrap_fn, initcall_t *fn) {
     _test_status = TEST_PASS;
 
     struct intr_action oldaction = intr_getaction(INTR_TEST);
@@ -44,26 +50,30 @@ bool _test_wrapper(initcall_t *fn) {
     if (!_test_setjmp() && _test_status == TEST_PASS)
         (*fn)();
 
+    if (!_test_verbose) {
+        if (_test_status == TEST_PASS) {
+            test_passed++;
+            putc('.');
+        } else {
+            test_failed++;
+            putc('F');
+            list_insert_back(&failed_tests, wrap_fn);
+        }
+    }
+
     intr_setaction(INTR_TEST, oldaction);
     return _test_status;
 }
 
 void _test_fail_longjmp(struct intr_info *info) {
-    if (info) {
-        info->eax = 0;
-        intr_tests(info);
-    } else {
-        asm volatile ("mov %0, %%eax; int %1" : : "i"(_TEST_SYS_FAIL), "i" (INTR_TEST) : "eax");
-    }
+    test_printf(_test_failmsg);
+    info->eax = 0;
+    intr_tests(info);
 }
 
 void _test_longjmp(struct intr_info *info) {
-    if (info) {
-        info->eax = 2;
-        intr_tests(info);
-    } else {
-        asm volatile ("mov %0, %%eax; int %1" : : "i"(_TEST_SYS_LONGJMP), "i" (INTR_TEST) : "eax");
-    }
+    info->eax = 2;
+    intr_tests(info);
 }
 
 /* Test suite entry point */
@@ -72,12 +82,38 @@ void launch_tests() {
     cli();
     if (tests_running)
         return;
-    tests_running = 1;
+    tests_running = true;
     sti();
+
+    _test_verbose = false;
+    test_passed = test_failed = 0;
+
+    printf("Kernel self-test running in PID %d Comm: %s\n", current->pid, current->comm);
+    printf("Legend: . = PASS, F = FAIL\n");
 
     DO_INITCALL(tests);
 
-    tests_running = 0;
+    printf("\nResults: %d tests ran, %d passed, %d failed\n", test_passed+ test_failed, test_passed, test_failed);
+
+    if (test_failed) {
+        printf("Rerunning failed tests verbosely\n");
+        _test_verbose = true;
+        while (!list_isempty(&failed_tests)) {
+            initcall_t *wrap_fn = list_pop_back(&failed_tests);
+            (*wrap_fn)();
+        }
+    }
+
+    list_destroy(&failed_tests);
+
+    printf("Kernel self-test complete\n");
+
+    tests_running = false;
 }
+
+static void init_tests() {
+    list_init(&failed_tests);
+}
+DEFINE_INITCALL(init_tests, early);
 
 #endif
