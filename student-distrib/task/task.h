@@ -28,6 +28,7 @@ enum task_state {
     TASK_INTERRUPTIBLE,
     TASK_UNINTERRUPTIBLE,
     TASK_ZOMBIE,
+    TASK_DEAD,
 };
 
 enum subsystem {
@@ -74,10 +75,12 @@ struct task_struct *get_current(void) {
 
 extern struct list tasks[PID_BUCKETS];
 
-struct task_struct *kernel_thread(int (*fn)(void *data), void *data);
+struct task_struct *kernel_thread(int (*fn)(void *args), void *args);
 struct task_struct *get_task_from_pid(uint16_t pid);
 
 noreturn void do_exit(int exitcode);
 int do_wait(struct task_struct *task);
+
+void do_free_tasks();
 
 #endif

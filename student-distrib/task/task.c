@@ -1,15 +1,17 @@
 #include "task.h"
-#include "../err.h"
+#include "kthread.h"
 #include "../mm/paging.h"
 #include "../eflags.h"
 #include "../x86_desc.h"
 #include "../lib/cli.h"
 #include "../panic.h"
 #include "../initcall.h"
+#include "../err.h"
 #include "sched.h"
 
 // struct task_struct *tasks[MAXPID];
 struct list tasks[PID_BUCKETS];
+static struct list free_tasks;
 
 static uint16_t _next_pid() {
     // TODO: change to atomic variables
@@ -47,7 +49,9 @@ struct task_struct *get_task_from_pid(uint16_t pid) {
 }
 
 // TODO: When we get userspace, merge with generic clone()
-struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
+struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
+    do_free_tasks();
+
     void *stack = alloc_pages(TASK_STACK_PAGES, TASK_STACK_PAGES_POW, 0);
     if (!stack)
         return ERR_PTR(-ENOMEM);
@@ -81,7 +85,7 @@ struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
     struct intr_info *regs = (void *)((uint32_t)task - sizeof(struct intr_info));
     *regs = (struct intr_info){
         .eax    = (uint32_t)fn,
-        .ebx    = (uint32_t)data,
+        .ebx    = (uint32_t)args,
         .eflags = EFLAGS_BASE | IF,
         .eip    = (uint32_t)&entry_task,
         .cs     = KERNEL_CS,
@@ -107,7 +111,14 @@ void do_exit(int exitcode) {
             filp_close(file);
     }
 
+    struct task_struct *parent = get_task_from_pid(current->ppid);
+    // if the parent is kthreadd then just auto reap it.
+    // TODO: read POSIX and determine based on signals
+    if (parent == kthreadd_task) {
+        do_wait(current);
+    }
     // TODO; SIGNAL parent so they can "mourn us"
+    wake_up_process(parent);
     // TODO: reparent children
     schedule();
 
@@ -116,20 +127,29 @@ void do_exit(int exitcode) {
 
 // Reap a child process, return its exitcode
 int do_wait(struct task_struct *task) {
-    // TODO: Hook onto the scheduler and use signals to wake up, even if we are
-    // the kernel and practically ignores signals anyways
-    while (task->state != TASK_ZOMBIE)
-        schedule();
+    if (current != task) {
+        current->state = TASK_INTERRUPTIBLE;
+        while (task->state != TASK_ZOMBIE)
+            schedule();
+        current->state = TASK_RUNNING;
+    }
+
+    task->state = TASK_DEAD;
 
     uint16_t pid = task->pid;
     list_remove(&tasks[pid & (PID_BUCKETS - 1)], task);
 
-    int exitcode = task->exitcode;
-    // align to page boundary and free
-    void *stack = (void *)((uint32_t)task & ~(TASK_STACK_PAGES * PAGE_SIZE_SMALL - 1));
-    free_pages(stack, TASK_STACK_PAGES, 0);
+    list_insert_back(&free_tasks, task);
 
-    return exitcode;
+    return task->exitcode;
+}
+
+void do_free_tasks() {
+    while (!list_isempty(&free_tasks)) {
+        struct task_struct *task = list_pop_front(&free_tasks);
+        void *stack = (void *)((uint32_t)task & ~(TASK_STACK_PAGES * PAGE_SIZE_SMALL - 1));
+        free_pages(stack, TASK_STACK_PAGES, 0);
+    }
 }
 
 asmlinkage noreturn
@@ -142,5 +162,7 @@ static void init_tasks() {
     for (i = 0; i < PID_BUCKETS; i++) {
         list_init(&tasks[i]);
     }
+
+    list_init(&free_tasks);
 }
 DEFINE_INITCALL(init_tasks, early);

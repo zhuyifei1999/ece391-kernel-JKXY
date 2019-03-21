@@ -1,5 +1,6 @@
 #include "main.h"
 #include "task/sched.h"
+#include "task/kthread.h"
 #include "initcall.h"
 #include "panic.h"
 #include "structure/list.h"
@@ -12,10 +13,11 @@
 #include "lib/string.h"
 #include "lib/stdio.h"
 
-struct task_struct *init_task;
+struct task_struct *swapper_task;
 
 #if RUN_TESTS
 static int kselftest(void *args) {
+    strcpy(kthreadd_task->comm, "kselftest");
     printf("kselftest running with PID %d\n", current->pid);
     launch_tests();
     return 0;
@@ -23,10 +25,10 @@ static int kselftest(void *args) {
 #endif
 
 static int kernel_main(void *args) {
-    init_task = current;
-    strcpy(init_task->comm, "swapper");
+    swapper_task = current;
+    strcpy(swapper_task->comm, "swapper");
 
-    printf("init_task running with PID %d\n", current->pid);
+    printf("swapper_task running with PID %d\n", current->pid);
 
     // Initialize drivers
     DO_INITCALL(drivers);
@@ -34,17 +36,19 @@ static int kernel_main(void *args) {
     // device (1, 0) is 0th initrd
     struct file *initrd_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
     do_mount(initrd_block, get_sb_op_by_name("ece391fs"), &root_path);
-    init_task->cwd = filp_open("/", 0, 0);
+    swapper_task->cwd = filp_open("/", 0, 0);
+
+    struct task_struct *kthreadd_task = kernel_thread(&kthreadd, NULL);
+    wake_up_process(kthreadd_task);
+    schedule();
 
 #if RUN_TESTS
-    // start the tests in a seperate kernel thread
-    struct task_struct *kselftest_thread = kernel_thread(&kselftest, NULL);
+    // start the tests in a seperate kthread
+    struct task_struct *kselftest_thread = kthread(&kselftest, NULL);
     wake_up_process(kselftest_thread);
-    schedule();
-    do_wait(kselftest_thread);
 #endif
 
-    printf("init_task idling with PID %d\n", current->pid);
+    printf("swapper_task idling with PID %d\n", current->pid);
 
     for (;;) {
         while (list_isempty(&schedule_queue))
@@ -54,7 +58,7 @@ static int kernel_main(void *args) {
 }
 
 noreturn
-void exec_init_task(void) {
+void exec_swapper_task(void) {
     struct task_struct *task = kernel_thread(&kernel_main, NULL);
     wake_up_process(task);
     schedule();

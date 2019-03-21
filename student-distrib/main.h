@@ -3,8 +3,8 @@
 
 #include "task/task.h"
 
-extern struct task_struct *init_task;
+extern struct task_struct *swapper_task;
 
-noreturn void exec_init_task(void);
+noreturn void exec_swapper_task(void);
 
 #endif
