@@ -3,6 +3,7 @@
 
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
+#include "../lib/cli.h"
 
 // This doublely linked list uses sentinel nodes for both first node
 // and last node
@@ -37,5 +38,26 @@ void list_remove(struct list *list, void *value);
     node->value;                        \
     node = node->next                   \
 )
+
+#define list_remove_on_cond(list, typ, name, cond) do { \
+    unsigned long __flags;                              \
+    cli_and_save(__flags);                              \
+    struct list_node *__node;                           \
+    struct list_node *__next;                           \
+    for (                                               \
+        __node = (list)->first.next;                    \
+        __node->value;                                  \
+        __node = __next                                 \
+    ) {                                                 \
+        typ name = __node->value;                       \
+        __next = __node->next;                          \
+        if (cond) {                                     \
+            __node->next->prev = __node->prev;          \
+            __node->prev->next = __node->next;          \
+            kfree(__node);                              \
+        }                                               \
+    }                                                   \
+    restore_flags(__flags);                             \
+} while (0)
 
 #endif

@@ -93,13 +93,29 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         goto out_inode_decref;
     }
 
+    struct file_operations *file_op;
+    switch (inode->mode & S_IFMT) {
+    case S_IFCHR:
+    case S_IFBLK:
+        file_op = get_dev_file_op(inode->mode, inode->rdev);
+        if (!file_op) {
+            ret = ERR_PTR(-ENXIO);
+            goto out_inode_decref;
+        }
+        break;
+    // TODO: Pipes, sockets, directories, etc.
+    default:
+        file_op = inode->op->default_file_ops;
+        break;
+    }
+
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
         ret = ERR_PTR(-ENOMEM);
         goto out_inode_decref;
     }
     *ret = (struct file){
-        .op = inode->op->default_file_ops,
+        .op = file_op,
         .inode = inode,
         .path = path_dest,
         .flags = flags,
@@ -237,6 +253,8 @@ int32_t filp_close(struct file *file) {
         return 0;
 
     (*file->op->release)(file);
+    path_destroy(file->path);
+    inode_decref(file->inode);
     kfree(file);
     return 0;
 }
@@ -277,8 +295,7 @@ int32_t default_file_open(struct file *file, struct inode *inode) {
     return 0;
 }
 void default_file_release(struct file *file) {
-    path_destroy(file->path);
-    inode_decref(file->inode);
+    return;
 }
 
 int32_t default_ino_create(struct inode *inode, const char *name, uint32_t flags, uint16_t mode, struct inode **next) {

@@ -26,7 +26,7 @@ static int32_t initrd_open(struct file *file, struct inode *inode) {
     if (!our_only_initrd_entry.start_addr)
         return -ENXIO;
     file->vendor = &our_only_initrd_entry;
-    return default_file_open(file, inode);
+    return 0;
 }
 
 // this code is essencially copied from default_file_seek

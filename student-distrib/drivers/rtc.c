@@ -2,7 +2,10 @@
 #include "../irq.h"
 #include "../lib/cli.h"
 #include "../lib/io.h"
+#include "../structure/list.h"
 #include "../initcall.h"
+
+struct list rtc_handlers;
 
 // some source from https://wiki.osdev.org/RTC
 
@@ -14,20 +17,24 @@
 #define NMI_disable_select_register(reg) outb((reg) | 0x80, 0x70)
 
 static uint32_t rtc_irq_count;
-static void rtc_handler(struct intr_info *info) {
-    unsigned long flags;
-    cli_and_save(flags);
 
+// RTC interrupt handler, make run with interrupts disabled
+static void rtc_hw_handler(struct intr_info *info) {
     // discard register C to we get interrupts again
     NMI_disable_select_register(0xC);
     inb(RTC_IMR_PORT);
+    NMI_enable();
+
     rtc_irq_count++;
 
-    NMI_enable();
-    restore_flags(flags);
+    struct list_node *node;
+    list_for_each(&rtc_handlers, node) {
+        void (*handler)(void) = node->value;
+        (*handler)();
+    }
 }
 
-void rtc_set_rate(unsigned char rate) {
+static void rtc_set_rate(unsigned char rate) {
     unsigned long flags;
     cli_and_save(flags);
 
@@ -47,7 +54,9 @@ void rtc_set_rate(unsigned char rate) {
     restore_flags(flags);
 }
 
-unsigned char rtc_get_rate() {
+// FIXME: Is this actually needed anywhere?
+__attribute__((unused))
+static unsigned char rtc_get_rate() {
     unsigned long flags;
     cli_and_save(flags);
 
@@ -66,7 +75,7 @@ static void init_rtc() {
     unsigned long flags;
     cli_and_save(flags);
 
-    set_irq_handler(RTC_IRQ, &rtc_handler);
+    set_irq_handler(RTC_IRQ, &rtc_hw_handler);
 
     NMI_disable_select_register(0xB);
     // read the current value of register B
@@ -80,53 +89,60 @@ static void init_rtc() {
     restore_flags(flags);
 
     // initialize to default 1024Hz
-    rtc_set_rate(6);
+    rtc_set_rate(RTC_HW_RATE);
 }
 DEFINE_INITCALL(init_rtc, drivers);
 
-#include "../tests.h"
-#if RUN_TESTS
-/* RTC Test
- *
- * Test whether rtc interrupt interval is 500 ms
- */
-static unsigned char get_second() {
+void register_rtc_handler(void (*handler)(void)) {
+    list_insert_back(&rtc_handlers, handler);
+}
+
+static void init_rtc_registry() {
+    list_init(&rtc_handlers);
+}
+DEFINE_INITCALL(init_rtc_registry, early);
+
+uint8_t rtc_get_second() {
     unsigned long flags;
     cli_and_save(flags);
 
     // register 0 is seconds register
     NMI_disable_select_register(0x0);
-    unsigned char seconds = inb(RTC_IMR_PORT);
+    uint8_t seconds = inb(RTC_IMR_PORT);
 
     NMI_enable();
     restore_flags(flags);
     return seconds;
 }
+
+#include "../tests.h"
+#if RUN_TESTS
+/* RTC Test
+ *
+ * Test whether rtc interrupt frequency is 1024Hz
+ */
 __testfunc
 static void rtc_test() {
-    unsigned char init_second, test_second;
+    uint8_t init_second, test_second;
+    uint32_t init_count;
 
-    unsigned int init_count;
-
-    int expected_freq = rtc_rate_to_freq(rtc_get_rate());
+    uint16_t expected_freq = rtc_rate_to_freq(rtc_get_rate());
     printf("Expected RTC frequency = %d Hz\n", expected_freq);
 
-    init_second = get_second();
-    while ((test_second = get_second()) == init_second) {
+    init_second = rtc_get_second();
+    while ((test_second = rtc_get_second()) == init_second) {
         asm volatile ("hlt" : : : "memory");
     }
     init_count = rtc_irq_count;
 
-    while (get_second() == test_second) {
+    while (rtc_get_second() == test_second) {
         asm volatile ("hlt" : : : "memory");
     }
 
-    int actual_freq = rtc_irq_count - init_count;
-
+    uint16_t actual_freq = rtc_irq_count - init_count;
     printf("RTC interrupt frequency = %d Hz\n", actual_freq);
-
     // The allowed range is 0.9 - 1.1 times expected value
-    TEST_ASSERT((expected_freq * 9 / 10) < actual_freq && actual_freq < (expected_freq * 11 / 10));
+    TEST_ASSERT((expected_freq * 9 / 10) <= actual_freq && actual_freq <= (expected_freq * 11 / 10));
 }
 DEFINE_TEST(rtc_test);
 #endif

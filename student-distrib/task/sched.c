@@ -38,11 +38,10 @@ void schedule(void) {
 }
 
 void wake_up_process(struct task_struct *task) {
-    if (task->state != TASK_RUNNING)
-        panic("Can't schedule task %s at 0x%#x, task is not running\n",
-              task->comm,
-              (uint32_t)&task);
-
+    if (task == current)
+        return; // can't wake up self
+    if (list_contains(&schedule_queue, task))
+        return; // already woken up
     list_insert_back(&schedule_queue, task);
 }
 

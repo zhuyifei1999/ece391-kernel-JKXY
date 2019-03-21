@@ -25,8 +25,8 @@ struct files_struct {
 
 enum task_state {
     TASK_RUNNING,
-    TASK_INTERRUPTABLE,
-    TASK_UNINTERRUPTABLE,
+    TASK_INTERRUPTIBLE,
+    TASK_UNINTERRUPTIBLE,
     TASK_ZOMBIE,
 };
 

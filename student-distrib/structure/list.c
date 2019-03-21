@@ -1,5 +1,4 @@
 #include "list.h"
-#include "../lib/cli.h"
 #include "../mm/kmalloc.h"
 #include "../err.h"
 #include "../errno.h"
@@ -137,18 +136,7 @@ bool list_contains(struct list *list, void *value) {
 
     return false;
 }
+
 void list_remove(struct list *list, void *value) {
-    unsigned long flags;
-    cli_and_save(flags);
-
-    struct list_node *node;
-    list_for_each(list, node) {
-        if (node->value == value) {
-            node->next->prev = node->prev;
-            node->prev->next = node->next;
-            kfree(node);
-        }
-    }
-
-    restore_flags(flags);
+    list_remove_on_cond(list, void *, entry, entry == value);
 }
