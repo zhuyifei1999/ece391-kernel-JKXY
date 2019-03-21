@@ -26,6 +26,27 @@ static inline void update_cursor(void) {
     outb((unsigned char)(cursor_loc>>8), 0x3D5);
 }
 
+void backspace(){
+    unsigned long flags;
+    cli_and_save(flags);
+    if(screen_x==0){
+        if(screen_y == 0)
+            return;
+        else{
+            screen_y--;
+            screen_x = 79;            
+        }
+    }
+    else{
+        screen_x--;
+    }
+    int32_t i = (NUM_COLS * screen_y + screen_x);
+    *(uint8_t *)(video_mem + (i << 1)) = ' ';
+    *(uint8_t *)(video_mem + (i << 1) + 1) = ATTRIB;    
+    update_cursor();
+    restore_flags(flags);
+}
+
 /* void clear(void);
  * Inputs: void
  * Return Value: none
@@ -35,12 +56,10 @@ void clear(void) {
     cli_and_save(flags);
 
     int32_t i;
-    for (i = 0; i < NUM_ROWS * NUM_COLS; i++) {
+    for (i = (NUM_COLS * screen_y + screen_x); i < NUM_ROWS * NUM_COLS; i++) {
         *(uint8_t *)(video_mem + (i << 1)) = ' ';
         *(uint8_t *)(video_mem + (i << 1) + 1) = ATTRIB;
     }
-    screen_x = screen_y = 0;
-
     update_cursor();
 
     restore_flags(flags);

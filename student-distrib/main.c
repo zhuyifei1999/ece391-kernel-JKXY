@@ -10,6 +10,7 @@
 #include "vfs/path.h"
 #include "vfs/mount.h"
 #include "lib/string.h"
+#include "drivers/terminal.h"
 #include "lib/stdio.h"
 
 struct task_struct *init_task;
@@ -34,6 +35,14 @@ static int kernel_main(void *args) {
     do_mount(initrd_block, get_sb_op_by_name("ece391fs"), &root_path);
 
     init_task->cwd = filp_open("/", 0, 0);
+
+    terminal_open();
+    int32_t cnt;
+    uint8_t buf[1024];
+    terminal_read(buf, 200);
+    terminal_write(buf, 200);
+    terminal_read(buf, 200);
+    terminal_write(buf, 200);
 
 #if RUN_TESTS
     /* Run tests */
