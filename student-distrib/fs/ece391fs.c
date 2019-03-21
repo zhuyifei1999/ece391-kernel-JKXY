@@ -73,44 +73,51 @@ static int32_t ece391fs_read_data(struct super_block *sb, uint32_t inode, uint32
 }
 
 static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes) {
+    // maximum to read
+    if (nbytes > file->inode->size - file->pos)
+        nbytes = file->inode->size - file->pos;
+
+    uint32_t read = nbytes;
+    while (nbytes) {
+        int32_t res;
+        res = ece391fs_read_data(file->inode->sb, file->inode->ino, file->pos, buf, nbytes);
+        if (res < 0)
+            return res;
+        nbytes -= res;
+        buf += res;
+        file->pos += res;
+    }
+    return read;
+}
+static int32_t ece391fs_dir_read(struct file *file, char *buf, uint32_t nbytes) {
+    // TODO: Should be handled by VFS
+    // TODO: only for ece391 subsystem
+    struct ece391fs_dentry *dentry;
+    int32_t res;
+    res = ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry);
+    if (!res)
+        return 0;
+
+    file->pos++;
+
+    char *name = dentry->name;
+    uint8_t len = strlen(name);
+
+    if (len > sizeof(dentry->name))
+        len = sizeof(dentry->name);
+    if (len > nbytes)
+        len = nbytes;
+
+    strncpy(buf, name, len);
+    return len;
+}
+
+static int32_t ece391fs_read(struct file *file, char *buf, uint32_t nbytes) {
     switch (file->inode->mode & S_IFMT) {
     case S_IFREG:;
-        // maximum to read
-        if (nbytes > file->inode->size - file->pos)
-            nbytes = file->inode->size - file->pos;
-
-        uint32_t read = nbytes;
-        while (nbytes) {
-            int32_t res;
-            res = ece391fs_read_data(file->inode->sb, file->inode->ino, file->pos, buf, nbytes);
-            if (res < 0)
-                return res;
-            nbytes -= res;
-            buf += res;
-            file->pos += res;
-        }
-        return read;
+        return ece391fs_file_read(file, buf, nbytes);
     case S_IFDIR:;
-        // TODO: Should be handled by VFS
-        // TODO: only for ece391 subsystem
-        struct ece391fs_dentry *dentry;
-        int32_t res;
-        res = ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry);
-        if (!res)
-            return 0;
-
-        file->pos++;
-
-        char *name = dentry->name;
-        uint8_t len = strlen(name);
-
-        if (len > sizeof(dentry->name))
-            len = sizeof(dentry->name);
-        if (len > nbytes)
-            len = nbytes;
-
-        strncpy(buf, name, len);
-        return len;
+        return ece391fs_dir_read(file, buf, nbytes);
     default:
         return -EINVAL; // VFS should handle the rest
     }
@@ -141,7 +148,7 @@ int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flag
 }
 
 struct file_operations ece391fs_file_op = {
-    .read = &ece391fs_file_read,
+    .read = &ece391fs_read,
 };
 struct inode_operations ece391fs_ino_op = {
     .default_file_ops = &ece391fs_file_op,
