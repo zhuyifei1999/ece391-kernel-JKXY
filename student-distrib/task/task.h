@@ -48,7 +48,8 @@ struct task_struct {
     int exitcode;
 };
 
-#define TASK_STACK_PAGES 2  // each task has 4 (1<<2) pages for kernel stack
+#define TASK_STACK_PAGES_POW 2  // each task has 4 (1<<2) pages for kernel stack
+#define TASK_STACK_PAGES (1<<TASK_STACK_PAGES_POW)
 #define ALIGN_SP 0xf        // C likes stuffs to be aligned
 
 // the task_struct is always at the bottom of the kernel stack
@@ -69,11 +70,14 @@ struct task_struct *get_current(void) {
 
 #define current (get_current())
 
+#define is_boot_context() ((uint32_t)current < KDIR_VIRT_ADDR)
+
 extern struct list tasks[PID_BUCKETS];
 
 struct task_struct *kernel_thread(int (*fn)(void *data), void *data);
 struct task_struct *get_task_from_pid(uint16_t pid);
 
 noreturn void do_exit(int exitcode);
+int do_wait(struct task_struct *task);
 
 #endif

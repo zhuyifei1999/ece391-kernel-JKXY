@@ -100,10 +100,12 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
     }
     *ret = (struct file){
         .op = inode->op->default_file_ops,
+        .inode = inode,
         .path = path_dest,
         .flags = flags,
     };
     atomic_set(&ret->refcount, 1);
+    atomic_inc(&inode->refcount);
 
     int32_t res = (*ret->op->open)(ret, inode);
     if (res < 0) {
@@ -142,7 +144,7 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
 
     struct file *ret;
 
-    struct inode * inode = mk_dummyinode();
+    struct inode *inode = mk_dummyinode();
     if (IS_ERR(inode)) {
         ret = ERR_CAST(inode);
         goto out_destroy_path;
@@ -157,11 +159,13 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     }
     *ret = (struct file){
         .op = file_op,
+        .inode = inode,
         .path = path_dest,
         // TODO: change flags according to mode
         .flags = flags,
     };
     atomic_set(&ret->refcount, 1);
+    atomic_inc(&inode->refcount);
 
     int32_t res = (*ret->op->open)(ret, inode);
     if (res < 0) {
@@ -236,6 +240,37 @@ int32_t filp_close(struct file *file) {
     kfree(file);
     return 0;
 }
+struct file *filp_dup(struct file *file) {
+    struct path *path_dest = path_clone(&root_path);
+    if (IS_ERR(path_dest))
+        return ERR_CAST(path_dest);
+
+    struct file *ret = kmalloc(sizeof(*ret));
+    if (!ret) {
+        ret = ERR_PTR(-ENOMEM);
+        goto out_destroy_path;
+    }
+
+    memcpy(ret, file, sizeof(*ret));
+    ret->vendor = NULL;
+    ret->path = path_dest;
+    atomic_set(&ret->refcount, 1);
+
+    int32_t res = (*ret->op->open)(ret, ret->inode);
+    if (res < 0) {
+        kfree(ret);
+        ret = ERR_PTR(res);
+        goto out_destroy_path;
+    }
+
+    atomic_inc(&ret->inode->refcount);
+
+out_destroy_path:
+    if (IS_ERR(ret))
+        path_destroy(path_dest);
+
+    return ret;
+}
 
 int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
     if ((file->inode->mode & S_IFMT) != S_IFREG)
@@ -270,9 +305,6 @@ int32_t default_file_write(struct file *file, const char *buf, uint32_t nbytes) 
     return -EINVAL;
 }
 int32_t default_file_open(struct file *file, struct inode *inode) {
-    file->pos = 0;
-    file->inode = inode;
-    atomic_inc(&inode->refcount);
     return 0;
 }
 void default_file_release(struct file *file) {

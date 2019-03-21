@@ -48,19 +48,38 @@ struct task_struct *get_task_from_pid(uint16_t pid) {
 
 // TODO: When we get userspace, merge with generic clone()
 struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
-    void *stack = alloc_pages((1<<TASK_STACK_PAGES), TASK_STACK_PAGES, 0);
+    void *stack = alloc_pages(TASK_STACK_PAGES, TASK_STACK_PAGES_POW, 0);
     if (!stack)
         return ERR_PTR(-ENOMEM);
 
     struct task_struct *task = task_from_stack(stack);
-    *task = (struct task_struct) {
-        .pid       = next_pid(),
-        .ppid      = current->pid,
-        .comm      = "kthread",
-        .mm        = NULL,
-        .state     = TASK_RUNNING,
-        .subsystem = SUBSYSTEM_ECE391,
-    };
+    if (is_boot_context()) {
+        // boot context, fill with dummies, cwd will be initialized by initial thread
+        *task = (struct task_struct) {
+            .pid       = next_pid(),
+            .ppid      = 0,
+            .comm      = "init_task",
+            .mm        = NULL,
+            .state     = TASK_RUNNING,
+            .subsystem = SUBSYSTEM_ECE391,
+        };
+    } else {
+        struct file *cwd_dup = filp_dup(current->cwd);
+        if (IS_ERR(cwd_dup)) {
+            task = ERR_CAST(cwd_dup);
+            goto err_free_pages;
+        }
+
+        *task = (struct task_struct) {
+            .pid       = next_pid(),
+            .ppid      = current->pid,
+            .comm      = "kthread",
+            .mm        = NULL,
+            .state     = TASK_RUNNING,
+            .subsystem = SUBSYSTEM_ECE391,
+            .cwd       = cwd_dup,
+        };
+    }
 
     /* function prototype don't matter here */
     extern void (*entry_task)(void);
@@ -78,6 +97,11 @@ struct task_struct *kernel_thread(int (*fn)(void *data), void *data) {
     list_insert_back(&tasks[task->pid & (PID_BUCKETS - 1)], task);
 
     return task;
+
+err_free_pages:
+    free_pages(stack, TASK_STACK_PAGES, 0);
+
+    return task;
 }
 
 noreturn
@@ -85,11 +109,34 @@ void do_exit(int exitcode) {
     current->exitcode = exitcode;
     current->state = TASK_ZOMBIE;
 
+    filp_close(current->cwd);
+    uint32_t i;
+    array_for_each(&current->files.files, i) {
+        struct file *file = array_get(&current->files.files, i);
+        if (file)
+            filp_close(file);
+    }
+
     // TODO; SIGNAL parent so they can "mourn us"
     // TODO: reparent children
     schedule();
 
     panic("Dead process scheduled.\n");
+}
+
+// Reap a child process, return its exitcode
+int do_wait(struct task_struct *task) {
+    // TODO: Hook onto the scheduler and use signals to wake up, even if we are
+    // the kernel and practically ignores signals anyways
+    while (task->state != TASK_ZOMBIE)
+        schedule();
+
+    int exitcode = task->exitcode;
+    // align to page boundary and free
+    void *stack = (void *)((uint32_t)task & ~(TASK_STACK_PAGES * PAGE_SIZE_SMALL - 1));
+    free_pages(stack, TASK_STACK_PAGES, 0);
+
+    return exitcode;
 }
 
 asmlinkage noreturn

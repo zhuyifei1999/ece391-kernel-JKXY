@@ -148,6 +148,8 @@ int32_t filp_read(struct file *file, void *buf, uint32_t nbytes);
 int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes);
 int32_t filp_close(struct file *file);
 
+struct file *filp_dup(struct file *file);
+
 int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence);
 int32_t default_file_read(struct file *file, char *buf, uint32_t nbytes);
 int32_t default_file_write(struct file *file, const char *buf, uint32_t nbytes);
