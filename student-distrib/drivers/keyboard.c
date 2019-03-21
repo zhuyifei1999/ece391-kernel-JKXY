@@ -146,7 +146,7 @@ void keyboard_buffer_insert(unsigned char a) {
     } else {
         keyboard_buffer[buffer_end] = a;
         buffer_end++;
-        tty_keyboard(a);
+        tty_keyboard(1, a);
     }
 }
 void keyboard_buffer_delete() {
@@ -198,13 +198,15 @@ void keyboard_handler(struct intr_info *info) {
             unsigned char scancode_mapped = scancode_map[scancode];
             if (scancode_mapped == 0)
                 continue; // unknowwn key, do nothing
-            if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii
+            if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
                 if (keyboard_buffer_is_full()) {
                     continue;
                 }
-                if (has_shift ^ has_caps) // upper case
+                if (has_shift && !('a' < scancode_mapped < 'z') ) // shift translation
                     scancode_mapped = scancode_map[scancode | MSB];
-
+                if(has_shift ^ has_caps && ('a' < scancode_mapped < 'z') )
+                        scancode_mapped = scancode_map[scancode | MSB];
+                
                 keyboard_buffer_insert(scancode_mapped);
             } else { // function key
                 do_function(scancode_mapped);
