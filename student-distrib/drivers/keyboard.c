@@ -201,6 +201,11 @@ static void do_function(unsigned char scancode_mapped) {
         default:
             break;
     }
+
+    if (scancode_mapped == 'l' && has_ctrl) {
+        // FIXME: this is ultra evil
+        tty_clear();
+    }
 }
 
 static void init_keyboard() {

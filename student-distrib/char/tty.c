@@ -168,6 +168,13 @@ static struct file_operations tty_dev_op = {
     .release = &tty_release,
 };
 
+// FIXME: support ANSI/VT100. this is evil
+// http://www.termsys.demon.co.uk/vtansi.htm
+void tty_clear() {
+    clear();
+    tty_write(NULL, keyboard_tty->buffer, keyboard_tty->buffer_end);
+}
+
 static void init_tty_char() {
     list_init(&ttys);
     register_dev(S_IFCHR, MKDEV(TTY_MAJOR, MINORMASK), &tty_dev_op);

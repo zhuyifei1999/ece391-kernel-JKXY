@@ -5,5 +5,6 @@
 #include "../lib/stdbool.h"
 
 void tty_keyboard(char chr);
+void tty_clear();
 
 #endif
