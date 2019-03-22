@@ -9,4 +9,7 @@ void putc(uint8_t c);
 int32_t puts(int8_t *s);
 
 void clear(void);
+
+void update_mouse(uint32_t x, uint32_t y);
+
 #endif

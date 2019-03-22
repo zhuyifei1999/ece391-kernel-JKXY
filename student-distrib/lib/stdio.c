@@ -33,6 +33,19 @@ void backspace() {
     update_cursor();
     restore_flags(flags);
 }
+static uint32_t mouse_x_prev, mouse_y_prev;
+void update_mouse(uint32_t x, uint32_t y){
+    if(x>79 || y>24){
+        return;
+    }
+    int32_t i;
+    i = (NUM_COLS * mouse_y_prev + mouse_x_prev);    
+    *(uint8_t *)(video_mem + (i << 1) + 1) = ATTRIB; 
+    mouse_y_prev = y;
+    mouse_x_prev = x;
+    i = (NUM_COLS * y + x); 
+    *(uint8_t *)(video_mem + (i << 1) + 1) = 0x70; 
+}
 
 /* void clear(void);
  * Inputs: void
@@ -236,11 +249,11 @@ void putc(uint8_t c) {
         int32_t i;
         for (i = 0; i < (NUM_ROWS - 1) * NUM_COLS; i++) {
             video_mem[i * 2] = video_mem[(i + NUM_COLS) * 2];
-            video_mem[i * 2 + 1] = video_mem[(i + NUM_COLS) * 2 + 1];
+            //video_mem[i * 2 + 1] = video_mem[(i + NUM_COLS) * 2 + 1];
         }
         for (i = (NUM_ROWS - 1) * NUM_COLS; i < NUM_ROWS * NUM_COLS; i++) {
             video_mem[i * 2] = ' ';
-            video_mem[i * 2 + 1] = ATTRIB;
+            //video_mem[i * 2 + 1] = ATTRIB;
         }
     }
 
