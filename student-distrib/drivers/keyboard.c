@@ -147,6 +147,9 @@ static void keyboard_handler(struct intr_info *info) {
     unsigned char scancode;
     while (inb(PS2_CTRL_PORT) & 1) { // the LSB is whether there are more scancodes to read
         scancode = inb(PS2_DATA_PORT);
+        // Zero scancode for some reason occur during initialization
+        if (!scancode)
+            continue;
         // These are scancode prefixes. We ignore them
         if (scancode == 0xE0 || scancode == 0xE1)
             continue;
