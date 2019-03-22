@@ -36,6 +36,9 @@ struct tty {
 
 struct tty *keyboard_tty;
 
+// meh... Can't this logic be in userspace?
+#define tty_should_read(tty) (tty->buffer_end && tty->buffer[tty->buffer_end - 1] == WAKEUP_CHAR)
+
 static struct tty *tty_get(uint32_t device_num) {
     // TODO: This should be read from the task's associated TTY, not the tty
     // that's attached to the keyboard
@@ -113,7 +116,7 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
 
     current->state = TASK_UNINTERRUPTIBLE;
     // Until the last character in buffer is '\n'
-    while (!tty->buffer_end || tty->buffer[tty->buffer_end - 1] != WAKEUP_CHAR)
+    while (!tty_should_read(tty))
         schedule();
     current->state = TASK_RUNNING;
 
@@ -150,7 +153,7 @@ void tty_keyboard(char chr) {
             keyboard_tty->buffer_end--;
         }
     } else {
-        if (keyboard_tty->buffer_end < BUFFER_SIZE) {
+        if (keyboard_tty->buffer_end < BUFFER_SIZE && !tty_should_read(keyboard_tty)) {
             keyboard_tty->buffer[keyboard_tty->buffer_end++] = chr;
             putc(chr);
 
