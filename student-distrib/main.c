@@ -23,6 +23,56 @@ static int kselftest(void *args) {
 }
 #endif
 
+#define CP2_DEMO_BUF_LENGTH 256
+#include "err.h"
+static int cp2_demo(void *args) {
+    strcpy(current->comm, "cp2_demo");
+    // device (5, 0) is console tty
+    struct file *tty = filp_open_anondevice(MKDEV(5, 0), O_RDWR, S_IFCHR | 0666);
+    while (1) {
+        char buf[CP2_DEMO_BUF_LENGTH];
+        int32_t len;
+        len = filp_read(tty, buf, CP2_DEMO_BUF_LENGTH - 1);
+        if (len < 0) {
+            printf("TTY read failure: %d\n", len);
+            continue;
+        }
+        if (!len)
+            panic("\\n isn't part of tty read?!\n");
+        buf[len-1] = '\0';
+        struct file *file = filp_open(buf, 0, 0);
+        if (IS_ERR(file)) {
+            printf("Unable to open file '%s': %d\n", buf, PTR_ERR(file));
+            continue;
+        }
+
+        while (1) {
+            len = filp_read(file, buf, CP2_DEMO_BUF_LENGTH);
+            if (len < 0) {
+                printf("File read failure: %d\n", len);
+                break;
+            } else if (!len) {
+                break;
+            }
+
+            char *bufnow = buf;
+            while (len) {
+                int32_t res = filp_write(tty, bufnow, len);
+                if (res <= 0) {
+                    printf("TTY write failure: %d\n", res);
+                    break;
+                }
+                len -= res;
+                bufnow += res;
+            }
+        }
+
+        len = filp_close(file);
+        if (len < 0)
+            printf("File close failure: %d\n", len);
+    }
+}
+
 static int kernel_main(void *args) {
     swapper_task = current;
     strcpy(swapper_task->comm, "swapper");
@@ -51,9 +101,10 @@ static int kernel_main(void *args) {
 
 #if RUN_TESTS
     // start the tests in a seperate kthread
-    struct task_struct *kselftest_thread = kthread(&kselftest, NULL);
-    wake_up_process(kselftest_thread);
+    wake_up_process(kthread(&kselftest, NULL));
 #endif
+
+    wake_up_process(kthread(&cp2_demo, NULL));
 
     printf("swapper_task idling with PID %d\n", current->pid);
 

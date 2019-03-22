@@ -127,7 +127,7 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
     tty->buffer_start += nbytes;
     // Buffer finished reading, clear it.
     if (tty->buffer_start == tty->buffer_end)
-        tty->buffer_start = tty->buffer_end;
+        tty->buffer_start = tty->buffer_end = 0;
 
     return nbytes;
 }
