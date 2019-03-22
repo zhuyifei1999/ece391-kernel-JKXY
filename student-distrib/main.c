@@ -77,8 +77,6 @@ static int kernel_main(void *args) {
     swapper_task = current;
     strcpy(swapper_task->comm, "swapper");
 
-    printf("swapper_task running with PID %d\n", current->pid);
-
     // Initialize drivers
     DO_INITCALL(drivers);
 
@@ -91,22 +89,12 @@ static int kernel_main(void *args) {
     wake_up_process(kthreadd_task);
     schedule();
 
-    // terminal_open();
-    // int32_t cnt;
-    // uint8_t buf[1024];
-    // terminal_read(buf, 200);
-    // terminal_write(buf, 200);
-    // terminal_read(buf, 200);
-    // terminal_write(buf, 200);
-
 #if RUN_TESTS
     // start the tests in a seperate kthread
     wake_up_process(kthread(&kselftest, NULL));
 #endif
 
     wake_up_process(kthread(&cp2_demo, NULL));
-
-    printf("swapper_task idling with PID %d\n", current->pid);
 
     for (;;) {
         while (list_isempty(&schedule_queue))

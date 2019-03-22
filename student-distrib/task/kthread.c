@@ -22,7 +22,6 @@ struct create_entry {
 int kthreadd(void *args) {
     kthreadd_task = current;
     strcpy(kthreadd_task->comm, "kthreadd");
-    printf("kthreadd running with PID %d\n", current->pid);
 
     while (1) {
         current->state = TASK_RUNNING;

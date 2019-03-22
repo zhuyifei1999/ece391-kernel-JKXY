@@ -51,11 +51,10 @@ struct task_struct *get_task_from_pid(uint16_t pid) {
 struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
     do_free_tasks();
 
-    void *stack = alloc_pages(TASK_STACK_PAGES, TASK_STACK_PAGES_POW, 0);
-    if (!stack)
+    struct task_struct *task = alloc_pages(TASK_STACK_PAGES, TASK_STACK_PAGES_POW, 0);
+    if (!task)
         return ERR_PTR(-ENOMEM);
 
-    struct task_struct *task = task_from_stack(stack);
     if (is_boot_context()) {
         // boot context, fill with dummies, cwd will be initialized by initial thread
         *task = (struct task_struct) {
@@ -81,7 +80,8 @@ struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
 
     /* function prototype don't matter here */
     extern void (*entry_task)(void);
-    struct intr_info *regs = (void *)((uint32_t)task - sizeof(struct intr_info));
+    struct intr_info *regs = (void *)((uint32_t)task +
+        TASK_STACK_PAGES * PAGE_SIZE_SMALL - sizeof(struct intr_info));
     *regs = (struct intr_info){
         .eax    = (uint32_t)fn,
         .ebx    = (uint32_t)args,
@@ -146,8 +146,7 @@ int do_wait(struct task_struct *task) {
 void do_free_tasks() {
     while (!list_isempty(&free_tasks)) {
         struct task_struct *task = list_pop_front(&free_tasks);
-        void *stack = (void *)((uint32_t)task & ~(TASK_STACK_PAGES * PAGE_SIZE_SMALL - 1));
-        free_pages(stack, TASK_STACK_PAGES, 0);
+        free_pages(task, TASK_STACK_PAGES, 0);
     }
 }
 

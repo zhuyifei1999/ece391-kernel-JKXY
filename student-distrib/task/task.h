@@ -53,15 +53,11 @@ struct task_struct {
 #define TASK_STACK_PAGES (1<<TASK_STACK_PAGES_POW)
 #define ALIGN_SP 0xf        // C likes stuffs to be aligned
 
-// the task_struct is always at the bottom of the kernel stack
+// the task_struct is always at the top of the pages of kernel stack
 static inline __always_inline
 struct task_struct *task_from_stack(void *stack) {
-    uint32_t addr;
-    addr = (uint32_t)stack / TASK_STACK_PAGES / PAGE_SIZE_SMALL;
-    addr = (addr + 1) * TASK_STACK_PAGES * PAGE_SIZE_SMALL;
-    addr -= sizeof(struct task_struct);
-    addr &= -ALIGN_SP;
-    return (struct task_struct *)addr;
+    uint32_t addr = (uint32_t)stack;
+    return (void *)(addr & ~(TASK_STACK_PAGES * PAGE_SIZE_SMALL - 1));
 }
 static inline __always_inline
 struct task_struct *get_current(void) {
