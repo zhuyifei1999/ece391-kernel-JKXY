@@ -1,3 +1,4 @@
+#include "ps2.h"
 #include "../irq.h"
 #include "../char/tty.h"
 #include "../lib/stdio.h"
@@ -142,10 +143,10 @@ bool has_shift, has_ctrl, has_alt, has_caps;
 
 static void do_function(unsigned char scancode_mapped);
 
-void keyboard_handler(struct intr_info *info) {
+static void keyboard_handler(struct intr_info *info) {
     unsigned char scancode;
-    while (inb(0x64) & 1) { // the LSB is whether there are more scancodes to read
-        scancode = inb(0x60);
+    while (inb(PS2_CTRL_PORT) & 1) { // the LSB is whether there are more scancodes to read
+        scancode = inb(PS2_DATA_PORT);
         // These are scancode prefixes. We ignore them
         if (scancode == 0xE0 || scancode == 0xE1)
             continue;
