@@ -78,10 +78,13 @@ struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
         };
     }
 
-    /* function prototype don't matter here */
-    extern void (*entry_task)(void);
+    // The position of this struct intr_info controls where the stack is going
+    // to end up, not any of the contents in the struct, bacause we are using
+    // the same code segment.
     struct intr_info *regs = (void *)((uint32_t)task +
         TASK_STACK_PAGES * PAGE_SIZE_SMALL - sizeof(struct intr_info));
+    // function prototype don't matter here
+    extern void (*entry_task)(void);
     *regs = (struct intr_info){
         .eax    = (uint32_t)fn,
         .ebx    = (uint32_t)args,
