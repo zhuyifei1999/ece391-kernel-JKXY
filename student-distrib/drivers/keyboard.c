@@ -1,6 +1,5 @@
-#include "./terminal.h"
-#include "./keyboard.h"
 #include "../irq.h"
+#include "../char/tty.h"
 #include "../lib/stdio.h"
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
@@ -9,6 +8,11 @@
 #include "../initcall.h"
 
 #define KEYBOARD_IRQ 1
+
+// TODO: the LEDs
+// This could be complicated, see
+// https://stackoverflow.com/q/20819172
+// https://stackoverflow.com/q/47847580
 
 /*
  * MSB shows:
@@ -133,31 +137,8 @@ static unsigned char scancode_map[256] = {
 #define CTRL 0x1D
 #define ALT 0x38
 
-#define BUFFER_SIZE 128
-
 unsigned char buffer_end;
 bool has_shift, has_ctrl, has_alt, has_caps;
-unsigned char keyboard_buffer[BUFFER_SIZE];
-
-void keyboard_buffer_insert(unsigned char a) {
-    if (buffer_end == BUFFER_SIZE) {
-        // full
-        return;
-    } else {
-        keyboard_buffer[buffer_end] = a;
-        buffer_end++;
-        tty_keyboard(1, a);
-    }
-}
-void keyboard_buffer_delete() {
-    if (buffer_end) {
-        buffer_end--;
-        tty_keyboard(-1, NULL);
-    }
-}
-void keyboard_buffer_clear() {
-    buffer_end = 0;
-}
 
 static void do_function(unsigned char scancode_mapped);
 
@@ -190,7 +171,7 @@ void keyboard_handler(struct intr_info *info) {
             has_alt = false;
             break;
         case CAPS:
-            has_caps = !is_caps;
+            has_caps = !has_caps;
             break;
         default:
             if (scancode >= MSB)
@@ -199,15 +180,12 @@ void keyboard_handler(struct intr_info *info) {
             if (scancode_mapped == 0)
                 continue; // unknowwn key, do nothing
             if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
-                if (keyboard_buffer_is_full()) {
-                    continue;
-                }
                 if (has_shift && !('a' < scancode_mapped < 'z') ) // shift translation
                     scancode_mapped = scancode_map[scancode | MSB];
-                if(has_shift ^ has_caps && ('a' < scancode_mapped < 'z') )
-                        scancode_mapped = scancode_map[scancode | MSB];
-                
-                keyboard_buffer_insert(scancode_mapped);
+                if (has_shift ^ has_caps && ('a' < scancode_mapped < 'z') )
+                    scancode_mapped = scancode_map[scancode | MSB];
+
+                tty_keyboard(scancode_mapped);
             } else { // function key
                 do_function(scancode_mapped);
             }
@@ -218,9 +196,14 @@ void keyboard_handler(struct intr_info *info) {
 static void do_function(unsigned char scancode_mapped) {
     switch (scancode_mapped) {
         case DO_BKSP:
-            keyboard_buffer_delete();
+            tty_keyboard('\b');
             break;
         default:
             break;
     }
 }
+
+static void init_keyboard() {
+    set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
+}
+DEFINE_INITCALL(init_keyboard, drivers);

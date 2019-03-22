@@ -4,6 +4,6 @@
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
 
-void tty_update_keyboard(int32_t flag, unsigned char a);
+void tty_keyboard(char chr);
 
 #endif

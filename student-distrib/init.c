@@ -11,7 +11,6 @@
 #include "block/initrd_b.h"
 #include "mm/paging.h"
 #include "main.h"
-#include "./drivers/terminal.h"
 
 /* Macros. */
 /* Check if the bit BIT in FLAGS is set. */

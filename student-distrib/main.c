@@ -11,7 +11,6 @@
 #include "vfs/path.h"
 #include "vfs/mount.h"
 #include "lib/string.h"
-#include "drivers/terminal.h"
 #include "lib/stdio.h"
 
 struct task_struct *swapper_task;

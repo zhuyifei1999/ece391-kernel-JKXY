@@ -163,7 +163,7 @@ static void rtc_char_test() {
         rtc_char_test_single(i);
     }
 }
-DEFINE_TEST(rtc_char_test);
+// DEFINE_TEST(rtc_char_test);
 
 // test initial rate is 2Hz (rate = 15)
 static void rtc_char_test_initial_rate_bad_input() {

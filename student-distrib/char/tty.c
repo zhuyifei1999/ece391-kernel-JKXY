@@ -1,13 +1,15 @@
-#include "./tty.h"
-#include "../drivers/keyboard.h"
+#include "tty.h"
 #include "../vfs/file.h"
 #include "../vfs/device.h"
 #include "../task/task.h"
 #include "../task/sched.h"
 #include "../structure/list.h"
+#include "../mm/kmalloc.h"
 #include "../lib/stdio.h"
+#include "../lib/string.h"
 #include "../lib/cli.h"
 #include "../atomic.h"
+#include "../initcall.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -15,23 +17,26 @@
 #define TTY_CURRENT MKDEV(5, 0)
 #define TTY_CONSOLE MKDEV(5, 1)
 
-#define MAX_BUFFER_SIZE 128
+#define BUFFER_SIZE 128
+
+#define WAKEUP_CHAR '\n'
 
 // We are gonna support (practically) infinite TTYs, because why not?
-static list ttys;
+static struct list ttys;
 
 struct tty {
     atomic_t refcount;
     uint32_t device_num;
     struct task_struct *task; // The task that's reading the tty
     // FIXME: This should be handled by the line discipline
-    uint8_t buffer_size;
-    char buffer[MAX_BUFFER_SIZE];
+    uint8_t buffer_start;
+    uint8_t buffer_end;
+    char buffer[BUFFER_SIZE];
 };
 
 struct tty *keyboard_tty;
 
-struct tty *tty_get(uint32_t device_num) {
+static struct tty *tty_get(uint32_t device_num) {
     // TODO: This should be read from the task's associated TTY, not the tty
     // that's attached to the keyboard
     if (device_num == TTY_CURRENT)
@@ -71,6 +76,22 @@ out:
     return ret;
 }
 
+static void tty_put(struct tty *tty) {
+    if (atomic_dec(&tty->refcount))
+        return;
+
+    unsigned long flags;
+    cli_and_save(flags);
+
+    // No more reference count, let's enter a critical section and recheck
+    if (!atomic_read(&tty->refcount)) {
+        list_remove(&ttys, tty);
+        kfree(tty);
+    }
+
+    restore_flags(flags);
+}
+
 static int32_t tty_open(struct file *file, struct inode *inode) {
     file->vendor = tty_get(inode->rdev);
     if (IS_ERR(file->vendor))
@@ -78,39 +99,65 @@ static int32_t tty_open(struct file *file, struct inode *inode) {
     return 0;
 }
 static void tty_release(struct file *file) {
-    clear();
-    return 0;
+    tty_put(file->vendor);
 }
 
-static int32_t tty_read(void *buf, int32_t nbytes) {
+static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
+    struct tty *tty = file->vendor;
+
+    // Only one task can wait per tty
+    if (tty->task)
+        return -EBUSY;
+
+    tty->task = current;
+
     current->state = TASK_UNINTERRUPTIBLE;
-    while (!ready_for_reading)
+    // Until the last character in buffer is '\n'
+    while (!tty->buffer_end || tty->buffer[tty->buffer_end - 1] != WAKEUP_CHAR)
         schedule();
     current->state = TASK_RUNNING;
-    ready_for_reading = false;
 
-    // FIXME: Do we really have so much data?!
-    memcpy(buf, keyboard_buffer_copy, nbytes)
+    tty->task = NULL;
+
+    if (nbytes > tty->buffer_end - tty->buffer_start)
+        nbytes = tty->buffer_end - tty->buffer_start;
+
+    memcpy(buf, &tty->buffer[tty->buffer_start], nbytes);
+
+    tty->buffer_start += nbytes;
+    // Buffer finished reading, clear it.
+    if (tty->buffer_start == tty->buffer_end)
+        tty->buffer_start = tty->buffer_end;
+
     return nbytes;
 }
-static int32_t tty_write(void *buf, int32_t nbytes) {
-    for(i=0; i<nbytes;++i) {
-        putc(*(((unsigned char *)buf)+i));
+static int32_t tty_write(struct file *file, const char *buf, uint32_t nbytes) {
+    // TODO: multiple TTY support
+    int i;
+    for (i = 0; i < nbytes; i++) {
+        putc(buf[i]);
     }
     return i;
 }
-void tty_keyboard(int32_t flag, unsigned char a) {
-    if (flag==-1) {
-        backspace();
-    } else if (flag==1) {
-        putc(a);
-        if (a == '\n') {
-            memcpy()
-            buffer_end_copy = buffer_end;
-            ready_for_reading = true;
-            keyboard_buffer_clear();
-        }
 
+void tty_keyboard(char chr) {
+    if (!keyboard_tty)
+        return;
+
+    if (chr == '\b') {
+        if (keyboard_tty->buffer_end) {
+            putc(chr);
+            keyboard_tty->buffer_end--;
+        }
+    } else {
+        if (keyboard_tty->buffer_end < BUFFER_SIZE) {
+            keyboard_tty->buffer[keyboard_tty->buffer_end++] = chr;
+            putc(chr);
+
+            if (chr == WAKEUP_CHAR && keyboard_tty->task) {
+                wake_up_process(keyboard_tty->task);
+            }
+        }
     }
 }
 
@@ -121,11 +168,12 @@ static struct file_operations tty_dev_op = {
     .release = &tty_release,
 };
 
-
 static void init_tty_char() {
     list_init(&ttys);
     register_dev(S_IFCHR, MKDEV(TTY_MAJOR, MINORMASK), &tty_dev_op);
     register_dev(S_IFCHR, TTY_CURRENT, &tty_dev_op);
     register_dev(S_IFCHR, TTY_CONSOLE, &tty_dev_op);
+
+    keyboard_tty = tty_get(TTY_CONSOLE);
 }
 DEFINE_INITCALL(init_tty_char, drivers);
