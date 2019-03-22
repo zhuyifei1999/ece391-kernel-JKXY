@@ -117,6 +117,8 @@ uint8_t rtc_get_second() {
 
 #include "../tests.h"
 #if RUN_TESTS
+// The scheduler practically spins, but we are just giving other threads a chance to run
+#include "../task/sched.h"
 /* RTC Test
  *
  * Test whether rtc interrupt frequency is 1024Hz
@@ -131,12 +133,12 @@ static void rtc_test() {
 
     init_second = rtc_get_second();
     while ((test_second = rtc_get_second()) == init_second) {
-        asm volatile ("hlt" : : : "memory");
+        schedule();
     }
     init_count = rtc_irq_count;
 
     while (rtc_get_second() == test_second) {
-        asm volatile ("hlt" : : : "memory");
+        schedule();
     }
 
     uint16_t actual_freq = rtc_irq_count - init_count;
