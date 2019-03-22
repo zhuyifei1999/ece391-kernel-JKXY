@@ -178,8 +178,11 @@ static void keyboard_handler(struct intr_info *info) {
             if (scancode >= MSB)
                 continue; // release key does not matter
             unsigned char scancode_mapped = scancode_map[scancode];
-            if (scancode_mapped == 0)
-                continue; // unknowwn key, do nothing
+            if (scancode_mapped == 0) {
+                // unknown key. TODO: remove this after CP2
+                printf("Unknown key: 0x%#x\n", scancode);
+                continue;
+            }
             if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
                 if (has_shift && !('a' < scancode_mapped && scancode_mapped < 'z') ) // shift translation
                     scancode_mapped = scancode_map[scancode | MSB];
