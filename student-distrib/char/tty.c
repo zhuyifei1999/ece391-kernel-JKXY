@@ -122,6 +122,7 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
 
     tty->task = NULL;
 
+    // Don't read more than you can read
     if (nbytes > tty->buffer_end - tty->buffer_start)
         nbytes = tty->buffer_end - tty->buffer_start;
 
@@ -147,13 +148,17 @@ void tty_keyboard(char chr) {
     if (!keyboard_tty)
         return;
 
+    // When you press enter, the line is committed
+    if (tty_should_read(keyboard_tty))
+        return;
+
     if (chr == '\b') {
         if (keyboard_tty->buffer_end) {
             putc(chr);
             keyboard_tty->buffer_end--;
         }
     } else {
-        if (keyboard_tty->buffer_end < BUFFER_SIZE && !tty_should_read(keyboard_tty)) {
+        if (keyboard_tty->buffer_end < BUFFER_SIZE) {
             keyboard_tty->buffer[keyboard_tty->buffer_end++] = chr;
             putc(chr);
 
@@ -173,6 +178,7 @@ static struct file_operations tty_dev_op = {
 
 // FIXME: support ANSI/VT100. this is evil
 // http://www.termsys.demon.co.uk/vtansi.htm
+// FIXME: This is using files in an interrupt handler.
 void tty_clear() {
     clear();
     tty_write(NULL, keyboard_tty->buffer, keyboard_tty->buffer_end);

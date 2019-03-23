@@ -86,6 +86,7 @@ void launch_tests() {
     sti();
 
     _test_verbose = false;
+    // _test_verbose = true;
     test_passed = test_failed = 0;
 
     printf("Kernel self-test running in PID %d Comm: %s\n", current->pid, current->comm);
