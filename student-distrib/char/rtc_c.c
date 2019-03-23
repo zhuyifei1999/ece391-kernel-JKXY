@@ -136,6 +136,8 @@ static void rtc_char_expect_rate(struct file *dev, uint8_t rate) {
     uint16_t count = 0;
     while (rtc_get_second() == test_second) {
         count++;
+        // TODO: Remove after CP2
+        // putc('I');
         TEST_ASSERT(filp_read(dev, &junk, 0) == 0);
     }
 
