@@ -187,9 +187,9 @@ static void keyboard_handler(struct intr_info *info) {
                 continue;
             }
             if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
-                if (has_shift && !('a' < scancode_mapped && scancode_mapped < 'z') ) // shift translation
+                if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
                     scancode_mapped = scancode_map[scancode | MSB];
-                if (has_shift ^ has_caps && ('a' < scancode_mapped && scancode_mapped < 'z') )
+                if (has_shift ^ has_caps && ('a' <= scancode_mapped && scancode_mapped <= 'z') )
                     scancode_mapped = scancode_map[scancode | MSB];
 
                 tty_keyboard(scancode_mapped);
