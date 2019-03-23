@@ -118,16 +118,6 @@ DEFINE_INITCALL(init_rtc_char, drivers);
 #include "../tests.h"
 #if RUN_TESTS
 #include "../err.h"
-static void show_spinner() {
-    char icons[] = {'|', '/', '-', '\\'};
-    static uint8_t i;
-    char icon = icons[i];
-    putc('\b');
-    putc(icon);
-    i++;
-    if (i >= sizeof(icons))
-        i = 0;
-}
 // test that reading rtc char device works as expected
 static void rtc_char_expect_rate(struct file *dev, uint8_t rate) {
     test_printf("RTC rate = %d\n", rate);
@@ -143,16 +133,11 @@ static void rtc_char_expect_rate(struct file *dev, uint8_t rate) {
         TEST_ASSERT(filp_read(dev, &junk, 0) == 0);
     }
 
-    putc(' ');
-
     uint16_t count = 0;
     while (rtc_get_second() == test_second) {
         count++;
-        show_spinner();
         TEST_ASSERT(filp_read(dev, &junk, 0) == 0);
     }
-
-    putc('\b');
 
     test_printf("RTC interrupt frequency = %d Hz\n", count);
     // The allowed range is 0.9 - 1.1 times expected value
@@ -178,7 +163,7 @@ static void rtc_char_test() {
         rtc_char_test_single(i);
     }
 }
-DEFINE_TEST(rtc_char_test);
+// DEFINE_TEST(rtc_char_test);
 
 // test initial rate is 2Hz (rate = 15)
 static void rtc_char_test_initial_rate_bad_input() {
