@@ -24,15 +24,16 @@ int kthreadd(void *args) {
     strcpy(kthreadd_task->comm, "kthreadd");
 
     while (1) {
+        current->state = TASK_INTERRUPTIBLE;
+        while (list_isempty(&kthread_create_queue))
+            schedule();
         current->state = TASK_RUNNING;
-        if (!list_isempty(&kthread_create_queue)) {
+
+        while (!list_isempty(&kthread_create_queue)) {
             struct create_entry *entry = list_pop_front(&kthread_create_queue);
             entry->kthread = kernel_thread(entry->fn, entry->args);
             wake_up_process(entry->caller);
         }
-        current->state = TASK_INTERRUPTIBLE;
-
-        schedule();
     }
 }
 
