@@ -35,6 +35,9 @@ static int32_t ece391fs_read_dentry_by_name(struct super_block *sb, const char *
     int i;
     for (i = 0; i < boot_block->num_dentry; i++) {
         struct ece391fs_dentry *dentry_read = &boot_block->dentries[i];
+        // Names longer than maximum should fail
+        if (strlen(fname) > sizeof(dentry_read->name))
+            return -ENOENT;
         if (!strncmp(dentry_read->name, fname, sizeof(dentry_read->name))) {
             *dentry = dentry_read;
             return 1;
@@ -319,4 +322,11 @@ static void ece391fs_ro_test() {
     TEST_ASSERT(!filp_close(file));
 }
 DEFINE_TEST(ece391fs_ro_test);
+
+// test that names longer than maximum fails
+__testfunc
+static void ece391fs_longname_test() {
+    TEST_ASSERT(IS_ERR(filp_open("verylargetextwithverylongname.txt", 0, 0)));
+}
+DEFINE_TEST(ece391fs_longname_test);
 #endif
