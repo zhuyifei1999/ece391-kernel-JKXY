@@ -109,10 +109,13 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
     struct tty *tty = file->vendor;
 
     // Only one task can wait per tty
-    if (tty->task)
+    cli();
+    if (tty->task) {
+        sti();
         return -EBUSY;
-
+    }
     tty->task = current;
+    sti();
 
     current->state = TASK_UNINTERRUPTIBLE;
     // Until the last character in buffer is '\n'

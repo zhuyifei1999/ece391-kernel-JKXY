@@ -82,8 +82,14 @@ static int kernel_main(void *args) {
 
     // device (1, 0) is 0th initrd
     struct file *initrd_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
-    do_mount(initrd_block, get_sb_op_by_name("ece391fs"), &root_path);
+    if (IS_ERR(initrd_block))
+        panic("Could not open initrd: %d\n", PTR_ERR(initrd_block));
+    int32_t res = do_mount(initrd_block, get_sb_op_by_name("ece391fs"), &root_path);
+    if (res < 0)
+        panic("Could not mount root: %d\n", res);
     swapper_task->cwd = filp_open("/", 0, 0);
+    if (IS_ERR(swapper_task->cwd))
+        panic("Could not set working directory to root directory: %d\n", PTR_ERR(swapper_task->cwd));
 
     struct task_struct *kthreadd_task = kernel_thread(&kthreadd, NULL);
     wake_up_process(kthreadd_task);

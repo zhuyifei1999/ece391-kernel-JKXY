@@ -117,9 +117,9 @@ static int32_t ece391fs_dir_read(struct file *file, char *buf, uint32_t nbytes) 
 
 static int32_t ece391fs_read(struct file *file, char *buf, uint32_t nbytes) {
     switch (file->inode->mode & S_IFMT) {
-    case S_IFREG:;
+    case S_IFREG:
         return ece391fs_file_read(file, buf, nbytes);
-    case S_IFDIR:;
+    case S_IFDIR:
         return ece391fs_dir_read(file, buf, nbytes);
     default:
         return -EINVAL; // VFS should handle the rest
@@ -136,7 +136,7 @@ int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flag
     *next = kmalloc(sizeof(**next));
     if (!next)
         return -ENOMEM;
-    **next = (struct inode) {
+    **next = (struct inode){
         .sb = inode->sb,
         .vendor = dentry,
     };

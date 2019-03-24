@@ -1,5 +1,6 @@
 #include "../drivers/rtc.h"
 #include "../lib/string.h"
+#include "../lib/cli.h"
 #include "../vfs/file.h"
 #include "../vfs/device.h"
 #include "../mm/kmalloc.h"
@@ -25,9 +26,13 @@ static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
     struct rtc_private *private = file->vendor;
 
     // Only one task can wait per struct file
-    if (private->task)
+    cli();
+    if (private->task) {
+        sti();
         return -EBUSY;
+    }
     private->task = current;
+    sti();
 
     // TODO: For the linux subsystem, write number of interrupts sinse last read
     uint32_t init_counter_div = private->counter_div;
@@ -37,8 +42,10 @@ static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
         schedule();
     current->state = TASK_RUNNING;
 
+    cli();
     private->counter_div = 0;
     private->task = NULL;
+    sti();
     return 0;
 }
 

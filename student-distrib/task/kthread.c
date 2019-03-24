@@ -56,7 +56,8 @@ struct task_struct *kthread(int (*fn)(void *args), void *args) {
 
     wake_up_process(kthreadd_task);
     current->state = TASK_UNINTERRUPTIBLE;
-    schedule();
+    while (!entry->kthread)
+        schedule();
     current->state = TASK_RUNNING;
 
     ret = entry->kthread;
