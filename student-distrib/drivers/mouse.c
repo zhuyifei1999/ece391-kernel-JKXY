@@ -52,11 +52,12 @@ static void mouse_handler(struct intr_info *info){
     byte_3 = inb(PS2_DATA_PORT);
     dx = byte_1;
     dy = byte_1;
+    // read the signal bits of package
     dx = (int32_t)byte_2 - ((dx << 4) & 0x100);
     dy = (int32_t)byte_3 - ((dy << 3) & 0x100);
     mouse_x += dx;
     mouse_y -= dy;
-
+    // check the position of mouse cursor
     if (mouse_x < 0)
         mouse_x = 0;
     else if (mouse_x >= NUM_COLS * SLOW_FACTOR)
