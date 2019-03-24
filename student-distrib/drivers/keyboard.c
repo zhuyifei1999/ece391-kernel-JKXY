@@ -52,6 +52,7 @@
 #define DO_DARROW 0xFF
 #define DO_RARROW 0xFF
 
+// scancode map of the keyboard with capital letters and symbols
 static unsigned char scancode_map[256] = {
     [0x1E]='a',[0x9E]='A',
     [0x30]='b',[0xB0]='B',
@@ -144,6 +145,14 @@ bool has_shift, has_ctrl, has_alt, has_caps;
 
 static void do_function(unsigned char scancode_mapped);
 
+/*
+ *   keyboard_handler
+ *   DESCRIPTION: handle interupt comes from the keyboard
+ *   INPUTS: intr_info
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 static void keyboard_handler(struct intr_info *info) {
     unsigned char scancode;
     while (inb(PS2_CTRL_PORT) & 1) { // the LSB is whether there are more scancodes to read
@@ -155,6 +164,7 @@ static void keyboard_handler(struct intr_info *info) {
         if (scancode == 0xE0 || scancode == 0xE1)
             continue;
         switch (scancode) {
+        // Cases change the status of SHIFT
         case LSHIFT:
         case RSHIFT:
             has_shift = true;
@@ -163,18 +173,21 @@ static void keyboard_handler(struct intr_info *info) {
         case RSHIFT | MSB:
             has_shift = false;
             break;
+        // Cases change the status of CTRL
         case CTRL:
             has_ctrl = true;
             break;
         case CTRL | MSB:
             has_ctrl = false;
             break;
+        // Cases change the status of ALT
         case ALT:
             has_alt = true;
             break;
         case ALT | MSB:
             has_alt = false;
             break;
+        // Case change the status of CAPS
         case CAPS:
             has_caps = !has_caps;
             break;
@@ -201,6 +214,14 @@ static void keyboard_handler(struct intr_info *info) {
     }
 }
 
+/*
+ *   do_function
+ *   DESCRIPTION: wake the keyboard thread due to the scancode
+ *   INPUTS: scancode_mapped
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 static void do_function(unsigned char scancode_mapped) {
     switch (scancode_mapped) {
         case DO_BKSP:
@@ -216,6 +237,14 @@ static void do_function(unsigned char scancode_mapped) {
     }
 }
 
+/*
+ *   init_keyboard
+ *   DESCRIPTION: initialize the keyboard driver
+ *   INPUTS: none
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 static void init_keyboard() {
     set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
 }
