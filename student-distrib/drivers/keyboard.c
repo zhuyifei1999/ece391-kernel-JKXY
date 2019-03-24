@@ -7,7 +7,6 @@
 #include "../lib/cli.h"
 #include "../lib/io.h"
 #include "../initcall.h"
-#include "tests.h"
 
 #define KEYBOARD_IRQ 1
 
@@ -250,7 +249,7 @@ static void init_keyboard() {
 }
 DEFINE_INITCALL(init_keyboard, drivers);
 
-
+#include "../tests.h"
 #if RUN_TESTS
 /* keyboard Entry Test
  *
