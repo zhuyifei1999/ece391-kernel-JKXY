@@ -31,7 +31,16 @@
 // ym	Y-Axis Movement Value
 static int32_t mouse_x, mouse_y;
 
+/*
+ *   mouse_handler
+ *   DESCRIPTION: handle interupt comes from the mouse
+ *   INPUTS: intr_info
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 static void mouse_handler(struct intr_info *info){
+    // mouse's package
     unsigned char byte_1, byte_2, byte_3;
     int32_t dx, dy;
     if (!(inb(PS2_CTRL_PORT) & 1)) { // LSB = have something to read
@@ -59,6 +68,14 @@ static void mouse_handler(struct intr_info *info){
     update_mouse(mouse_x / SLOW_FACTOR, mouse_y / SLOW_FACTOR);
 }
 
+/*
+ *   init_mouse
+ *   DESCRIPTION: initialize the keyboard driver
+ *   INPUTS: none
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 static void init_mouse() {
     set_irq_handler(MOUSE_IRQ, &mouse_handler);
 }
