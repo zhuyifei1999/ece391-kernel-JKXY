@@ -11,7 +11,8 @@
 #define NUM_COLS    80
 #define NUM_ROWS    25
 
-#define SLOW_FACTOR 16
+#define SLOW_FACTOR_X 16
+#define SLOW_FACTOR_Y 32
 
 // Generic PS/2 Mouse Packet Bits
 // BYTE	7	6	5	4	3	2	1	0
@@ -60,13 +61,13 @@ static void mouse_handler(struct intr_info *info){
     // check the position of mouse cursor
     if (mouse_x < 0)
         mouse_x = 0;
-    else if (mouse_x >= NUM_COLS * SLOW_FACTOR)
-        mouse_x = NUM_COLS * SLOW_FACTOR - 1;
+    else if (mouse_x >= NUM_COLS * SLOW_FACTOR_X)
+        mouse_x = NUM_COLS * SLOW_FACTOR_X - 1;
     if (mouse_y < 0)
         mouse_y = 0;
-    else if (mouse_y >= NUM_ROWS * SLOW_FACTOR)
-        mouse_y = NUM_ROWS * SLOW_FACTOR -1;
-    update_mouse(mouse_x / SLOW_FACTOR, mouse_y / SLOW_FACTOR);
+    else if (mouse_y >= NUM_ROWS * SLOW_FACTOR_Y)
+        mouse_y = NUM_ROWS * SLOW_FACTOR_Y -1;
+    update_mouse(mouse_x / SLOW_FACTOR_X, mouse_y / SLOW_FACTOR_Y);
 }
 
 /*
