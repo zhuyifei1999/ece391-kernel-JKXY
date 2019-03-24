@@ -9,18 +9,36 @@
 #include "../err.h"
 #include "../errno.h"
 
+/*
+ *   inode_decref
+ *   DESCRIPTION: destroy the inode 
+ *   INPUTS: struct inode *inode
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 void inode_decref(struct inode *inode) {
     int32_t refcount = atomic_dec(&inode->refcount);
     if (refcount)
         return;
 
     // ok, it says no more references, time to deallocate
+    // use superblock to deallocate
     (*inode->sb->op->write_inode)(inode);
     (*inode->sb->op->put_inode)(inode);
 }
 
+/*
+ *   filp_openat
+ *   DESCRIPTION: open the file 
+ *   INPUTS: struct int32_t dfd, char *path, uint32_t flags, uint16_t mode
+ *   OUTPUTS: none
+ *   RETURN VALUE: struct file
+ *   SIDE EFFECTS: none
+ */
 struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
     struct path *path_rel = path_fromstr(path);
+    // check if the file's path is valid
     if (IS_ERR(path_rel))
         return ERR_CAST(path_rel);
 
@@ -67,6 +85,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
     bool created = false;
 
     struct list_node *node;
+    // create the linked list of components
     list_for_each(&path_dest->components, node) {
         char *component = node->value;
         if (!*component)
@@ -83,6 +102,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
             ret = ERR_PTR(res);
             goto out_inode_decref;
         }
+        // destroy the inode
         inode_decref(inode);
         inode = next_inode;
     }
@@ -109,6 +129,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         break;
     }
 
+    // allocate the space in the kernel
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
         ret = ERR_PTR(-ENOMEM);
@@ -130,6 +151,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         goto out_inode_decref;
     }
 
+// destroy three contents
 out_inode_decref:
     inode_decref(inode);
 
@@ -145,10 +167,27 @@ out_rel:
     return ret;
 }
 
+/*
+ *   filp_open
+ *   DESCRIPTION: open the file in the current working dirctory
+ *   INPUTS: char *path, uint32_t flags, uint16_t mode
+ *   OUTPUTS: none
+ *   RETURN VALUE: file
+ *   SIDE EFFECTS: none
+ */
 struct file *filp_open(char *path, uint32_t flags, uint16_t mode) {
     return filp_openat(AT_FDCWD, path, flags, mode);
 }
 
+/*
+ *   filp_open_anondevice
+ *   DESCRIPTION: open the device without a dev file
+ *   INPUTS: uint32_t dev, uint32_t flags, uint16_t mode
+ *   OUTPUTS: none
+ *   RETURN VALUE: file
+ *   operation
+ *   SIDE EFFECTS: none
+ */
 struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     struct file_operations *file_op = get_dev_file_op(mode, dev);
     if (!file_op)
@@ -160,11 +199,13 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
 
     struct file *ret;
 
+    // link the inode to a dummyinode
     struct inode *inode = mk_dummyinode();
     if (IS_ERR(inode)) {
         ret = ERR_CAST(inode);
         goto out_destroy_path;
     }
+    // assign the inode's dev number to dev
     inode->rdev = dev;
     inode->mode = mode;
 
@@ -173,6 +214,8 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
         ret = ERR_PTR(-ENOMEM);
         goto out_inode_decref;
     }
+
+    // assign the value to the ret
     *ret = (struct file){
         .op = file_op,
         .inode = inode,
@@ -183,6 +226,7 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     atomic_set(&ret->refcount, 1);
     atomic_inc(&inode->refcount);
 
+    // check the res's value
     int32_t res = (*ret->op->open)(ret, inode);
     if (res < 0) {
         kfree(ret);
@@ -200,9 +244,28 @@ out_destroy_path:
     return ret;
 }
 
+/*
+ *   filp_seek
+ *   DESCRIPTION: write the file
+ *   INPUTS: struct file *file, const void *buf, uint32_t nbytes
+ *   OUTPUTS: none
+ *   RETURN VALUE: write buffer and nbyte through the file's write
+ *   operation
+ *   SIDE EFFECTS: none
+ */
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
     return (*file->op->seek)(file, offset, whence);
 }
+
+/*
+ *   filp_read
+ *   DESCRIPTION: read the file
+ *   INPUTS: struct file *file, const void *buf, uint32_t nbytes
+ *   OUTPUTS: none
+ *   RETURN VALUE: read by buffer and nbyte in the file's write
+ *   operation
+ *   SIDE EFFECTS: none
+ */
 int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
     char *buf_char = buf;
 
@@ -224,6 +287,16 @@ int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
     // }
     // return bytes_read;
 }
+
+/*
+ *   filp_write
+ *   DESCRIPTION: write the file
+ *   INPUTS: struct file *file, const void *buf, uint32_t nbytes
+ *   OUTPUTS: none
+ *   RETURN VALUE: write through buffer and nbyte in the file's write
+ *   operation
+ *   SIDE EFFECTS: none
+ */
 int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes) {
     const char *buf_char = buf;
 
@@ -232,6 +305,7 @@ int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes) {
     if (file->flags & O_APPEND)
         filp_seek(file, 0, SEEK_END);
 
+    // invoke the write operation
     return (*file->op->write)(file, buf_char, nbytes);
 
     // int32_t bytes_written = 0;
@@ -247,25 +321,43 @@ int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes) {
     // }
     // return bytes_written;
 }
+
+/*
+ *   filp_close
+ *   DESCRIPTION: close the file
+ *   INPUTS: struct file *file
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 int32_t filp_close(struct file *file) {
     int32_t refcount = atomic_dec(&file->refcount);
     if (refcount)
         return 0;
 
     (*file->op->release)(file);
+    // destroy the path
     path_destroy(file->path);
     inode_decref(file->inode);
     kfree(file);
     return 0;
 }
 
+/*
+ *   default_file_seek
+ *   DESCRIPTION: seek the file
+ *   INPUTS: struct file *file, int32_t offset, int32_t whence 
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
     if ((file->inode->mode & S_IFMT) != S_IFREG)
         return -ESPIPE;
 
     int32_t new_pos;
     uint32_t size = file->inode->size;
-
+    // jump to different seek mode according to the whence
     switch (whence) {
     case SEEK_SET:
         new_pos = offset;
@@ -280,11 +372,16 @@ int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
         return -EINVAL;
     }
 
+    // check if the position we find is out of the range
     if (new_pos >= size || new_pos < 0)
         return -EINVAL;
     file->pos = new_pos;
     return new_pos;
 }
+
+
+// default operation makes nothing
+// return nonvalue
 int32_t default_file_read(struct file *file, char *buf, uint32_t nbytes) {
     return -EINVAL;
 }
@@ -316,7 +413,16 @@ int32_t default_ino_lookup(struct inode *inode, const char *name, uint32_t flags
 void default_ino_truncate(struct inode *inode) {
 }
 
+/*
+ *   fill_default_file_op
+ *   DESCRIPTION: fill the file_operation's instructions
+ *   INPUTS: struct file_operations *file_op
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 void fill_default_file_op(struct file_operations *file_op) {
+    // fill with the funtion pointer
     if (!file_op->seek)
         file_op->seek = &default_file_seek;
     if (!file_op->read)
@@ -329,7 +435,16 @@ void fill_default_file_op(struct file_operations *file_op) {
         file_op->release = &default_file_release;
 }
 
+/*
+ *   fill_default_ino_op
+ *   DESCRIPTION: fill the inode_operation's instructions
+ *   INPUTS: struct inode_operations *ino_op
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 void fill_default_ino_op(struct inode_operations *ino_op) {
+    // fill with the funtion pointer
     if (!ino_op->create)
         ino_op->create = &default_ino_create;
     if (!ino_op->lookup)
