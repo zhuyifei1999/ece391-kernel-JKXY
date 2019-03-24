@@ -7,6 +7,7 @@
 #include "../lib/cli.h"
 #include "../lib/io.h"
 #include "../initcall.h"
+#include "tests.h"
 
 #define KEYBOARD_IRQ 1
 
@@ -219,3 +220,41 @@ static void init_keyboard() {
     set_irq_handler(KEYBOARD_IRQ, &keyboard_handler);
 }
 DEFINE_INITCALL(init_keyboard, drivers);
+
+
+#if RUN_TESTS
+/* keyboard Entry Test
+ *
+ * Asserts that scancode caps-ing works correctly
+ * Coverage: keyboard scancode match
+ */
+static void keyboard_test() {
+    int i;
+    unsigned char test_scancode_lib[5] = { 0x11 , 0x13 , 0x1e, 0x1f , 0x20 };
+    unsigned char test_output_lib[10] = { 'w', 'r', 'a', 's', 'd', 'W', 'R', 'A', 'S', 'D'};
+    bool caps, shift;
+
+    // testcase both shift and caps are 1
+    shift = 1;
+    caps = 1;
+    for (i = 0; i < 5; i++) {
+        TEST_ASSERT(scancode_to_char(test_scancode_lib[i], shift, caps) == test_output_lib[i]);
+    }
+    return;
+
+    // testcase both shift and caps are 0
+    shift = 0;
+    caps = 0;
+    for (i = 0; i < 5; i++) {
+        TEST_ASSERT(scancode_to_char(test_scancode_lib[i], shift, caps) == test_output_lib[i]);
+    }
+
+    // testcase shift is 1
+    shift = 1;
+    for (i = 0; i < 5; i++) {
+        TEST_ASSERT(scancode_to_char(test_scancode_lib[i], shift, caps) == test_output_lib[i+5]);
+    }
+}
+DEFINE_TEST(keyboard_test);
+#endif
+
