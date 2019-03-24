@@ -269,7 +269,7 @@ static void keyboard_test() {
     has_shift = 1;
     has_caps = 1;
     for (i = 0; i < 5; i++) {
-        scancode = i;
+        scancode = test_scancode_lib[i];
         scancode_mapped = scancode_map[scancode];
         if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
             if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
@@ -284,7 +284,7 @@ static void keyboard_test() {
     has_shift = 0;
     has_caps = 0;
     for (i = 0; i < 5; i++) {
-        scancode = i;
+        scancode = test_scancode_lib[i];
         scancode_mapped = scancode_map[scancode];
         if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
             if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
@@ -298,7 +298,7 @@ static void keyboard_test() {
     // testcase shift is 1
     has_shift = 1;
     for (i = 0; i < 5; i++) {
-        scancode = i;
+        scancode = test_scancode_lib[i];
         scancode_mapped = scancode_map[scancode];
         if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
             if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
