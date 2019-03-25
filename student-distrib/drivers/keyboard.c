@@ -252,6 +252,7 @@ DEFINE_INITCALL(init_keyboard, drivers);
 #include "../tests.h"
 #if RUN_TESTS
 
+
 /* keyboard Entry Test
  *
  * Asserts that scancode caps-ing works correctly
@@ -262,8 +263,9 @@ static void keyboard_test() {
     int i;
     unsigned char test_scancode_lib[5] = {0x11 , 0x13 , 0x1e, 0x1f , 0x20};
     unsigned char test_output_lib[10] = {'w', 'r', 'a', 's', 'd', 'W', 'R', 'A', 'S', 'D'};
-    bool has_caps, has_shift;
+    bool has_caps, has_shift, has_alt;
     unsigned char scancode_mapped, scancode;
+    has_alt = 0;
 
     // testcase both shift and caps are 1
     has_shift = 1;
@@ -306,7 +308,7 @@ static void keyboard_test() {
             if (has_shift ^ has_caps && ('a' <= scancode_mapped && scancode_mapped <= 'z') )
                 scancode_mapped = scancode_map[scancode | MSB];
         }
-        TEST_ASSERT(scancode_mapped == test_output_lib[i]);
+        TEST_ASSERT(scancode_mapped == test_output_lib[i+5]);
     }
 }
 
