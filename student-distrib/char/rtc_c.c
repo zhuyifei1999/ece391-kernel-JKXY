@@ -22,6 +22,14 @@ struct rtc_private {
 
 struct list rtc_privates;
 
+/*
+ *   rtc_read
+ *   DESCRIPTION: read file's rtc's freqency.
+ *   INPUTS: struct file *file, char *buf, uint32_t nbytes
+ *   OUTPUTS: none
+ *   RETURN VALUE: int32_t
+ *   SIDE EFFECTS: none
+ */
 static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
     struct rtc_private *private = file->vendor;
 
@@ -54,7 +62,14 @@ static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
     return 0;
 }
 
-// set the frequency of rtc
+/*
+ *   rtc_write
+ *   DESCRIPTION: set file's rtc's freqency.
+ *   INPUTS: struct file *file, char *buf, uint32_t nbytes
+ *   OUTPUTS: none
+ *   RETURN VALUE: int32_t
+ *   SIDE EFFECTS: none
+ */
 static int32_t rtc_write(struct file *file, const char *buf, uint32_t nbytes) {
     // TODO: For the linux subsystem, block this and force use ioctl
     uint32_t freq;
@@ -80,6 +95,14 @@ static int32_t rtc_write(struct file *file, const char *buf, uint32_t nbytes) {
     return nbytes;
 }
 
+/*
+ *   rtc_open
+ *   DESCRIPTION: insert the task through rtc's private
+ *   INPUTS: struct file *file, struct inode *inode
+ *   OUTPUTS: none
+ *   RETURN VALUE: int32_t
+ *   SIDE EFFECTS: none
+ */
 static int32_t rtc_open(struct file *file, struct inode *inode) {
     // allocate memory
     struct rtc_private *private = kmalloc(sizeof(*private));
@@ -96,7 +119,15 @@ static int32_t rtc_open(struct file *file, struct inode *inode) {
     return 0;
 }
 
-// release memory
+
+/*
+ *   rtc_release
+ *   DESCRIPTION: release memory of rtc
+ *   INPUTS: struct file *file
+ *   OUTPUTS: none
+ *   RETURN VALUE: int32_t
+ *   SIDE EFFECTS: none
+ */
 static void rtc_release(struct file *file) {
     list_remove(&rtc_privates, file->vendor);
     kfree(file->vendor);
@@ -110,6 +141,14 @@ static struct file_operations rtc_dev_op = {
     .release = &rtc_release,
 };
 
+/*
+ *   rtc_handler
+ *   DESCRIPTION: handle rtc's package
+ *   INPUTS: none
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 static void rtc_handler() {
     struct list_node *node;
     // iterate through each node of rtc_privates (list of pointer to structs)
@@ -135,7 +174,14 @@ static void rtc_handler() {
     }
 }
 
-// initialize rtc
+/*
+ *   init_rtc_char
+ *   DESCRIPTION: initialize the rtc
+ *   INPUTS: none
+ *   OUTPUTS: none
+ *   RETURN VALUE: none
+ *   SIDE EFFECTS: none
+ */
 static void init_rtc_char() {
     list_init(&rtc_privates);
     register_rtc_handler(&rtc_handler);
