@@ -30,6 +30,7 @@ struct ece391fs_boot_block {
 
 // These are just here so that are are acting according to the specs, even
 // for in-kernel static functions...
+// This finds the dentry given the super block and file name
 static int32_t ece391fs_read_dentry_by_name(struct super_block *sb, const char *fname, struct ece391fs_dentry **dentry) {
     struct ece391fs_boot_block *boot_block = sb->vendor;
     int i;
@@ -45,6 +46,8 @@ static int32_t ece391fs_read_dentry_by_name(struct super_block *sb, const char *
     }
     return -ENOENT;
 }
+
+// This finds the dentry given the super block and dentry index
 static int32_t ece391fs_read_dentry_by_index(struct super_block *sb, uint32_t index, struct ece391fs_dentry **dentry) {
     struct ece391fs_boot_block *boot_block = sb->vendor;
     if (index >= boot_block->num_dentry)
@@ -52,11 +55,14 @@ static int32_t ece391fs_read_dentry_by_index(struct super_block *sb, uint32_t in
     *dentry = &boot_block->dentries[index];
     return 1;
 }
+
+// This reads at most one block of data into buf
 static int32_t ece391fs_read_data(struct super_block *sb, uint32_t inode, uint32_t offset, char *buf, uint32_t length) {
     struct ece391fs_boot_block *boot_block = sb->vendor;
     uint32_t inode_block_pos = (inode + 1) * BLOCK_SIZE;
     uint32_t block_id;
     int32_t res;
+    // Find block id
     res = filp_seek(sb->dev,
         inode_block_pos + (offset / BLOCK_SIZE + 1) * sizeof(uint32_t), SEEK_SET);
     if (res < 0)
@@ -65,6 +71,7 @@ static int32_t ece391fs_read_data(struct super_block *sb, uint32_t inode, uint32
     if (res < 0)
         return res;
 
+    // seek to the block and read it
     res = filp_seek(sb->dev,
         (boot_block->num_inode + block_id + 1) * BLOCK_SIZE + offset % BLOCK_SIZE, SEEK_SET);
     if (res < 0)
@@ -75,6 +82,7 @@ static int32_t ece391fs_read_data(struct super_block *sb, uint32_t inode, uint32
     return res;
 }
 
+// this reads a file until the file is fully read or nbytes runs out, whichever comes first
 static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes) {
     // maximum to read
     if (nbytes > file->inode->size - file->pos)
@@ -83,6 +91,7 @@ static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes)
     uint32_t read = nbytes;
     while (nbytes) {
         int32_t res;
+        // read this block
         res = ece391fs_read_data(file->inode->sb, file->inode->ino, file->pos, buf, nbytes);
         if (res < 0)
             return res;
@@ -92,6 +101,8 @@ static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes)
     }
     return read;
 }
+
+// This reads one filename from the directory
 static int32_t ece391fs_dir_read(struct file *file, char *buf, uint32_t nbytes) {
     // TODO: Should be handled by VFS
     // TODO: only for ece391 subsystem
@@ -106,6 +117,7 @@ static int32_t ece391fs_dir_read(struct file *file, char *buf, uint32_t nbytes) 
     char *name = dentry->name;
     uint8_t len = strlen(name);
 
+    // read at most this size. if the filename is larger than nbytes well too bad then
     if (len > sizeof(dentry->name))
         len = sizeof(dentry->name);
     if (len > nbytes)
@@ -126,6 +138,7 @@ static int32_t ece391fs_read(struct file *file, char *buf, uint32_t nbytes) {
     }
 }
 
+// find the inode number and prepare the inode struct, given the filename
 int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next) {
     struct ece391fs_dentry *dentry;
     int32_t res;
@@ -158,6 +171,7 @@ struct inode_operations ece391fs_ino_op = {
     .lookup = &ece391fs_ino_lookup,
 };
 
+// initialize superblock information, i.e. copy boot block out
 static int32_t ece391fs_init(struct super_block *sb, struct file *dev) {
     // vendor is a cached version of boot block
     struct ece391fs_boot_block *boot_block = kmalloc(BLOCK_SIZE);
@@ -184,6 +198,7 @@ out:
     return default_sb_init(sb, dev);
 }
 
+// initialize inode information
 static int32_t ece391fs_read_inode(struct inode *inode) {
     struct ece391fs_boot_block *boot_block = inode->sb->vendor;
     // Does it have a vendor field? If not, that's asking for the root dir
@@ -198,7 +213,7 @@ static int32_t ece391fs_read_inode(struct inode *inode) {
     switch (dentry->type) {
     case 0: // RTC device
         inode->rdev = MKDEV(10, 135); // Device (10, 135) is RTC
-        inode->mode = S_IFCHR | 0666; // char device rw for all
+        inode->mode = S_IFCHR | 0444; // char device r for all
         break;
     case 1: // Root directory
         inode->mode = S_IFDIR | 0555; // directory rx for all
@@ -206,6 +221,7 @@ static int32_t ece391fs_read_inode(struct inode *inode) {
     case 2:; // Regular file
         uint32_t size;
         int32_t res;
+        // need the file size from the dentry. this is evil.
         res = filp_seek(inode->sb->dev, (inode->ino + 1) * BLOCK_SIZE, SEEK_SET);
         if (res < 0)
             return res;
@@ -220,6 +236,7 @@ static int32_t ece391fs_read_inode(struct inode *inode) {
     return 0;
 }
 
+// just free the cached boot block
 static void ece391fs_put_super(struct super_block *sb) {
     kfree(sb->vendor);
 }
