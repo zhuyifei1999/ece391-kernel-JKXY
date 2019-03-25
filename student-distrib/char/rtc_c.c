@@ -15,7 +15,7 @@
 
 struct rtc_private {
     struct task_struct *task; // the task that's waiting on this
-    uint8_t rate;
+    uint8_t rate; // rate at which interrupt is set
     uint32_t counter_div; // how many virtualized interrupts has passed
     uint16_t counter_mod; // counter to the virtualized interrupt
 };
@@ -27,10 +27,12 @@ static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
 
     // Only one task can wait per struct file
     cli();
+    // set busy if there is already task waiting
     if (private->task) {
         sti();
         return -EBUSY;
     }
+    // set task to current task
     private->task = current;
     sti();
 
@@ -38,23 +40,28 @@ static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
     uint32_t init_counter_div = private->counter_div;
     // TODO: make this interruptable
     current->state = TASK_UNINTERRUPTIBLE;
+    // schedule until counter increases
     while (private->counter_div == init_counter_div)
         schedule();
+    // set the state of the current task to running
     current->state = TASK_RUNNING;
 
     cli();
+    // reinitialize count_div to 0 and task to NULL
     private->counter_div = 0;
     private->task = NULL;
     sti();
     return 0;
 }
 
+// set the frequency of rtc
 static int32_t rtc_write(struct file *file, const char *buf, uint32_t nbytes) {
     // TODO: For the linux subsystem, block this and force use ioctl
     uint32_t freq;
+    // check if frequency is 4 bytes
     if (nbytes != sizeof(freq))
         return -EINVAL;
-
+    // copy nbytes of frequency to buffer
     memcpy(&freq, buf, nbytes);
 
     // what rate is this?
@@ -74,22 +81,28 @@ static int32_t rtc_write(struct file *file, const char *buf, uint32_t nbytes) {
 }
 
 static int32_t rtc_open(struct file *file, struct inode *inode) {
+    // allocate memory
     struct rtc_private *private = kmalloc(sizeof(*private));
+    // return error if momeory not properly allocated
     if (!private)
         return -ENOMEM;
+    // set rate to maximum rate
     *private = (struct rtc_private){
         .rate = MAX_RATE,
     };
     file->vendor = private;
-
+    // insert task to the back of the list
     list_insert_back(&rtc_privates, private);
     return 0;
 }
+
+// release memory
 static void rtc_release(struct file *file) {
     list_remove(&rtc_privates, file->vendor);
     kfree(file->vendor);
 }
 
+// rtc operations
 static struct file_operations rtc_dev_op = {
     .read    = &rtc_read,
     .write   = &rtc_write,
@@ -99,13 +112,20 @@ static struct file_operations rtc_dev_op = {
 
 static void rtc_handler() {
     struct list_node *node;
+    // iterate through each node of rtc_privates (list of pointer to structs)
     list_for_each(&rtc_privates, node) {
         struct rtc_private *private = node->value;
+        // increment private counter_mod
         private->counter_mod++;
+        // set do_wakeup to false
         bool do_wakeup = false;
+        // calculate number of hardware interrupts needed
         uint16_t n_intr = rtc_rate_to_freq(MIN_RATE) / rtc_rate_to_freq(private->rate);
+        // when counter_mod is greater than interrupts needed
         while (private->counter_mod >= n_intr) {
+            // increment counter_div
             private->counter_div++;
+            // decrement counter_mod by number of interrupts needed
             private->counter_mod -= n_intr;
             do_wakeup = true;
         }
@@ -115,6 +135,7 @@ static void rtc_handler() {
     }
 }
 
+// initialize rtc
 static void init_rtc_char() {
     list_init(&rtc_privates);
     register_rtc_handler(&rtc_handler);
