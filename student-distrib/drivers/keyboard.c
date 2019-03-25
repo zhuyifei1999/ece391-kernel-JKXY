@@ -143,6 +143,7 @@ unsigned char buffer_end;
 bool has_shift, has_ctrl, has_alt, has_caps;
 
 static void do_function(unsigned char scancode_mapped);
+static unsigned char scancode_fixup_caps(unsigned char scancode, bool has_shift, bool has_caps);
 
 /*
  *   keyboard_handler
@@ -200,10 +201,7 @@ static void keyboard_handler(struct intr_info *info) {
                 continue;
             }
             if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
-                if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
-                    scancode_mapped = scancode_map[scancode | MSB];
-                if (has_shift ^ has_caps && ('a' <= scancode_mapped && scancode_mapped <= 'z') )
-                    scancode_mapped = scancode_map[scancode | MSB];
+                scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
 
                 tty_keyboard(scancode_mapped);
             } else { // function key
@@ -211,6 +209,21 @@ static void keyboard_handler(struct intr_info *info) {
             }
         }
     }
+}
+
+/*
+ *   scancode_fixup_caps
+ *   DESCRIPTION: wake the keyboard thread due to the scancode
+ *   INPUTS: scancode, shift and caps
+ *   RETURN VALUE: ascii, with regards to shift and caps status
+ */
+static unsigned char scancode_fixup_caps(unsigned char scancode, bool has_shift, bool has_caps) {
+    unsigned char scancode_mapped = scancode_map[scancode];
+    if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
+        scancode_mapped = scancode_map[scancode | MSB];
+    if (has_shift ^ has_caps && ('a' <= scancode_mapped && scancode_mapped <= 'z') )
+        scancode_mapped = scancode_map[scancode | MSB];
+    return scancode_mapped;
 }
 
 /*
@@ -259,58 +272,56 @@ DEFINE_INITCALL(init_keyboard, drivers);
  * Coverage: keyboard scancode match
  */
 __testfunc
-static void keyboard_test() {
+static void scancode_fixup_caps_test() {
     int i;
-    unsigned char test_scancode_lib[5] = {0x11 , 0x13 , 0x1e, 0x1f , 0x20};
-    unsigned char test_output_lib[10] = {'w', 'r', 'a', 's', 'd', 'W', 'R', 'A', 'S', 'D'};
-    bool has_caps, has_shift, has_alt;
+    unsigned char test_scancode_lib[] = {0x11 , 0x13 , 0x1e, 0x1f , 0x20, 0x29, 0x0C, 0x0D};
+    char *test_output_lib;
+    bool has_caps, has_shift;
     unsigned char scancode_mapped, scancode;
-    has_alt = 0;
 
     // testcase both shift and caps are 1
     has_shift = 1;
     has_caps = 1;
-    for (i = 0; i < 5; i++) {
+    test_output_lib = "wrasd~_+";
+    for (i = 0; i < sizeof(test_scancode_lib); i++) {
         scancode = test_scancode_lib[i];
-        scancode_mapped = scancode_map[scancode];
-        if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
-            if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
-                scancode_mapped = scancode_map[scancode | MSB];
-            if (has_shift ^ has_caps && ('a' <= scancode_mapped && scancode_mapped <= 'z') )
-                scancode_mapped = scancode_map[scancode | MSB];
-        }
+        scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
         TEST_ASSERT(scancode_mapped == test_output_lib[i]);
     }
 
     // testcase both shift and caps are 0
     has_shift = 0;
     has_caps = 0;
-    for (i = 0; i < 5; i++) {
+    test_output_lib = "wrasd`-=";
+    for (i = 0; i < sizeof(test_scancode_lib); i++) {
         scancode = test_scancode_lib[i];
         scancode_mapped = scancode_map[scancode];
-        if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
-            if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
-                scancode_mapped = scancode_map[scancode | MSB];
-            if (has_shift ^ has_caps && ('a' <= scancode_mapped && scancode_mapped <= 'z') )
-                scancode_mapped = scancode_map[scancode | MSB];
-        }
+        scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
         TEST_ASSERT(scancode_mapped == test_output_lib[i]);
     }
 
     // testcase shift is 1
     has_shift = 1;
-    for (i = 0; i < 5; i++) {
+    has_caps = 0;
+    test_output_lib = "WRASD~_+";
+    for (i = 0; i < sizeof(test_scancode_lib); i++) {
         scancode = test_scancode_lib[i];
         scancode_mapped = scancode_map[scancode];
-        if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
-            if (has_shift && !('a' <= scancode_mapped && scancode_mapped <= 'z') ) // shift translation
-                scancode_mapped = scancode_map[scancode | MSB];
-            if (has_shift ^ has_caps && ('a' <= scancode_mapped && scancode_mapped <= 'z') )
-                scancode_mapped = scancode_map[scancode | MSB];
-        }
-        TEST_ASSERT(scancode_mapped == test_output_lib[i+5]);
+        scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
+        TEST_ASSERT(scancode_mapped == test_output_lib[i]);
+    }
+
+    // testcase caps is 1
+    has_shift = 0;
+    has_caps = 1;
+    test_output_lib = "WRASD`-=";
+    for (i = 0; i < sizeof(test_scancode_lib); i++) {
+        scancode = test_scancode_lib[i];
+        scancode_mapped = scancode_map[scancode];
+        scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
+        TEST_ASSERT(scancode_mapped == test_output_lib[i]);
     }
 }
 
-DEFINE_TEST(keyboard_test);
+DEFINE_TEST(scancode_fixup_caps_test);
 #endif
