@@ -13,15 +13,19 @@ struct initrd_entry {
 // TODO: Support more initrd block devices
 static struct initrd_entry our_only_initrd_entry;
 
+// read file into buffer according to the number of bytes specified
 static int32_t initrd_read(struct file *file, char *buf, uint32_t nbytes) {
     struct initrd_entry *metadata = file->vendor;
     int32_t max_nbytes = metadata->size - file->pos;
+    // check whether specified bytes is greater than maximum
     if (nbytes > max_nbytes)
         nbytes = max_nbytes;
+    // copy nbytes of file into buffer
     memcpy(buf, metadata->start_addr + file->pos, nbytes);
     return nbytes;
 }
 
+// open file according to specified inode
 static int32_t initrd_open(struct file *file, struct inode *inode) {
     if (!our_only_initrd_entry.start_addr)
         return -ENXIO;
@@ -35,6 +39,7 @@ static int32_t initrd_seek(struct file *file, int32_t offset, int32_t whence) {
     struct initrd_entry *metadata = file->vendor;
     uint32_t size = metadata->size;
 
+    // cases for whence
     switch (whence) {
     case SEEK_SET:
         new_pos = offset;
@@ -49,17 +54,20 @@ static int32_t initrd_seek(struct file *file, int32_t offset, int32_t whence) {
         return -EINVAL;
     }
 
+    // check validity of new_pos
     if (new_pos >= size || new_pos < 0)
         return -EINVAL;
     file->pos = new_pos;
     return new_pos;
 }
 
+// file operations struct
 static struct file_operations initrd_dev_op = {
     .read = &initrd_read,
     .open = &initrd_open,
     .seek = &initrd_seek,
 };
+
 
 void load_initrd_addr(char *start_addr, uint32_t size) {
     our_only_initrd_entry.start_addr = start_addr;
