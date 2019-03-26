@@ -63,7 +63,9 @@ struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
             .comm      = "init_task",
             .mm        = NULL,
             .state     = TASK_RUNNING,
-            .subsystem = SUBSYSTEM_ECE391,
+            .subsystem = SUBSYSTEM_LINUX,
+            .cwd       = NULL,
+            .exe       = NULL,
         };
     } else {
         atomic_inc(&current->cwd->refcount);
@@ -73,8 +75,9 @@ struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
             .comm      = "kthread",
             .mm        = NULL,
             .state     = TASK_RUNNING,
-            .subsystem = SUBSYSTEM_ECE391,
+            .subsystem = SUBSYSTEM_LINUX,
             .cwd       = current->cwd,
+            .exe       = NULL,
         };
     }
 
@@ -106,6 +109,9 @@ void do_exit(int exitcode) {
     current->state = TASK_ZOMBIE;
 
     filp_close(current->cwd);
+    if (current->exe)
+        filp_close(current->exe);
+
     uint32_t i;
     array_for_each(&current->files.files, i) {
         struct file *file = array_get(&current->files.files, i);

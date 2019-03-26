@@ -42,6 +42,7 @@ struct task_struct {
     char comm[16];
     struct mm_struct *mm;
     struct file *cwd;
+    struct file *exe;
     struct files_struct files;
     struct intr_info *return_regs;
     enum task_state state;
