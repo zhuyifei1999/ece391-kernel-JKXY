@@ -12,6 +12,7 @@
 #include "vfs/mount.h"
 #include "lib/string.h"
 #include "lib/stdio.h"
+#include "err.h"
 
 struct task_struct *swapper_task;
 

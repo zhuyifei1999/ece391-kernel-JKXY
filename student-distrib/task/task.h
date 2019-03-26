@@ -55,12 +55,12 @@ struct task_struct {
 #define ALIGN_SP 0xf        // C likes stuffs to be aligned
 
 // the task_struct is always at the top of the pages of kernel stack
-static inline __always_inline
+static inline __always_inline __attribute__((pure, const))
 struct task_struct *task_from_stack(void *stack) {
     uint32_t addr = (uint32_t)stack;
     return (void *)(addr & ~(TASK_STACK_PAGES * PAGE_SIZE_SMALL - 1));
 }
-static inline __always_inline
+static inline __always_inline __attribute__((pure, const))
 struct task_struct *get_current(void) {
     int temp;
     return task_from_stack(&temp);
