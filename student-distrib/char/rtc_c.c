@@ -210,8 +210,6 @@ static void rtc_char_expect_rate(struct file *dev, uint8_t rate) {
     uint16_t count = 0;
     while (rtc_get_second() == test_second) {
         count++;
-        // TODO: Remove after CP2
-        // putc('I');
         TEST_ASSERT(filp_read(dev, &junk, 0) == 0);
     }
 
@@ -235,7 +233,7 @@ __testfunc
 // test reading and writing
 static void rtc_char_test() {
     int i;
-    for (i = MIN_RATE; i <= MAX_RATE; i++) {
+    for (i = MAX_RATE; i >= MIN_RATE; i--) {
         rtc_char_test_single(i);
     }
 }

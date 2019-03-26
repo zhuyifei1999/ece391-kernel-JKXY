@@ -195,11 +195,8 @@ static void keyboard_handler(struct intr_info *info) {
             if (scancode >= MSB)
                 continue; // release key does not matter
             unsigned char scancode_mapped = scancode_map[scancode];
-            if (scancode_mapped == 0) {
-                // unknown key. TODO: remove this after CP2
-                printf("Unknown key: 0x%#x\n", scancode);
-                continue;
-            }
+            if (!scancode_mapped)
+                continue; // unknown key
             if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
                 scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
 
