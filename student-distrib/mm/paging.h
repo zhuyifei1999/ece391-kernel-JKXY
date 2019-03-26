@@ -149,6 +149,9 @@ page_directory_t *current_page_directory() {
 #define GFP_RO      (1<<2)
 
 __attribute__((malloc))
+void *request_pages(void *page, uint32_t num, uint32_t gfp_flags);
+
+__attribute__((malloc))
 void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags);
 
 void free_pages(void *pages, uint32_t num, uint32_t gfp_flags);

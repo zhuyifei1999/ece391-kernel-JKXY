@@ -57,7 +57,7 @@ struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
 
     if (is_boot_context()) {
         // boot context, fill with dummies, cwd will be initialized by initial thread
-        *task = (struct task_struct) {
+        *task = (struct task_struct){
             .pid       = next_pid(),
             .ppid      = 0,
             .comm      = "init_task",
@@ -69,7 +69,7 @@ struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
         };
     } else {
         atomic_inc(&current->cwd->refcount);
-        *task = (struct task_struct) {
+        *task = (struct task_struct){
             .pid       = next_pid(),
             .ppid      = current->pid,
             .comm      = "kthread",

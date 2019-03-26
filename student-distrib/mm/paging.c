@@ -257,15 +257,23 @@ page_table_t *find_userspace_page_table(struct page_directory_entry *dir_entry) 
 }
 
 __attribute__((malloc))
-void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags) {
+void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
     unsigned long flags;
-    uint32_t align_num = 1 << align;
-    uint32_t start, bigstart;
     uint32_t offset = 0;
 
-    void *ret = NULL;
+    void *ret = page;
 
-    if (num > NUM_ENTRIES || align_num > NUM_ENTRIES)
+    // sanity check
+    if (gfp_flags & GFP_LARGE) {
+        if ((uint32_t)page % PAGE_SIZE_LARGE)
+            return NULL;
+    } else {
+        if ((uint32_t)page % PAGE_SIZE_SMALL)
+            return NULL;
+    }
+
+    // TODO: if page + num cross boundaries
+    if (num > NUM_ENTRIES)
         return NULL;
 
     cli_and_save(flags);
@@ -273,148 +281,110 @@ void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags) {
     if (gfp_flags & GFP_USER) {
         page_directory_t *directory = current_page_directory();
         if (gfp_flags & GFP_LARGE) {
-            for (start = 0; start <= NUM_ENTRIES - num; start += align_num) {
-                for (offset = 0; offset < num; offset++) {
-                    if ((*directory)[start+offset].present)
-                        goto next_ul;
-                }
+            // Check if all available
+            for (offset = 0; offset < num; offset++) {
+                if ((*directory)[PAGE_DIR_IDX((uint32_t)ret)+offset].present)
+                    goto err_nofree;
+            }
 
-                ret = (void *)(start * PAGE_SIZE_LARGE);
-
-                // Found one! Mapping...
-                for (offset = 0; offset < num; offset++) {
-                    void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
-                    if (!physaddr)
-                        goto err;
-                    (*directory)[start+offset] = (struct page_directory_entry){
-                        .present = 1,
-                        .user    = 1,
-                        .rw      = !(gfp_flags & GFP_RO),
-                        .size    = 1,
-                        .global  = 0,
-                        .addr    = PAGE_IDX((uint32_t)physaddr)
-                    };
-                    continue;
-                }
-                goto out;
-
-            next_ul: ;
+            // Mapping...
+            for (offset = 0; offset < num; offset++) {
+                void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
+                if (!physaddr)
+                    goto err;
+                (*directory)[PAGE_DIR_IDX((uint32_t)ret)+offset] = (struct page_directory_entry){
+                    .present = 1,
+                    .user    = 1,
+                    .rw      = !(gfp_flags & GFP_RO),
+                    .size    = 1,
+                    .global  = 0,
+                    .addr    = PAGE_IDX((uint32_t)physaddr)
+                };
+                continue;
             }
         } else { /* !(gfp_flags & GFP_LARGE) */
-            for (bigstart = 0; bigstart < NUM_ENTRIES; bigstart++) {
-                struct page_directory_entry *dir_entry = &(*directory)[bigstart];
-                if (dir_entry->present) {
-                    if (!dir_entry->user)
-                        continue;
+            struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)ret)];
+            page_table_t *table;
+            if (dir_entry->present) {
+                if (!dir_entry->user)
+                    goto err_nofree;
 
-                    page_table_t *table = find_userspace_page_table(dir_entry);
+                table = find_userspace_page_table(dir_entry);
 
-                    for (start = 0; start <= NUM_ENTRIES - num; start += align_num) {
-                        for (offset = 0; offset < num; offset++) {
-                            if ((*table)[start+offset].present)
-                                goto next_us;
-                        }
-
-                        ret = (void *)(bigstart* PAGE_SIZE_LARGE + start * PAGE_SIZE_SMALL);
-
-                        // Found one! Mapping...
-                        for (offset = 0; offset < num; offset++) {
-                            void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
-                            if (!physaddr)
-                                goto err;
-                            (*table)[start+offset] = (struct page_table_entry){
-                                .present = 1,
-                                .user    = 1,
-                                .rw      = !(gfp_flags & GFP_RO),
-                                .global  = 0,
-                                .addr    = PAGE_IDX((uint32_t)physaddr)
-                            };
-                            continue;
-                        }
-                        goto out;
-
-                    next_us: ;
-                    }
-                } else { // !dir_entry->present
-                    // We are allocating a user page, but we need to allocate a
-                    // kernel page for a page table.
-                    page_table_t *table = alloc_pages(1, 0, 0);
-
-                    if (!table)
-                        goto out;
-
-                    *dir_entry = (struct page_directory_entry){
-                        .present = 1,
-                        .user    = 1,
-                        .rw      = 1,
-                        .size    = 0,
-                        .global  = 0,
-                        .addr    = heap_tables[(uint32_t)table / PAGE_SIZE_SMALL].addr
-                    };
-
-                    ret = (void *)(bigstart* PAGE_SIZE_LARGE);
-
-                    // just allocate the first pages in the table.
-                    // it's always aligned.
-                    for (offset = 0; offset < num; offset++) {
-                        void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
-                        if (!physaddr)
-                            goto err;
-                        (*table)[offset] = (struct page_table_entry){
-                            .present = 1,
-                            .user    = 1,
-                            .rw      = !(gfp_flags & GFP_RO),
-                            .global  = 0,
-                            .addr    = PAGE_IDX((uint32_t)physaddr)
-                        };
-                        continue;
-                    }
-
-                    goto out;
+                for (offset = 0; offset < num; offset++) {
+                    if ((*table)[PAGE_TABLE_IDX((uint32_t)ret)+offset].present)
+                        goto err_nofree;
                 }
+
+            } else { // !dir_entry->present
+                // We are allocating a user page, but we need to allocate a
+                // kernel page for a page table.
+                table = alloc_pages(1, 0, 0);
+
+                if (!table)
+                    goto err_nofree;
+
+                *dir_entry = (struct page_directory_entry){
+                    .present = 1,
+                    .user    = 1,
+                    .rw      = 1,
+                    .size    = 0,
+                    .global  = 0,
+                    .addr    = heap_tables[(uint32_t)table / PAGE_SIZE_SMALL].addr
+                };
+            }
+
+            // Mapping...
+            for (offset = 0; offset < num; offset++) {
+                void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
+                if (!physaddr)
+                    goto err;
+                (*table)[PAGE_TABLE_IDX((uint32_t)ret)+offset] = (struct page_table_entry){
+                    .present = 1,
+                    .user    = 1,
+                    .rw      = !(gfp_flags & GFP_RO),
+                    .global  = 0,
+                    .addr    = PAGE_IDX((uint32_t)physaddr)
+                };
+                continue;
             }
         }
     } else { /* !(gfp_flags & GFP_USER) */
         if (gfp_flags & GFP_LARGE) {
-            goto out; // Can't do this with process-local page-tables
+            goto err_nofree; // Can't do this with process-local page-tables
         } else {
-            if ((KHEAP_ADDR_IDX) % align_num)
-                // Can't align this.
-                goto out;
-            for (start = KHEAP_ADDR_IDX;
-                    start <= KHEAP_ADDR_IDX + NUM_PAGE_TABLES - num;
-                    start += align_num) {
-                for (offset = 0; offset < num; offset++) {
-                    if (heap_tables[start+offset].present)
-                        goto next_ks;
-                }
+            if ((uint32_t)ret < KHEAP_ADDR)
+                goto err_nofree;
 
-                ret = (void *)(start * PAGE_SIZE_SMALL);
+            for (offset = 0; offset < num; offset++) {
+                if (heap_tables[KHEAP_ADDR_IDX+PAGE_TABLE_IDX((uint32_t)ret)+offset].present)
+                    goto err_nofree;
+            }
 
-                // Found one! Mapping...
-                for (offset = 0; offset < num; offset++) {
-                    void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
-                    if (!physaddr)
-                        goto err;
-                    heap_tables[start+offset] = (struct page_table_entry){
-                        .present = 1,
-                        .user    = 0,
-                        .rw      = !(gfp_flags & GFP_RO),
-                        .global  = 1,
-                        .addr    = PAGE_IDX((uint32_t)physaddr)
-                    };
-                    continue;
-                }
-                goto out;
-
-            next_ks: ;
+            // Mapping...
+            for (offset = 0; offset < num; offset++) {
+                void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
+                if (!physaddr)
+                    goto err;
+                heap_tables[KHEAP_ADDR_IDX+PAGE_TABLE_IDX((uint32_t)ret)+offset] = (struct page_table_entry){
+                    .present = 1,
+                    .user    = 0,
+                    .rw      = !(gfp_flags & GFP_RO),
+                    .global  = 1,
+                    .addr    = PAGE_IDX((uint32_t)physaddr)
+                };
+                continue;
             }
         }
     }
 
+    goto out;
+
 err:
     // Failed, undo
     free_pages(ret, offset, gfp_flags);
+
+err_nofree:
     ret = NULL;
 
 out:
@@ -434,12 +404,55 @@ out:
     return ret;
 }
 
-void *request_page(void *page, void __physaddr *phys, uint32_t num, uint32_t gfp_flags) {
-    if (!(gfp_flags & GFP_USER))
-        return NULL; // There is no reason for the kernel to request a specific page
+__attribute__((malloc))
+void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags) {
+    uint32_t align_num = 1 << align;
+    uint32_t start, bigstart;
 
+    void *ret = NULL;
 
-    return NULL;  // TODO
+    if (align_num > NUM_ENTRIES)
+        return NULL;
+
+    if (gfp_flags & GFP_USER) {
+        if (gfp_flags & GFP_LARGE) {
+            for (start = 0; start <= NUM_ENTRIES - num; start += align_num) {
+                ret = (void *)(start * PAGE_SIZE_LARGE);
+                ret = request_pages(ret, num, gfp_flags);
+                if (ret)
+                    return ret;
+            }
+            return NULL;
+        } else { /* !(gfp_flags & GFP_LARGE) */
+            for (bigstart = NUM_PREALLOCATE_LARGE; bigstart < NUM_ENTRIES; bigstart++) {
+                for (start = 0; start <= NUM_ENTRIES - num; start += align_num) {
+                    ret = (void *)(bigstart* PAGE_SIZE_LARGE + start * PAGE_SIZE_SMALL);
+                    ret = request_pages(ret, num, gfp_flags);
+                    if (ret)
+                        return ret;
+                }
+            }
+            return NULL;
+        }
+    } else { /* !(gfp_flags & GFP_USER) */
+        if (gfp_flags & GFP_LARGE) {
+            return NULL; // Can't do this with process-local page-tables
+        } else {
+            if ((KHEAP_ADDR_IDX) % align_num)
+                // Can't align this.
+                return NULL;
+            for (start = KHEAP_ADDR_IDX;
+                    start <= KHEAP_ADDR_IDX + NUM_PAGE_TABLES - num;
+                    start += align_num) {
+
+                ret = (void *)(start * PAGE_SIZE_SMALL);
+                ret = request_pages(ret, num, gfp_flags);
+                if (ret)
+                    return ret;
+            }
+            return NULL;
+        }
+    }
 }
 
 static void free_one_page(void *page, uint32_t gfp_flags) {
