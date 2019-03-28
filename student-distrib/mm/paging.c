@@ -1,6 +1,5 @@
 #include "paging.h"
 #include "../lib/cli.h"
-#include "../lib/stdbool.h"
 #include "../lib/string.h"
 #include "../panic.h"
 #include "../multiboot.h"
@@ -20,7 +19,7 @@ static page_table_t zero_page_table = {
     },
 };
 
-/*  One Global Page dirctory
+/*  One Global Page directory
  *  set the page table information for video memory and kernel memory
  */
 __attribute__((aligned(PAGE_SIZE_SMALL)))
@@ -176,6 +175,11 @@ void init_page(struct multiboot_info __physaddr *mbi) {
     restore_flags(flags); // restore interrupts
 }
 
+static int16_t *get_phys_dir_entry(void __physaddr *addr, uint32_t gfp_flags) {
+    uint32_t idx = (uint32_t)addr / page_size(gfp_flags);
+    return &phys_dir[idx];
+}
+
 static void __physaddr *alloc_phys_mem(uint32_t gfp_flags) {
     unsigned long flags;
     uint32_t start_idx = (gfp_flags & GFP_LARGE) ? 0 : PHYS_DIR_LARGE_NUM;
@@ -203,44 +207,43 @@ static void __physaddr *alloc_phys_mem(uint32_t gfp_flags) {
 
 static void free_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
     unsigned long flags;
-    uint32_t idx = (uint32_t)addr / page_size(gfp_flags);
+    int16_t *dir_entry = get_phys_dir_entry(addr, gfp_flags);
 
     cli_and_save(flags);
-    if (phys_dir[idx] == PHYS_DIR_UNUSED)
+    if (*dir_entry == PHYS_DIR_UNUSED)
         panic("Freeing already freed physical memory at addr 0x%#x\n", (uint32_t)addr);
-    if (phys_dir[idx] == PHYS_DIR_UNAVAIL)
+    if (*dir_entry == PHYS_DIR_UNAVAIL)
         panic("Freeing unavailable physical memory at addr 0x%#x\n", (uint32_t)addr);
-    if (phys_dir[idx] == PHYS_DIR_KERNEL) {
+    if (*dir_entry == PHYS_DIR_KERNEL) {
         if (gfp_flags & GFP_USER)
             panic("Freeing kernel physical memory for userspace at addr 0x%#x\n", (uint32_t)addr);
-        phys_dir[idx] = PHYS_DIR_UNUSED;
-    } else if (phys_dir[idx] > 0) {
+        *dir_entry = PHYS_DIR_UNUSED;
+    } else if (*dir_entry > 0) {
         if (!(gfp_flags & GFP_USER))
             panic("Freeing userspace physical memory for kernel at addr 0x%#x\n", (uint32_t)addr);
-        phys_dir[idx]--;
+        (*dir_entry)--;
     } else {
-        panic("Corrupted physical memory entry at addr 0x%#x, value = %d\n", (uint32_t)addr, (uint32_t)phys_dir[idx]);
+        panic("Corrupted physical memory entry at addr 0x%#x, value = %d\n", (uint32_t)addr, (uint32_t)*dir_entry);
     }
     restore_flags(flags);
 }
 
-__attribute__((unused))  // FIXME: Get COW and use this
 static void use_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
     unsigned long flags;
-    uint32_t idx = (uint32_t)addr / page_size(gfp_flags);
+    int16_t *dir_entry = get_phys_dir_entry(addr, gfp_flags);
 
     cli_and_save(flags);
-    if (phys_dir[idx] <= 0)
-        panic("Can't add uses to physical memory entry at addr 0x%#x, value = %d\n", (uint32_t)addr, (uint32_t)phys_dir[idx]);
+    if (*dir_entry <= 0)
+        panic("Can't add uses to physical memory entry at addr 0x%#x, value = %d\n", (uint32_t)addr, (uint32_t)*dir_entry);
     if (!(gfp_flags & GFP_USER))
         panic("Can't add uses to physical memory for kernel at addr 0x%#x\n", (uint32_t)addr);
-    phys_dir[idx]++;
+    (*dir_entry)++;
     restore_flags(flags);
 }
 
 // FIXME: How do I find the virtual address given the physical? It must be
 // in our heap somewhere.
-page_table_t *find_userspace_page_table(struct page_directory_entry *dir_entry) {
+static page_table_t *find_userspace_page_table(struct page_directory_entry *dir_entry) {
     page_table_t *table = NULL;
     uint32_t i;
     for (i = KHEAP_ADDR_IDX; i < KHEAP_ADDR_IDX + NUM_PAGE_TABLES; i++) {
@@ -254,6 +257,30 @@ page_table_t *find_userspace_page_table(struct page_directory_entry *dir_entry) 
               "at physical address 0x%#x\n",
               (unsigned)PAGE_IDX_ADDR(dir_entry->addr));
     return table;
+}
+
+static page_table_t *mk_user_table(struct page_directory_entry *dir_entry) {
+    // We are allocating a user page, but we need to allocate a
+    // kernel page for a page table.
+    page_table_t *table = alloc_pages(1, 0, 0);
+
+    if (table) {
+        memset(table, 0, sizeof(*table));
+
+        *dir_entry = (struct page_directory_entry){
+            .present = 1,
+            .user    = 1,
+            .rw      = 1,
+            .size    = 0,
+            .global  = 0,
+            .addr    = heap_tables[PAGE_IDX((uint32_t)table)].addr
+        };
+    }
+    return table;
+}
+
+static inline __always_inline void invlpg(void *addr) {
+    asm volatile ("invlpg %0" : : "m"(*(char *)addr));
 }
 
 __attribute__((malloc))
@@ -317,21 +344,9 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                 }
 
             } else { // !dir_entry->present
-                // We are allocating a user page, but we need to allocate a
-                // kernel page for a page table.
-                table = alloc_pages(1, 0, 0);
-
+                table = mk_user_table(dir_entry);
                 if (!table)
                     goto err_nofree;
-
-                *dir_entry = (struct page_directory_entry){
-                    .present = 1,
-                    .user    = 1,
-                    .rw      = 1,
-                    .size    = 0,
-                    .global  = 0,
-                    .addr    = heap_tables[(uint32_t)table / PAGE_SIZE_SMALL].addr
-                };
             }
 
             // Mapping...
@@ -357,7 +372,7 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                 goto err_nofree;
 
             for (offset = 0; offset < num; offset++) {
-                if (heap_tables[KHEAP_ADDR_IDX+PAGE_TABLE_IDX((uint32_t)ret)+offset].present)
+                if (heap_tables[PAGE_IDX((uint32_t)ret)+offset].present)
                     goto err_nofree;
             }
 
@@ -366,7 +381,7 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                 void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
                 if (!physaddr)
                     goto err;
-                heap_tables[KHEAP_ADDR_IDX+PAGE_TABLE_IDX((uint32_t)ret)+offset] = (struct page_table_entry){
+                heap_tables[PAGE_IDX((uint32_t)ret)+offset] = (struct page_table_entry){
                     .present = 1,
                     .user    = 0,
                     .rw      = !(gfp_flags & GFP_RO),
@@ -391,7 +406,7 @@ out:
     // refresh TLB
     if (ret) {
         for (offset = 0; offset < num; offset++)
-            asm volatile ("invlpg %0" : : "m"(*(((char *)ret) + page_size(gfp_flags))));
+            invlpg((char *)ret + page_size(gfp_flags));
     }
 
     restore_flags(flags);
@@ -456,12 +471,8 @@ void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags) {
 }
 
 static void free_one_page(void *page, uint32_t gfp_flags) {
-    // TODO: Free userspace page tables when empty
-    unsigned long flags;
     uint32_t addr = (uint32_t)page;
     uint32_t phys = 0;
-
-    cli_and_save(flags);
 
     if (gfp_flags & GFP_USER) {
         page_directory_t *directory = current_page_directory();
@@ -485,8 +496,7 @@ static void free_one_page(void *page, uint32_t gfp_flags) {
             ; // Do nothing. This sould not be possible
         } else {
             if (addr >= KHEAP_ADDR) {
-                struct page_table_entry *table_entry = &heap_tables[
-                    addr / PAGE_SIZE_SMALL];
+                struct page_table_entry *table_entry = &heap_tables[PAGE_IDX(addr)];
                 if (table_entry->present && !table_entry->user) {
                     phys = table_entry->addr * PAGE_SIZE_SMALL;
                     *table_entry = (struct page_table_entry){0};
@@ -495,18 +505,133 @@ static void free_one_page(void *page, uint32_t gfp_flags) {
         }
     }
 
-    restore_flags(flags);
-
-    asm volatile ("invlpg %0" : : "m"(*(char *)page));
+    invlpg(page);
 
     if (phys)
         free_phys_mem((void __physaddr *)phys, gfp_flags);
 }
 
 void free_pages(void *page, uint32_t num, uint32_t gfp_flags) {
-    int i;
+    uint32_t i;
     for (i = 0; i < num; i++)
         free_one_page((void *)((uint32_t)page + page_size(gfp_flags)), gfp_flags);
+}
+
+page_directory_t *clone_directory(page_directory_t *src) {
+    // TODO: Handle OOM.
+    page_directory_t *dst = alloc_pages(1, 0, 0);
+
+    uint16_t i, j;
+    for (i = 0; i < NUM_ENTRIES; i++) {
+        struct page_directory_entry *src_dir_entry = &(*src)[i];
+        struct page_directory_entry *dst_dir_entry = &(*dst)[i];
+        if (!src_dir_entry->present)
+            *dst_dir_entry = (struct page_directory_entry){0};
+        else if (!src_dir_entry->user)
+            *dst_dir_entry = *src_dir_entry;
+        else if (src_dir_entry->size) {
+            *dst_dir_entry = *src_dir_entry;
+            if (src_dir_entry->rw && !(src_dir_entry->flags & PAGE_SHARED)) {
+                src_dir_entry->rw = dst_dir_entry->rw = 0;
+                src_dir_entry->flags |= PAGE_COW_RO;
+                dst_dir_entry->flags |= PAGE_COW_RO;
+            }
+            use_phys_mem((void __physaddr *)PAGE_IDX_ADDR(src_dir_entry->addr), GFP_USER | GFP_LARGE);
+        } else {
+            *dst_dir_entry = (struct page_directory_entry){0};
+
+            page_table_t *src_table = find_userspace_page_table(dst_dir_entry);
+            // create the directory only if it's needed
+            page_table_t *dst_table = NULL;
+
+            for (j = 0; j < NUM_ENTRIES; j++) {
+                struct page_table_entry *src_table_entry = &(*src_table)[j];
+
+                if (src_table_entry->present) {
+                    if (!dst_table) {
+                        dst_table = mk_user_table(dst_dir_entry);
+                    }
+
+                    struct page_table_entry *dst_table_entry = &(*dst_table)[j];
+
+                    *dst_table_entry = *src_table_entry;
+
+                    if (src_table_entry->rw && !(src_table_entry->flags & PAGE_SHARED)) {
+                        src_table_entry->rw = dst_table_entry->rw = 0;
+                        src_table_entry->flags |= PAGE_COW_RO;
+                        dst_table_entry->flags |= PAGE_COW_RO;
+                    }
+                    use_phys_mem((void __physaddr *)PAGE_IDX_ADDR(src_table_entry->addr), GFP_USER);
+                }
+            }
+        }
+    }
+
+    return dst;
+}
+
+bool clone_cow(void *addr) {
+    page_directory_t *directory = current_page_directory();
+    struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)addr)];
+    if (!dir_entry->present || !dir_entry->user)
+        return false;
+    if (dir_entry->size) {
+        if (dir_entry->rw || !(dir_entry->flags & PAGE_COW_RO))
+            return false;
+        int16_t *phys_dir_entry = get_phys_dir_entry(addr, GFP_USER | GFP_LARGE);
+        if (*phys_dir_entry > 1) {
+            void __physaddr *old_physaddr = (void __physaddr *)PAGE_IDX_ADDR(dir_entry->addr);
+            void __physaddr *physaddr = alloc_phys_mem(GFP_USER | GFP_LARGE);
+            if (!physaddr)
+                return false;
+            void *tempmem = alloc_pages(1, 0, GFP_USER | GFP_LARGE);
+            if (!physaddr)
+                return false;
+
+            addr = (void *)((uint32_t)addr & ~(PAGE_SIZE_LARGE - 1));
+            memcpy(tempmem, addr, PAGE_SIZE_LARGE);
+
+            dir_entry->addr = PAGE_IDX((uint32_t)physaddr);
+            invlpg(addr);
+            memcpy(addr, tempmem, PAGE_SIZE_LARGE);
+
+            free_phys_mem(old_physaddr, GFP_USER | GFP_LARGE);
+            free_pages(tempmem, 1, GFP_USER | GFP_LARGE);
+        }
+        dir_entry->rw = 1;
+        dir_entry->flags &= ~PAGE_COW_RO;
+    } else {
+        page_table_t *table = find_userspace_page_table(dir_entry);
+        struct page_table_entry *table_entry = &(*table)[PAGE_TABLE_IDX((uint32_t)addr)];
+        if (!table_entry->present || !table_entry->user)
+            return false;
+        if (table_entry->rw || !(table_entry->flags & PAGE_COW_RO))
+            return false;
+        int16_t *phys_dir_entry = get_phys_dir_entry(addr, GFP_USER);
+        if (*phys_dir_entry > 1) {
+            void __physaddr *old_physaddr = (void __physaddr *)PAGE_IDX_ADDR(table_entry->addr);
+            void __physaddr *physaddr = alloc_phys_mem(GFP_USER);
+            if (!physaddr)
+                return false;
+            void *tempmem = alloc_pages(1, 0, GFP_USER);
+            if (!physaddr)
+                return false;
+
+            addr = (void *)((uint32_t)addr & ~(PAGE_SIZE_SMALL - 1));
+            memcpy(tempmem, addr, PAGE_SIZE_SMALL);
+
+            table_entry->addr = PAGE_IDX((uint32_t)physaddr);
+            invlpg(addr);
+            memcpy(addr, tempmem, PAGE_SIZE_SMALL);
+
+            free_phys_mem(old_physaddr, GFP_USER);
+            free_pages(tempmem, 1, GFP_USER);
+        }
+        table_entry->rw = 1;
+        table_entry->flags &= ~PAGE_COW_RO;
+    }
+
+    return true;
 }
 
 #include "../tests.h"

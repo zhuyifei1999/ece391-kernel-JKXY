@@ -2,6 +2,7 @@
 #define _PAGING_H
 
 #include "../lib/stdint.h"
+#include "../lib/stdbool.h"
 #include "../compiler.h"
 
 #define PAGE_IDX(val)       ((val) >> 12) // get the 4k aligned address of input memory address
@@ -97,7 +98,10 @@
 // label that an address is physical address rather than virtual
 #define __physaddr
 
-struct page_directory_entry {         // contains of page directory, 32 bits long
+#define PAGE_COW_RO     1
+#define PAGE_SHARED     2
+
+struct page_directory_entry {   // contains of page directory, 32 bits long
     uint32_t present       : 1;
     uint32_t rw            : 1;
     uint32_t user          : 1; // If the bit is set, then the page may be accessed by all
@@ -107,11 +111,11 @@ struct page_directory_entry {         // contains of page directory, 32 bits lon
     uint32_t reserved      : 1;
     uint32_t size          : 1; // Page Size
     uint32_t global        : 1;
-    uint32_t avail         : 3;
+    uint32_t flags         : 3;
     uint32_t addr          : 20; // address of page table (4kB aligned)
 } __attribute__ ((packed));
 
-struct page_table_entry {              // contains of page table, 32 bits long
+struct page_table_entry {        // contains of page table, 32 bits long
     uint32_t present       : 1;
     uint32_t rw            : 1;
     uint32_t user          : 1;
@@ -121,7 +125,7 @@ struct page_table_entry {              // contains of page table, 32 bits long
     uint32_t dirty         : 1;
     uint32_t reserved      : 1;
     uint32_t global        : 1;
-    uint32_t avail         : 3;
+    uint32_t flags         : 3;
     uint32_t addr          : 20; // address of page (4kB aligned)
 } __attribute__ ((packed));
 
@@ -155,5 +159,9 @@ __attribute__((malloc))
 void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags);
 
 void free_pages(void *pages, uint32_t num, uint32_t gfp_flags);
+
+page_directory_t *clone_directory(page_directory_t *src);
+
+bool clone_cow(void *addr);
 
 #endif

@@ -118,6 +118,7 @@ void do_exit(int exitcode) {
         if (file)
             filp_close(file);
     }
+    array_destroy(&current->files.files);
 
     struct task_struct *parent = get_task_from_pid(current->ppid);
     // if the parent is kthreadd then just auto reap it.
