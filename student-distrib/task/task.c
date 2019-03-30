@@ -1,8 +1,6 @@
 #include "task.h"
 #include "kthread.h"
 #include "../mm/paging.h"
-#include "../eflags.h"
-#include "../x86_desc.h"
 #include "../lib/cli.h"
 #include "../panic.h"
 #include "../initcall.h"
@@ -12,28 +10,6 @@
 // struct task_struct *tasks[MAXPID];
 struct list tasks[PID_BUCKETS];
 static struct list free_tasks;
-
-static uint16_t _next_pid() {
-    static uint16_t pid = 0;
-    unsigned long flags;
-
-    cli_and_save(flags);
-    uint16_t ret = pid;
-    pid++;
-    if (pid > MAXPID)
-        pid = LOOPPID;
-    restore_flags(flags);
-
-    return ret;
-}
-
-static uint16_t next_pid() {
-    uint16_t pid;
-    do {
-        pid = _next_pid();
-    } while (PTR_ERR(get_task_from_pid(pid)) != -ESRCH);
-    return pid;
-}
 
 struct task_struct *get_task_from_pid(uint16_t pid) {
     if (pid > MAXPID)
@@ -47,62 +23,6 @@ struct task_struct *get_task_from_pid(uint16_t pid) {
     return ERR_PTR(-ESRCH);
 }
 
-// TODO: When we get userspace, merge with generic clone()
-struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
-    do_free_tasks();
-
-    struct task_struct *task = alloc_pages(TASK_STACK_PAGES, TASK_STACK_PAGES_POW, 0);
-    if (!task)
-        return ERR_PTR(-ENOMEM);
-
-    if (is_boot_context()) {
-        // boot context, fill with dummies, cwd will be initialized by initial thread
-        *task = (struct task_struct){
-            .pid       = next_pid(),
-            .ppid      = 0,
-            .comm      = "init_task",
-            .mm        = NULL,
-            .state     = TASK_RUNNING,
-            .subsystem = SUBSYSTEM_LINUX,
-            .cwd       = NULL,
-            .exe       = NULL,
-        };
-    } else {
-        atomic_inc(&current->cwd->refcount);
-        *task = (struct task_struct){
-            .pid       = next_pid(),
-            .ppid      = current->pid,
-            .comm      = "kthread",
-            .mm        = NULL,
-            .state     = TASK_RUNNING,
-            .subsystem = SUBSYSTEM_LINUX,
-            .cwd       = current->cwd,
-            .exe       = NULL,
-        };
-    }
-
-    // The position of this struct intr_info controls where the stack is going
-    // to end up, not any of the contents in the struct, bacause we are using
-    // the same code segment.
-    struct intr_info *regs = (void *)((uint32_t)task +
-        TASK_STACK_PAGES * PAGE_SIZE_SMALL - sizeof(struct intr_info));
-    // function prototype don't matter here
-    extern void (*entry_task)(void);
-    *regs = (struct intr_info){
-        .eax    = (uint32_t)fn,
-        .ebx    = (uint32_t)args,
-        .eflags = EFLAGS_BASE | IF,
-        .eip    = (uint32_t)&entry_task,
-        .cs     = KERNEL_CS,
-    };
-
-    task->return_regs = regs;
-
-    list_insert_back(&tasks[task->pid & (PID_BUCKETS - 1)], task);
-
-    return task;
-}
-
 noreturn
 void do_exit(int exitcode) {
     current->exitcode = exitcode;
@@ -112,13 +32,23 @@ void do_exit(int exitcode) {
     if (current->exe)
         filp_close(current->exe);
 
-    uint32_t i;
-    array_for_each(&current->files.files, i) {
-        struct file *file = array_get(&current->files.files, i);
-        if (file)
-            filp_close(file);
+    if (current->files) {
+        if (!atomic_dec(&current->files->refcount)) {
+            uint32_t i;
+            array_for_each(&current->files->files, i) {
+                struct file *file = array_get(&current->files->files, i);
+                if (file)
+                    filp_close(file);
+            }
+            array_destroy(&current->files->files);
+        }
     }
-    array_destroy(&current->files.files);
+
+    if (current->mm) {
+        if (!atomic_dec(&current->mm->refcount)) {
+            free_directory(current->mm->page_directory);
+        }
+    }
 
     struct task_struct *parent = get_task_from_pid(current->ppid);
     // if the parent is kthreadd then just auto reap it.
@@ -158,11 +88,6 @@ void do_free_tasks() {
         struct task_struct *task = list_pop_front(&free_tasks);
         free_pages(task, TASK_STACK_PAGES, 0);
     }
-}
-
-asmlinkage noreturn
-void kthread_execute(int (*fn)(void *data), void *data) {
-    do_exit((*fn)(data));
 }
 
 static void init_tasks() {

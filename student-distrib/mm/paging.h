@@ -144,6 +144,12 @@ page_directory_t *current_page_directory() {
     return ret;
 }
 
+static inline __always_inline
+void switch_directory(page_directory_t *dir) {
+    // cr3 is address to page directory address
+    asm volatile ("movl %0, %%cr3" : : "r"(dir) : "memory");
+}
+
 // Flags for getting pages
 // #define GFP_KERNEL  0
 #define GFP_USER    1
@@ -163,5 +169,7 @@ void free_pages(void *pages, uint32_t num, uint32_t gfp_flags);
 page_directory_t *clone_directory(page_directory_t *src);
 
 bool clone_cow(void *addr);
+
+void free_directory(page_directory_t *dir);
 
 #endif

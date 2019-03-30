@@ -157,20 +157,17 @@ void init_page(struct multiboot_info __physaddr *mbi) {
         memset(table, 0, sizeof(*table));
     }
 
-    // cr3 is address to page directory address
+    switch_directory(&init_page_directory);
     // cr4 enables (Page Size Extension) PSE
     // cr0 enables paging
     asm volatile(
-        "movl %0, %%cr3;"         // load CR3 with the address of the page directory
         "movl %%cr4, %%eax;"
         "orl $0x00000010, %%eax;"
         "movl %%eax, %%cr4;"      // enable PSE (4 MiB pages) of %cr4
         "movl %%cr0, %%eax;"
         "orl $0x80000000, %%eax;" // set the paging (PG) bits of %CR0
         "movl %%eax, %%cr0;"
-        :                     /* no outputs */
-        : "r"(init_page_directory) /* put page directory address into cr3 */
-        : "eax", "cc"         /* clobbered register */
+        : : : "eax", "cc"         /* clobbered register */
     );
     restore_flags(flags); // restore interrupts
 }
@@ -540,7 +537,7 @@ page_directory_t *clone_directory(page_directory_t *src) {
         } else {
             *dst_dir_entry = (struct page_directory_entry){0};
 
-            page_table_t *src_table = find_userspace_page_table(dst_dir_entry);
+            page_table_t *src_table = find_userspace_page_table(src_dir_entry);
             // create the directory only if it's needed
             page_table_t *dst_table = NULL;
 
@@ -578,6 +575,9 @@ bool clone_cow(void *addr) {
     if (dir_entry->size) {
         if (dir_entry->rw || !(dir_entry->flags & PAGE_COW_RO))
             return false;
+        dir_entry->rw = 1;
+        dir_entry->flags &= ~PAGE_COW_RO;
+
         int16_t *phys_dir_entry = get_phys_dir_entry(addr, GFP_USER | GFP_LARGE);
         if (*phys_dir_entry > 1) {
             void __physaddr *old_physaddr = (void __physaddr *)PAGE_IDX_ADDR(dir_entry->addr);
@@ -598,8 +598,6 @@ bool clone_cow(void *addr) {
             free_phys_mem(old_physaddr, GFP_USER | GFP_LARGE);
             free_pages(tempmem, 1, GFP_USER | GFP_LARGE);
         }
-        dir_entry->rw = 1;
-        dir_entry->flags &= ~PAGE_COW_RO;
     } else {
         page_table_t *table = find_userspace_page_table(dir_entry);
         struct page_table_entry *table_entry = &(*table)[PAGE_TABLE_IDX((uint32_t)addr)];
@@ -607,6 +605,9 @@ bool clone_cow(void *addr) {
             return false;
         if (table_entry->rw || !(table_entry->flags & PAGE_COW_RO))
             return false;
+        table_entry->rw = 1;
+        table_entry->flags &= ~PAGE_COW_RO;
+
         int16_t *phys_dir_entry = get_phys_dir_entry(addr, GFP_USER);
         if (*phys_dir_entry > 1) {
             void __physaddr *old_physaddr = (void __physaddr *)PAGE_IDX_ADDR(table_entry->addr);
@@ -627,11 +628,47 @@ bool clone_cow(void *addr) {
             free_phys_mem(old_physaddr, GFP_USER);
             free_pages(tempmem, 1, GFP_USER);
         }
-        table_entry->rw = 1;
-        table_entry->flags &= ~PAGE_COW_RO;
     }
 
     return true;
+}
+
+void free_directory(page_directory_t *dir) {
+    unsigned long flags;
+    cli_and_save(flags);
+
+    page_directory_t *back = current_page_directory();
+    if (dir == back)
+        back = &init_page_directory;
+
+    switch_directory(dir);
+
+    uint16_t i, j;
+    for (i = 0; i < NUM_ENTRIES; i++) {
+        struct page_directory_entry *dir_entry = &(*dir)[i];
+        if (!dir_entry->present || !dir_entry->user)
+            continue;
+        else if (dir_entry->size) {
+            free_phys_mem((void __physaddr *)PAGE_IDX_ADDR(dir_entry->addr), GFP_USER | GFP_LARGE);
+        } else {
+            page_table_t *table = find_userspace_page_table(dir_entry);
+
+            for (j = 0; j < NUM_ENTRIES; j++) {
+                struct page_table_entry *table_entry = &(*table)[j];
+
+                if (table_entry->present) {
+                    free_phys_mem((void __physaddr *)PAGE_IDX_ADDR(table_entry->addr), GFP_USER);
+                }
+            }
+
+            free_pages(table, 1, 0);
+        }
+    }
+
+    switch_directory(back);
+    free_pages(dir, 1, 0);
+
+    restore_flags(flags);
 }
 
 #include "../tests.h"

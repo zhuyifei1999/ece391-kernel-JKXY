@@ -14,7 +14,7 @@ static void schedule_handler(struct intr_info *info) {
         "mov %0,%%esp;"
         "jmp ISR_return;"
         :
-        : "rm"(task->return_regs)
+        : "irm"(task->return_regs)
     );
 }
 

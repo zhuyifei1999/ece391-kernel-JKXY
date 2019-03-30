@@ -1,4 +1,5 @@
 #include "kthread.h"
+#include "clone.h"
 #include "sched.h"
 #include "../structure/list.h"
 #include "../lib/stdio.h"

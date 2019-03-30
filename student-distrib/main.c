@@ -1,6 +1,7 @@
 #include "main.h"
 #include "task/sched.h"
 #include "task/kthread.h"
+#include "task/clone.h"
 #include "initcall.h"
 #include "panic.h"
 #include "structure/list.h"

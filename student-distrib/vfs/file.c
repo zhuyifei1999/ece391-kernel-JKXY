@@ -11,7 +11,7 @@
 
 /*
  *   inode_decref
- *   DESCRIPTION: destroy the inode 
+ *   DESCRIPTION: destroy the inode
  *   INPUTS: struct inode *inode
  *   OUTPUTS: none
  *   RETURN VALUE: none
@@ -30,7 +30,7 @@ void inode_decref(struct inode *inode) {
 
 /*
  *   filp_openat
- *   DESCRIPTION: open the file 
+ *   DESCRIPTION: open the file
  *   INPUTS: struct int32_t dfd, char *path, uint32_t flags, uint16_t mode
  *   OUTPUTS: none
  *   RETURN VALUE: struct file
@@ -52,7 +52,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         if (dfd == AT_FDCWD) {
             rel = current->cwd;
         } else {
-            rel = array_get(&current->files.files, dfd);
+            rel = array_get(&current->files->files, dfd);
         }
         if (!rel) {
             ret = ERR_PTR(-EBADF);
@@ -346,7 +346,7 @@ int32_t filp_close(struct file *file) {
 /*
  *   default_file_seek
  *   DESCRIPTION: seek the file
- *   INPUTS: struct file *file, int32_t offset, int32_t whence 
+ *   INPUTS: struct file *file, int32_t offset, int32_t whence
  *   OUTPUTS: none
  *   RETURN VALUE: none
  *   SIDE EFFECTS: none

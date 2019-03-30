@@ -8,6 +8,7 @@
 #include "../structure/list.h"
 #include "../structure/array.h"
 #include "../vfs/file.h"
+#include "../atomic.h"
 
 #define MAXPID 32767  // See paging.h for explanation
 #define LOOPPID 16    // When MAXPID is reached, loop from here
@@ -15,11 +16,12 @@
 #define PID_BUCKETS 16 // number of buckets for PID
 
 struct mm_struct {
+    atomic_t refcount;
     page_directory_t *page_directory;
 };
 
 struct files_struct {
-    uint16_t next_fd;
+    atomic_t refcount;
     struct array files;
 };
 
@@ -41,9 +43,9 @@ struct task_struct {
     uint16_t ppid;
     char comm[16];
     struct mm_struct *mm;
+    struct files_struct *files;
     struct file *cwd;
     struct file *exe;
-    struct files_struct files;
     struct intr_info *return_regs;
     enum task_state state;
     enum subsystem subsystem;
@@ -72,7 +74,6 @@ struct task_struct *get_current(void) {
 
 extern struct list tasks[PID_BUCKETS];
 
-struct task_struct *kernel_thread(int (*fn)(void *args), void *args);
 struct task_struct *get_task_from_pid(uint16_t pid);
 
 noreturn void do_exit(int exitcode);
