@@ -42,8 +42,10 @@ struct tty *keyboard_tty;
 static struct tty *tty_get(uint32_t device_num) {
     // TODO: This should be read from the task's associated TTY, not the tty
     // that's attached to the keyboard
-    if (device_num == TTY_CURRENT)
+    if (device_num == TTY_CURRENT) {
+        atomic_inc(&keyboard_tty->refcount);
         return keyboard_tty;
+    }
     // The console is TTY0
     if (device_num == TTY_CONSOLE)
         device_num = MKDEV(TTY_MAJOR, 0);
@@ -73,6 +75,8 @@ static struct tty *tty_get(uint32_t device_num) {
         .device_num = device_num,
     };
     atomic_set(&ret->refcount, 1);
+
+    list_insert_back(&ttys, ret);
 
 out:
     restore_flags(flags);
