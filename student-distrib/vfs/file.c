@@ -344,11 +344,18 @@ int32_t filp_close(struct file *file) {
     return 0;
 }
 
+/*
+ *   do_sys_read
+ *   DESCRIPTION: syscall-read
+ *   INPUTS: struct file *file,*buf, nbytes
+ *   RETURN VALUE: int32_t result code
+ */
 int32_t do_sys_read(int32_t fd, void *buf, int32_t nbytes) {
     struct file *file = array_get(&current->files->files, fd);
     if (!file)
         return -EBADF;
 
+    // check the nbyte input
     uint32_t safe_nbytes = safe_buf(buf, nbytes, true);
     if (!safe_nbytes && nbytes)
         return -EFAULT;
@@ -362,11 +369,18 @@ DEFINE_SYSCALL3(LINUX, read, int32_t, fd, void *, buf, int32_t, nbytes) {
     return do_sys_read(fd, buf, nbytes);
 }
 
+/*
+ *   do_sys_write
+ *   DESCRIPTION: syscall-write
+ *   INPUTS: struct file *file,*buf, nbytes
+ *   RETURN VALUE: int32_t result code
+ */
 int32_t do_sys_write(int32_t fd, const void *buf, int32_t nbytes) {
     struct file *file = array_get(&current->files->files, fd);
     if (!file)
         return -EBADF;
 
+    // check the nbyte input
     uint32_t safe_nbytes = safe_buf(buf, nbytes, false);
     if (!safe_nbytes && nbytes)
         return -EFAULT;
@@ -380,7 +394,12 @@ DEFINE_SYSCALL3(LINUX, write, int32_t, fd, const void *, buf, int32_t, nbytes) {
     return do_sys_write(fd, buf, nbytes);
 }
 
-
+/*
+ *   do_sys_openat
+ *   DESCRIPTION: syscall-open the file
+ *   INPUTS: int32_t dfd, char *path, uint32_t flags, uint16_t mode
+ *   RETURN VALUE: int32_t result code
+ */
 int32_t do_sys_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
     // determine the length of the path
     uint32_t length = safe_arr_null_term(path, sizeof(char), false);
@@ -432,6 +451,12 @@ DEFINE_SYSCALL4(LINUX, openat, int, dirfd, char *, path, uint32_t, flags, uint16
     return do_sys_openat(dirfd, path, flags, mode);
 }
 
+/*
+ *   do_sys_close
+ *   DESCRIPTION: syscall-close the file
+ *   INPUTS: file index fd
+ *   RETURN VALUE: int32_t result code
+ */
 int32_t do_sys_close(int32_t fd) {
     int32_t res;
     struct file *file = array_get(&current->files->files, fd);
@@ -459,9 +484,6 @@ DEFINE_SYSCALL1(LINUX, close, int32_t, fd) {
  *   default_file_seek
  *   DESCRIPTION: seek the file
  *   INPUTS: struct file *file, int32_t offset, int32_t whence
- *   OUTPUTS: none
- *   RETURN VALUE: none
- *   SIDE EFFECTS: none
  */
 int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
     if ((file->inode->mode & S_IFMT) != S_IFREG)
