@@ -422,6 +422,29 @@ DEFINE_SYSCALL4(LINUX, openat, int, dirfd, char *, path, uint32_t, flags, uint16
     return do_sys_openat(dirfd, path, flags, mode);
 }
 
+int32_t do_sys_close(int32_t fd) {
+    int32_t res;
+    struct file *file = array_get(&current->files->files, fd);
+    if (!file)
+        return -EBADF;
+
+    res = filp_close(file);
+    if (res < 0)
+        return res;
+
+    res = array_set(&current->files->files, fd, NULL);
+    if (res < 0)
+        return res;
+
+    return 0;
+}
+DEFINE_SYSCALL1(ECE391, close, int32_t, fd) {
+    return do_sys_close(fd);
+}
+DEFINE_SYSCALL1(LINUX, close, int32_t, fd) {
+    return do_sys_close(fd);
+}
+
 /*
  *   default_file_seek
  *   DESCRIPTION: seek the file

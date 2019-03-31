@@ -22,7 +22,7 @@ void *array_get(struct array *arr, uint32_t index) {
     return arr->values[index];
 }
 
-uint32_t array_set(struct array *arr, uint32_t index, void *value) {
+int32_t array_set(struct array *arr, uint32_t index, void *value) {
     if (value && index >= arr->size) {
         // find the minimum 2-power needed to store this index
         uint32_t newsize = (1 << (bsr(index) + 1));
