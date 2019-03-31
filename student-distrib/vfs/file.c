@@ -380,6 +380,48 @@ DEFINE_SYSCALL3(LINUX, write, int32_t, fd, const void *, buf, int32_t, nbytes) {
     return do_sys_write(fd, buf, nbytes);
 }
 
+int32_t do_sys_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
+    uint32_t length = safe_arr_null_term(path, sizeof(char), false);
+    if (!length)
+        return -EFAULT;
+
+    char *path_kern = kmalloc(length + 1);
+    if (!path_kern)
+        return -ENOMEM;
+
+    strncpy(path_kern, path, length);
+    path_kern[length] = 0;
+
+    int32_t res;
+
+    struct file *file = filp_openat(dfd, path, flags, mode);
+    if (IS_ERR(file)) {
+        res = PTR_ERR(file);
+        goto out_free;
+    }
+
+    uint32_t i;
+    for (i = 0;; i++) {
+        if (!array_get(&current->files->files, i)) {
+            if (!array_set(&current->files->files, i, file))
+                return 0;
+        }
+    }
+
+out_free:
+    kfree(path_kern);
+    return res;
+}
+DEFINE_SYSCALL1(ECE391, open, /* const */ uint8_t *, filename) {
+    return do_sys_openat(AT_FDCWD, filename, O_RDWR, 0);
+}
+DEFINE_SYSCALL3(LINUX, open, char *, path, uint32_t, flags, uint16_t, mode) {
+    return do_sys_openat(AT_FDCWD, path, flags, mode);
+}
+DEFINE_SYSCALL4(LINUX, openat, int, dirfd, char *, path, uint32_t, flags, uint16_t, mode) {
+    return do_sys_openat(dirfd, path, flags, mode);
+}
+
 /*
  *   default_file_seek
  *   DESCRIPTION: seek the file
