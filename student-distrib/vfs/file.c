@@ -408,14 +408,10 @@ int32_t do_sys_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
     if (!length)
         return -EFAULT;
 
-    // allocate memory to store path
-    char *path_kern = kmalloc(length + 1);
+    // allocate kernel memory to store path
+    char *path_kern = strndup(path, length);
     if (!path_kern)
         return -ENOMEM;
-
-    // copy path into allocated memory
-    strncpy(path_kern, path, length);
-    path_kern[length] = '\0';
 
     int32_t res;
 

@@ -3,7 +3,6 @@
 #include "clone.h"
 #include "exec.h"
 #include "../lib/string.h"
-#include "../mm/kmalloc.h"
 #include "../syscall.h"
 #include "../signal.h"
 #include "../err.h"
@@ -18,12 +17,9 @@ DEFINE_SYSCALL1(ECE391, execute, char *, command) {
     if (!length)
         return -EFAULT;
 
-    char *command_kern = kmalloc(length + 1);
+    char *command_kern = strndup(command, length);
     if (!command_kern)
         return -ENOMEM;
-
-    strncpy(command_kern, command, length);
-    command_kern[length] = '\0';
 
     struct task_struct *child = do_clone(SIGCHLD, ece391execute_child, command_kern, NULL, NULL);
 

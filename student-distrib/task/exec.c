@@ -119,8 +119,7 @@ err_close:
 // TODO: ENOMEM
 int32_t do_execve_heapify(char *filename, char *argv[], char *envp[]) {
     // do_execve expect all args to be on heap so it can free it. if it's not, use this instead.
-    char *filename_h = kmalloc(strlen(filename) + 1);
-    strcpy(filename_h, filename);
+    char *filename_h = strdup(filename);
 
     char **argv_h = NULL;
     char **envp_h = NULL;
@@ -129,20 +128,16 @@ int32_t do_execve_heapify(char *filename, char *argv[], char *envp[]) {
         uint32_t length;
         for (length = 0; argv[length]; length++);
         argv_h = kcalloc(length + 1, sizeof(*argv));
-        for (length = 0; argv[length]; length++) {
-            argv_h[length] = kmalloc(strlen(argv[length]) + 1);
-            strcpy(argv_h[length], argv[length]);
-        }
+        for (length = 0; argv[length]; length++)
+            argv_h[length] = strdup(argv[length]);
     }
 
     if (envp) {
         uint32_t length;
         for (length = 0; envp[length]; length++);
         envp_h = kcalloc(length + 1, sizeof(*envp));
-        for (length = 0; envp[length]; length++) {
-            envp_h[length] = kmalloc(strlen(envp[length]) + 1);
-            strcpy(envp_h[length], envp[length]);
-        }
+        for (length = 0; envp[length]; length++)
+            envp_h[length] = strdup(envp[length]);
     }
 
     return do_execve(filename_h, argv_h, envp_h);

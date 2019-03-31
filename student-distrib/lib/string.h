@@ -17,4 +17,7 @@ uint32_t strlen(const int8_t *s);
 
 char *strchr(char *s, char c);
 
+char *strdup(const char *s);
+char *strndup(const char *s, uint32_t n);
+
 #endif

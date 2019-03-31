@@ -1,4 +1,5 @@
 #include "string.h"
+#include "../mm/kmalloc.h"
 
 /* int8_t *strrev(int8_t *s);
  * Inputs: int8_t *s = string to reverse
@@ -259,4 +260,23 @@ char *strchr(char *s, char c) {
         s++;
     }
     return NULL;
+}
+
+char *strndup(const char *s, uint32_t n) {
+    uint32_t len = strlen(s);
+    if (len > n)
+        len = n;
+
+    char *ret = kmalloc(len + 1);
+    if (!ret)
+        return NULL;
+
+    strncpy(ret, s, len);
+    ret[len] = '\0';
+    return ret;
+}
+
+char *strdup(const char *s) {
+    uint32_t len = strlen(s);
+    return strndup(s, len);
 }
