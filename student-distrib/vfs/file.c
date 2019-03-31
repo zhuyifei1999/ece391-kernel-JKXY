@@ -431,7 +431,7 @@ int32_t do_sys_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
     for (i = 0;; i++) {
         if (!array_get(&current->files->files, i)) {
             if (!array_set(&current->files->files, i, file)) {
-                res = 0;
+                res = i;
                 goto out_free;
             }
         }
