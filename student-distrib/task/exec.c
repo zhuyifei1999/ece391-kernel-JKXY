@@ -1,4 +1,5 @@
 #include "exec.h"
+#include "ece391exec_shim.h"
 #include "../lib/string.h"
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
@@ -82,12 +83,16 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     case SUBSYSTEM_ECE391:;
         // ECE391 subsystem always map the file to 0x08048000,
         // with stack bottom at the end of the page
-#define ECE391_PAGEADDR 0x08000000
-#define ECE391_MAPADDR 0x48000
         request_pages((void *)ECE391_PAGEADDR, 1, GFP_USER | GFP_LARGE);
         filp_read(exe, (void *)(ECE391_PAGEADDR + ECE391_MAPADDR), LEN_4M - ECE391_MAPADDR);
         regs.eip = *(uint32_t *)(ECE391_PAGEADDR + ECE391_MAPADDR + 24);
         regs.esp = ECE391_PAGEADDR + LEN_4M;
+
+        if (argv && argv[0] && argv[1])
+            strncpy((char *)ECE391_ARGSADDR, argv[1], ECE391_MAPADDR);
+        else
+            *(char *)ECE391_ARGSADDR = '\0';
+
         break;
     default:
         panic("Impossible subsystem\n");
