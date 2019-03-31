@@ -164,4 +164,8 @@ bool clone_cow(void *addr);
 
 void free_directory(page_directory_t *dir);
 
+uint32_t safe_buf(const void *buf, uint32_t nbytes, bool write);
+
+uint32_t safe_arr_null_term(const void *buf, uint32_t entry_size, bool write);
+
 #endif

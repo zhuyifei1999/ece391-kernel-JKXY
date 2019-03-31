@@ -6,6 +6,7 @@
 #include "dummyinode.h"
 #include "../task/task.h"
 #include "../mm/kmalloc.h"
+#include "../syscall.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -341,6 +342,42 @@ int32_t filp_close(struct file *file) {
     inode_decref(file->inode);
     kfree(file);
     return 0;
+}
+
+int32_t do_sys_read(int32_t fd, void *buf, int32_t nbytes) {
+    struct file *file = array_get(&current->files->files, fd);
+    if (!file)
+        return -EBADF;
+
+    uint32_t safe_nbytes = safe_buf(buf, nbytes, true);
+    if (!safe_nbytes && nbytes)
+        return -EFAULT;
+
+    return filp_read(file, buf, nbytes);
+}
+DEFINE_SYSCALL3(ECE391, read, int32_t, fd, void *, buf, int32_t, nbytes) {
+    return do_sys_read(fd, buf, nbytes);
+}
+DEFINE_SYSCALL3(LINUX, read, int32_t, fd, void *, buf, int32_t, nbytes) {
+    return do_sys_read(fd, buf, nbytes);
+}
+
+int32_t do_sys_write(int32_t fd, const void *buf, int32_t nbytes) {
+    struct file *file = array_get(&current->files->files, fd);
+    if (!file)
+        return -EBADF;
+
+    uint32_t safe_nbytes = safe_buf(buf, nbytes, false);
+    if (!safe_nbytes && nbytes)
+        return -EFAULT;
+
+    return filp_write(file, buf, nbytes);
+}
+DEFINE_SYSCALL3(ECE391, write, int32_t, fd, const void *, buf, int32_t, nbytes) {
+    return do_sys_write(fd, buf, nbytes);
+}
+DEFINE_SYSCALL3(LINUX, write, int32_t, fd, const void *, buf, int32_t, nbytes) {
+    return do_sys_write(fd, buf, nbytes);
 }
 
 /*

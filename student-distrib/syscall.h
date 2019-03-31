@@ -418,28 +418,31 @@ static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info) {
 }                                                                                \
 void sys_ ## subsystem ## _ ## name(struct intr_info *info_arg)
 
-#define DEFINE_SYSCALL1(subsystem, name, arg1)                                   \
+#define DEFINE_SYSCALL1(subsystem, name, type1, arg1)                            \
 _DEFINE_SYSCALL(subsystem, name);                                                \
-int32_t sys_ ## subsystem ## _ ## name(arg1);                                    \
+int32_t sys_ ## subsystem ## _ ## name(type1 arg1);                              \
 static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info) { \
-    info->eax = sys_ ## subsystem ## _ ## name(info->ebx);                       \
+    info->eax = sys_ ## subsystem ## _ ## name((type1)info->ebx);                \
 }                                                                                \
-int32_t sys_ ## subsystem ## _ ## name(arg1)
+int32_t sys_ ## subsystem ## _ ## name(type1 arg1)
 
-#define DEFINE_SYSCALL2(subsystem, name, arg1, arg2)                             \
+#define DEFINE_SYSCALL2(subsystem, name, type1, arg1, type2, arg2)               \
 _DEFINE_SYSCALL(subsystem, name);                                                \
-int32_t sys_ ## subsystem ## _ ## name(arg1, arg2);                              \
+int32_t sys_ ## subsystem ## _ ## name(type1 arg1, type2 arg2);                  \
 static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info) { \
-    info->eax = sys_ ## subsystem ## _ ## name(info->ebx, info->ecx);            \
+    info->eax = sys_ ## subsystem ## _ ## name((type1)info->ebx,                 \
+                                               (type2)info->ecx);                \
 }                                                                                \
-int32_t sys_ ## subsystem ## _ ## name(arg1, arg2)
+int32_t sys_ ## subsystem ## _ ## name(type1 arg1, type2 arg2)
 
-#define DEFINE_SYSCALL3(subsystem, name, arg1, arg2, arg3)                       \
+#define DEFINE_SYSCALL3(subsystem, name, type1, arg1, type2, arg2, type3, arg3)  \
 _DEFINE_SYSCALL(subsystem, name);                                                \
-int32_t sys_ ## subsystem ## _ ## name(arg1, arg2, arg3);                        \
+int32_t sys_ ## subsystem ## _ ## name(type1 arg1, type2 arg2, type3 arg3);      \
 static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info) { \
-    info->eax = sys_ ## subsystem ## _ ## name(info->ebx, info->ecx, info->edx); \
+    info->eax = sys_ ## subsystem ## _ ## name((type1)info->ebx,                 \
+                                               (type2)info->ecx,                 \
+                                               (type3)info->edx);                \
 }                                                                                \
-int32_t sys_ ## subsystem ## _ ## name(arg1, arg2, arg3)
+int32_t sys_ ## subsystem ## _ ## name(type1 arg1, type2 arg2, type3 arg3)
 
 #endif

@@ -1,4 +1,5 @@
 #include "paging.h"
+#include "../task/task.h"
 #include "../lib/cli.h"
 #include "../lib/string.h"
 #include "../panic.h"
@@ -710,6 +711,74 @@ void free_directory(page_directory_t *dir) {
     free_pages(dir, 1, 0);
 
     restore_flags(flags);
+}
+
+static bool addr_is_safe(page_directory_t *directory, const void *addr, bool write) {
+    struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)addr)];
+    if (!dir_entry->present || !dir_entry->user)
+        return false;
+    else if (dir_entry->size) {
+        if (write && !dir_entry->rw)
+            return false;
+    } else {
+        page_table_t *table = find_userspace_page_table(dir_entry);
+
+        struct page_table_entry *table_entry = &(*table)[PAGE_TABLE_IDX((uint32_t)addr)];
+
+        if (!table_entry->present)
+            return false;
+        if (write && !dir_entry->rw)
+            return false;
+    }
+    return true;
+}
+
+uint32_t safe_buf(const void *buf, uint32_t nbytes, bool write) {
+    const char *buf_char = buf;
+    uint32_t ret = 0;
+
+    page_directory_t *dir = current_page_directory();
+
+    while (nbytes) {
+        uint16_t nbytes_cancheck = ((uint32_t)buf_char / LEN_4K + 1) * LEN_4K - (uint32_t)buf_char;
+        if (nbytes_cancheck > nbytes)
+            nbytes_cancheck = nbytes;
+
+        if (!addr_is_safe(dir, buf_char, write))
+            break;
+
+        ret += nbytes_cancheck;
+        buf_char += nbytes_cancheck;
+        nbytes -= nbytes_cancheck;
+    }
+
+    return ret;
+}
+
+uint32_t safe_arr_null_term(const void *buf, uint32_t entry_size, bool write) {
+    const char *buf_char = buf;
+    uint32_t ret = 0;
+
+    page_directory_t *dir = current_page_directory();
+
+    for (;; ret++) {
+        int i;
+        bool zero = true;
+        for (i = 0; i < entry_size; i++) {
+            if (!addr_is_safe(dir, buf_char, write))
+                goto out;
+
+            if (*buf_char)
+                zero = false;
+
+            buf_char++;
+        }
+        if (zero)
+            break;
+    }
+
+out:
+    return ret;
 }
 
 #include "../tests.h"

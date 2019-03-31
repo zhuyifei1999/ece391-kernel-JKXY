@@ -3,6 +3,7 @@
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
 #include "../vfs/file.h"
+#include "../panic.h"
 #include "../eflags.h"
 #include "../err.h"
 #include "../errno.h"
@@ -48,9 +49,10 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     uint32_t i;
     array_for_each(&current->files->files, i) {
         struct file *file = array_get(&current->files->files, i);
-        if (file && (file->flags & O_CLOEXEC))
+        if (file && (file->flags & O_CLOEXEC)) {
             filp_close(file);
-        array_set(&current->files->files, i, NULL);
+            array_set(&current->files->files, i, NULL);
+        }
     }
 
     page_directory_t *new_pagedir = new_directory();
@@ -84,6 +86,9 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         filp_read(exe, (void *)(ECE391_PAGEADDR + ECE391_MAPADDR), LEN_4M - ECE391_MAPADDR);
         regs.eip = *(uint32_t *)(ECE391_PAGEADDR + ECE391_MAPADDR + 24);
         regs.esp = ECE391_PAGEADDR + LEN_4M;
+        break;
+    default:
+        panic("Impossible subsystem\n");
     }
 
     set_all_regs(&regs);

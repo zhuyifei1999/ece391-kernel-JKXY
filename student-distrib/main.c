@@ -33,7 +33,8 @@ static int run_init_process(void *args) {
     atomic_set(&current->files->refcount, 1);
     current->files->files = (struct array){0};
 
-    // TODO: open FD 0 & 1
+    array_set(&current->files->files, 0, filp_open_anondevice(MKDEV(5, 0), 0, S_IFCHR | 0666));
+    array_set(&current->files->files, 1, filp_open_anondevice(MKDEV(5, 0), O_WRONLY, S_IFCHR | 0666));
 
     char *argv[] = {
         "hello",
