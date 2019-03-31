@@ -37,7 +37,7 @@ static int run_init_process(void *args) {
     array_set(&current->files->files, 1, filp_open_anondevice(MKDEV(5, 0), O_WRONLY, S_IFCHR | 0666));
 
     char *argv[] = {
-        "hello",
+        "shell",
         NULL
     };
     char *envp[] = {
@@ -45,7 +45,7 @@ static int run_init_process(void *args) {
         // "TERM=linux"
         NULL
     };
-    int32_t res = do_execve(argv[0], argv, envp);
+    int32_t res = do_execve_heapify(argv[0], argv, envp);
     panic("Could not set execute init: %d\n", res);
 }
 

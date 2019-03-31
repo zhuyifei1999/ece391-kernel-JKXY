@@ -452,8 +452,8 @@ int32_t sys_ ## subsystem ## _ ## name(type1 arg1, type2 arg2, type3 arg3, type4
 static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info) {             \
     info->eax = sys_ ## subsystem ## _ ## name((type1)info->ebx,                             \
                                                (type2)info->ecx,                             \
-                                               (type2)info->edx,                             \
-                                               (type3)info->esi);                            \
+                                               (type3)info->edx,                             \
+                                               (type4)info->esi);                            \
 }                                                                                            \
 int32_t sys_ ## subsystem ## _ ## name(type1 arg1, type2 arg2, type3 arg3, type4 arg4)
 

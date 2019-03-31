@@ -4,6 +4,7 @@
 #include "mount.h"
 #include "device.h"
 #include "dummyinode.h"
+#include "../lib/string.h"
 #include "../task/task.h"
 #include "../mm/kmalloc.h"
 #include "../syscall.h"
@@ -413,7 +414,7 @@ int32_t do_sys_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
 
     // copy path into allocated memory
     strncpy(path_kern, path, length);
-    path_kern[length] = 0;
+    path_kern[length] = '\0';
 
     int32_t res;
 
@@ -441,7 +442,7 @@ out_free:
     kfree(path_kern);
     return res;
 }
-DEFINE_SYSCALL1(ECE391, open, /* const */ uint8_t *, filename) {
+DEFINE_SYSCALL1(ECE391, open, /* const */ char *, filename) {
     return do_sys_openat(AT_FDCWD, filename, O_RDWR, 0);
 }
 DEFINE_SYSCALL3(LINUX, open, char *, path, uint32_t, flags, uint16_t, mode) {

@@ -26,6 +26,8 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         goto err_close;
     }
 
+    ret = 0;
+
     // TODO: determine subsystem
     enum subsystem subsystem = SUBSYSTEM_ECE391;
 
@@ -91,9 +93,57 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         panic("Impossible subsystem\n");
     }
 
-    set_all_regs(&regs);
-
 err_close:
-    filp_close(exe);
-    return ret;
+    kfree(filename);
+
+    if (argv) {
+        for (i = 0; argv[i]; i++)
+            kfree(argv[i]);
+        kfree(argv);
+    }
+
+    if (envp) {
+        for (i = 0; envp[i]; i++)
+            kfree(envp[i]);
+        kfree(envp);
+    }
+
+    if (ret) {
+        filp_close(exe);
+        return ret;
+    }
+
+    set_all_regs(&regs);
+}
+
+// TODO: ENOMEM
+int32_t do_execve_heapify(char *filename, char *argv[], char *envp[]) {
+    // do_execve expect all args to be on heap so it can free it. if it's not, use this instead.
+    char *filename_h = kmalloc(strlen(filename) + 1);
+    strcpy(filename_h, filename);
+
+    char **argv_h = NULL;
+    char **envp_h = NULL;
+
+    if (argv) {
+        uint32_t length;
+        for (length = 0; argv[length]; length++);
+        argv_h = kcalloc(length + 1, sizeof(*argv));
+        for (length = 0; argv[length]; length++) {
+            argv_h[length] = kmalloc(strlen(argv[length]) + 1);
+            strcpy(argv_h[length], argv[length]);
+        }
+    }
+
+    if (envp) {
+        uint32_t length;
+        for (length = 0; envp[length]; length++);
+        envp_h = kcalloc(length + 1, sizeof(*envp));
+        for (length = 0; envp[length]; length++) {
+            envp_h[length] = kmalloc(strlen(envp[length]) + 1);
+            strcpy(envp_h[length], envp[length]);
+        }
+    }
+
+    return do_execve(filename_h, argv_h, envp_h);
 }

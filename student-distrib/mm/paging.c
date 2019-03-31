@@ -549,7 +549,7 @@ static void free_one_page(void *page, uint32_t gfp_flags) {
 void free_pages(void *page, uint32_t num, uint32_t gfp_flags) {
     uint32_t i;
     for (i = 0; i < num; i++)
-        free_one_page((void *)((uint32_t)page + page_size(gfp_flags)), gfp_flags);
+        free_one_page((void *)((uint32_t)page + page_size(gfp_flags) * i), gfp_flags);
 }
 
 page_directory_t *clone_directory(page_directory_t *src) {

@@ -23,6 +23,8 @@
 // #define CLONE_UNTRACED       0x00800000 /* set if the tracing process can't force CLONE_PTRACE on this clone */
 #define CLONE_CHILD_SETTID   0x01000000 /* set the TID in the child */
 
+struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, int *parent_tidptr, int *child_tidptr);
+
 struct task_struct *kernel_thread(int (*fn)(void *args), void *args);
 
 #endif
