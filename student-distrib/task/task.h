@@ -37,6 +37,8 @@ enum task_state {
 enum subsystem {
     SUBSYSTEM_ECE391,
     SUBSYSTEM_LINUX,
+
+    NUM_SUBSYSTEMS,
 };
 
 struct task_struct {
