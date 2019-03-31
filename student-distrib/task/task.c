@@ -1,12 +1,13 @@
 #include "task.h"
 #include "kthread.h"
+#include "sched.h"
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
 #include "../lib/cli.h"
 #include "../panic.h"
 #include "../initcall.h"
+#include "../syscall.h"
 #include "../err.h"
-#include "sched.h"
 
 // struct task_struct *tasks[MAXPID];
 struct list tasks[PID_BUCKETS];
@@ -65,6 +66,13 @@ void do_exit(int exitcode) {
     schedule();
 
     panic("Dead process scheduled.\n");
+}
+
+DEFINE_SYSCALL1(ECE391, halt, uint8_t, status) {
+    do_exit(status);
+}
+DEFINE_SYSCALL1(LINUX, exit, int, status) {
+    do_exit(status);
 }
 
 // Reap a child process, return its exitcode
