@@ -4,14 +4,14 @@
 #include "../lib/stdint.h"
 #include "../atomic.h"
 
-// #define O_RDONLY 0x0
-#define O_WRONLY 0x1
-#define O_RDWR 0x2
-#define O_CREAT 0x40
-#define O_EXCL 0x80
-#define O_NOCTTY 0x100
-#define O_TRUNC 0x200
-#define O_APPEND 0x400
+// #define O_RDONLY  0x0
+#define O_WRONLY  0x1
+#define O_RDWR    0x2
+#define O_CREAT   0x40
+#define O_EXCL    0x80
+#define O_NOCTTY  0x100
+#define O_TRUNC   0x200
+#define O_APPEND  0x400
 #define O_CLOEXEC 0x80000
 
 #define AT_FDCWD -100 // Means openat should use CWD

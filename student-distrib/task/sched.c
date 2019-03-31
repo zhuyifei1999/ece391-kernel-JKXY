@@ -10,12 +10,7 @@ static void schedule_handler(struct intr_info *info) {
     current->return_regs = info;
     struct task_struct *task = (struct task_struct *)info->eax;
     // TODO: For userspace, update TSS, page directory, flush TLB
-    asm volatile (
-        "mov %0,%%esp;"
-        "jmp ISR_return;"
-        :
-        : "irm"(task->return_regs)
-    );
+    set_all_regs(task->return_regs);
 }
 
 static void switch_to(struct task_struct *task) {

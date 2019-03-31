@@ -8,6 +8,7 @@
 #include "../structure/list.h"
 #include "../structure/array.h"
 #include "../vfs/file.h"
+#include "../panic.h"
 #include "../atomic.h"
 
 #define MAXPID 32767  // See paging.h for explanation
@@ -71,6 +72,17 @@ struct task_struct *get_current(void) {
 #define current (get_current())
 
 #define is_boot_context() ((uint32_t)current < KDIR_VIRT_ADDR)
+
+static inline __always_inline noreturn
+void set_all_regs(struct intr_info *regs) {
+    asm volatile (
+        "mov %0,%%esp;"
+        "jmp ISR_return;"
+        :
+        : "irm"(regs)
+    );
+    panic("GCC is nuts\n");
+}
 
 extern struct list tasks[PID_BUCKETS];
 

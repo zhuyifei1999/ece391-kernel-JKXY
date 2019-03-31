@@ -14,7 +14,7 @@
 #define LEN_1K (1 << 10) // decimal value = 1024
 #define LEN_4K (1 << 12) // decimal value = 4096
 #define LEN_1M (1 << 20) // decimal value = 1048576
-#define LEN_4M (4 << 20) // decimal value = 4194304
+#define LEN_4M (1 << 22) // decimal value = 4194304
 
 /*
 #define LEN_4G (4 << 20) // decimal value = 4294967296
@@ -136,19 +136,9 @@ typedef struct page_table_entry page_table_t[NUM_ENTRIES];
 
 void init_page();
 
-static inline __always_inline
-// struct page_directory_entry (*current_page_directory())[NUM_ENTRIES] {
-page_directory_t *current_page_directory() {
-    page_directory_t *ret;
-    asm volatile("movl %%cr3, %0;" : "=a"(ret));
-    return ret;
-}
+page_directory_t *current_page_directory();
 
-static inline __always_inline
-void switch_directory(page_directory_t *dir) {
-    // cr3 is address to page directory address
-    asm volatile ("movl %0, %%cr3" : : "r"(dir) : "memory");
-}
+void switch_directory(page_directory_t *dir);
 
 // Flags for getting pages
 // #define GFP_KERNEL  0
@@ -167,6 +157,8 @@ void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags);
 void free_pages(void *pages, uint32_t num, uint32_t gfp_flags);
 
 page_directory_t *clone_directory(page_directory_t *src);
+
+page_directory_t *new_directory();
 
 bool clone_cow(void *addr);
 

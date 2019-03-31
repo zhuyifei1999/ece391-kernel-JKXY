@@ -19,6 +19,10 @@ ENTRY(ISR_\intr\()_hascode):
 .endm
 
 ISR_common:
+    pushl   %gs
+    pushl   %fs
+    pushl   %es
+    pushl   %ds
     pushal
     pushl   %esp
     cld
@@ -26,6 +30,10 @@ ISR_common:
     add     $4,%esp
 ENTRY(ISR_return):
     popal
+    popl    %ds
+    popl    %es
+    popl    %fs
+    popl    %gs
     add     $8,%esp
     iret
 

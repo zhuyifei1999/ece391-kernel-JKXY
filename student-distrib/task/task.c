@@ -1,6 +1,7 @@
 #include "task.h"
 #include "kthread.h"
 #include "../mm/paging.h"
+#include "../mm/kmalloc.h"
 #include "../lib/cli.h"
 #include "../panic.h"
 #include "../initcall.h"
@@ -41,12 +42,14 @@ void do_exit(int exitcode) {
                     filp_close(file);
             }
             array_destroy(&current->files->files);
+            kfree(current->files);
         }
     }
 
     if (current->mm) {
         if (!atomic_dec(&current->mm->refcount)) {
             free_directory(current->mm->page_directory);
+            kfree(current->mm);
         }
     }
 

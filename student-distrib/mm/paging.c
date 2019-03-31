@@ -157,17 +157,20 @@ void init_page(struct multiboot_info __physaddr *mbi) {
         memset(table, 0, sizeof(*table));
     }
 
-    switch_directory(&init_page_directory);
+    // cr3 is address to page directory address
     // cr4 enables (Page Size Extension) PSE
     // cr0 enables paging
     asm volatile(
+        "movl %0, %%cr3;"         // load CR3 with the address of the page directory
         "movl %%cr4, %%eax;"
         "orl $0x00000010, %%eax;"
         "movl %%eax, %%cr4;"      // enable PSE (4 MiB pages) of %cr4
         "movl %%cr0, %%eax;"
         "orl $0x80000000, %%eax;" // set the paging (PG) bits of %CR0
         "movl %%eax, %%cr0;"
-        : : : "eax", "cc"         /* clobbered register */
+        :                     /* no outputs */
+        : "r"(init_page_directory) /* put page directory address into cr3 */
+        : "eax", "cc"         /* clobbered register */
     );
     restore_flags(flags); // restore interrupts
 }
@@ -182,23 +185,29 @@ static void __physaddr *alloc_phys_mem(uint32_t gfp_flags) {
     uint32_t start_idx = (gfp_flags & GFP_LARGE) ? 0 : PHYS_DIR_LARGE_NUM;
     uint32_t end_idx = (gfp_flags & GFP_LARGE) ? PHYS_DIR_LARGE_NUM : PHYS_DIR_SMALL_NUM;
 
+    cli_and_save(flags);
+
     for (; start_idx < end_idx; start_idx++) {
-        if (!phys_dir[start_idx] && ((gfp_flags & GFP_LARGE) || !phys_dir[start_idx / LEN_1K])) {
-            // Is this still free? Enter a critical section and recheck
-            cli_and_save(flags);
-            if (phys_dir[start_idx] || (!(gfp_flags & GFP_LARGE) && phys_dir[start_idx / LEN_1K])) {
-                // Nope
-                restore_flags(flags);
+        if (phys_dir[start_idx])
+            continue;
+        if (gfp_flags & GFP_LARGE) {
+            uint16_t i;
+            for (i = start_idx * LEN_1K; i < (start_idx + 1) * LEN_1K; i++)
+                if (phys_dir[i])
+                    goto cont;
+        } else {
+            if (phys_dir[start_idx / LEN_1K])
                 continue;
-            }
-
-            // Found ya.
-            phys_dir[start_idx] = (gfp_flags & GFP_USER) ? 1 : PHYS_DIR_KERNEL;
-            restore_flags(flags);
-
-            return (void  __physaddr *)(start_idx * page_size(gfp_flags));
         }
+
+        // Found ya.
+        phys_dir[start_idx] = (gfp_flags & GFP_USER) ? 1 : PHYS_DIR_KERNEL;
+
+        restore_flags(flags);
+        return (void  __physaddr *)(start_idx * page_size(gfp_flags));
+    cont:;
     }
+    restore_flags(flags);
     return NULL;
 }
 
@@ -245,7 +254,7 @@ static page_table_t *find_userspace_page_table(struct page_directory_entry *dir_
     uint32_t i;
     for (i = KHEAP_ADDR_IDX; i < KHEAP_ADDR_IDX + NUM_PAGE_TABLES; i++) {
         if (heap_tables[i].present && heap_tables[i].addr == dir_entry->addr) {
-            table = (void *)(i * PAGE_SIZE_SMALL);
+            table = (void *)PAGE_IDX_ADDR(i);
             break;
         }
     }
@@ -278,6 +287,34 @@ static page_table_t *mk_user_table(struct page_directory_entry *dir_entry) {
 
 static inline __always_inline void invlpg(void *addr) {
     asm volatile ("invlpg %0" : : "m"(*(char *)addr));
+}
+
+// struct page_directory_entry (*current_page_directory())[NUM_ENTRIES] {
+page_directory_t *current_page_directory() {
+    uint32_t physaddr;
+    asm volatile("movl %%cr3, %0;" : "=a"(physaddr));
+    if ((page_directory_t *)physaddr == &init_page_directory)
+        return &init_page_directory;
+
+    page_directory_t *dir;
+    uint32_t i;
+    for (i = KHEAP_ADDR_IDX; i < KHEAP_ADDR_IDX + NUM_PAGE_TABLES; i++) {
+        if (heap_tables[i].present && heap_tables[i].addr == PAGE_IDX(physaddr)) {
+            dir = (void *)PAGE_IDX_ADDR(i);
+            break;
+        }
+    }
+    if (!dir)
+        panic("Cannot find current page directory");
+    return dir;
+}
+
+void switch_directory(page_directory_t *dir) {
+    if (dir != &init_page_directory) {
+        dir = (page_directory_t *)PAGE_IDX_ADDR(heap_tables[PAGE_IDX((uint32_t)dir)].addr);
+    }
+    // cr3 is physical address to page directory
+    asm volatile ("movl %0, %%cr3" : : "a"(dir) : "memory");
 }
 
 __attribute__((malloc))
@@ -565,6 +602,10 @@ page_directory_t *clone_directory(page_directory_t *src) {
     }
 
     return dst;
+}
+
+page_directory_t *new_directory() {
+    return clone_directory(&init_page_directory);
 }
 
 bool clone_cow(void *addr) {

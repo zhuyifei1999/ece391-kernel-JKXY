@@ -39,15 +39,9 @@ asmlinkage noreturn void clone_child(uint32_t flags, int (*fn)(void *args), void
     } else {
         // userspace clone
         // copy infr_info into our stack and free the original
-        struct intr_info info = *(struct intr_info *)args;
+        struct intr_info regs = *(struct intr_info *)args;
         kfree(args);
-        asm volatile (
-            "mov %0,%%esp;"
-            "jmp ISR_return;"
-            :
-            : "irm"(&info)
-        );
-        panic("GCC is nuts\n");
+        set_all_regs(&regs);
     }
 }
 
@@ -131,6 +125,10 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         .eflags = EFLAGS_BASE | IF,
         .eip    = (uint32_t)&entry_task,
         .cs     = KERNEL_CS,
+        .ds     = KERNEL_DS,
+        .es     = KERNEL_DS,
+        .fs     = KERNEL_DS,
+        .gs     = KERNEL_DS,
     };
 
     task->return_regs = regs;

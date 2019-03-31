@@ -2,6 +2,8 @@
 #include "task/sched.h"
 #include "task/kthread.h"
 #include "task/clone.h"
+#include "task/exec.h"
+#include "mm/kmalloc.h"
 #include "initcall.h"
 #include "panic.h"
 #include "structure/list.h"
@@ -13,6 +15,7 @@
 #include "vfs/mount.h"
 #include "lib/string.h"
 #include "lib/stdio.h"
+#include "atomic.h"
 #include "err.h"
 
 struct task_struct *swapper_task;
@@ -24,6 +27,26 @@ static int kselftest(void *args) {
     return 0;
 }
 #endif
+
+static int run_init_process(void *args) {
+    current->files = kmalloc(sizeof(*current->files));
+    atomic_set(&current->files->refcount, 1);
+    current->files->files = (struct array){0};
+
+    // TODO: open FD 0 & 1
+
+    char *argv[] = {
+        "hello",
+        NULL
+    };
+    char *envp[] = {
+        "HOME=/",
+        // "TERM=linux"
+        NULL
+    };
+    int32_t res = do_execve(argv[0], argv, envp);
+    panic("Could not set execute init: %d\n", res);
+}
 
 static int kernel_main(void *args) {
     swapper_task = current;
@@ -43,9 +66,13 @@ static int kernel_main(void *args) {
     if (IS_ERR(swapper_task->cwd))
         panic("Could not set working directory to root directory: %d\n", PTR_ERR(swapper_task->cwd));
 
+    struct task_struct *init_task = kernel_thread(&run_init_process, NULL);
+
     struct task_struct *kthreadd_task = kernel_thread(&kthreadd, NULL);
     wake_up_process(kthreadd_task);
     schedule();
+
+    wake_up_process(init_task);
 
 #if RUN_TESTS
     // start the tests in a seperate kthread
