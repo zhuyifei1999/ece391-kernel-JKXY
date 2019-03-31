@@ -1,4 +1,6 @@
 #include "sched.h"
+#include "../x86_desc.h"
+#include "../mm/paging.h"
 #include "../interrupt.h"
 #include "../initcall.h"
 #include "../panic.h"
@@ -9,7 +11,11 @@ struct list schedule_queue;
 static void schedule_handler(struct intr_info *info) {
     current->return_regs = info;
     struct task_struct *task = (struct task_struct *)info->eax;
-    // TODO: For userspace, update TSS, page directory, flush TLB
+    if (task->mm) // this task has userspace, update page directory
+        switch_directory(task->mm->page_directory);
+
+    tss.ss0 = KERNEL_DS;
+    tss.esp0 = (uint32_t)task + TASK_STACK_PAGES * PAGE_SIZE_SMALL;
     set_all_regs(task->return_regs);
 }
 
