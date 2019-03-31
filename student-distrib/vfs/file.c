@@ -68,6 +68,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         path_premount = path_clone(path_rel);
     }
 
+    // check if the path is vaild
     if (IS_ERR(path_premount)) {
         ret = ERR_CAST(path_premount);
         goto out_rel;
