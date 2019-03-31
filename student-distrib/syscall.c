@@ -2,6 +2,8 @@
 #include "lib/stdio.h"
 #include "errno.h"
 
+intr_handler_t *syscall_handlers[NUM_SUBSYSTEMS][MAX_SYSCALL];
+
 static void syscall_handler(struct intr_info *info) {
     intr_handler_t *handler = NULL;
     if (info->eax < MAX_SYSCALL)

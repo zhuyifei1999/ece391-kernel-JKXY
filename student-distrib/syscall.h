@@ -399,14 +399,15 @@
 
 #define MAX_SYSCALL 400
 
-intr_handler_t *syscall_handlers[NUM_SUBSYSTEMS][MAX_SYSCALL];
+extern intr_handler_t *syscall_handlers[NUM_SUBSYSTEMS][MAX_SYSCALL];
 
 #define _EXPAND(val) val
 
-#define _DEFINE_SYSCALL(subsystem, name)                                                                                                     \
-static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info);                                                              \
-static void init_sys_ ## subsystem ## _ ## name() {                                                                                          \
-    syscall_handlers[_EXPAND(SUBSYSTEM_ ## subsystem)][_EXPAND(NR_ ## subsystem ## _ ## name)] = sys_ ## subsystem ## _ ## name ## _wrapper; \
+#define _DEFINE_SYSCALL(subsystem, name)                                                       \
+static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info);                \
+static void init_sys_ ## subsystem ## _ ## name() {                                            \
+    syscall_handlers[_EXPAND(SUBSYSTEM_ ## subsystem)][_EXPAND(NR_ ## subsystem ## _ ## name)] \
+        = sys_ ## subsystem ## _ ## name ## _wrapper;                                          \
 }                                                                                                                                            \
 DEFINE_INITCALL(init_sys_ ## subsystem ## _ ## name, drivers)
 
