@@ -1,5 +1,6 @@
 #include "interrupt.h"
 #include "mm/paging.h"
+#include "task/task.h"
 #include "panic.h"
 #include "initcall.h"
 #include "compiler.h"
@@ -41,12 +42,18 @@ STUB_EXC_HANDLER("#VE", virtualization_exception,      INTR_EXC_VIRTUALIZATION_E
 
 static void page_fault(struct intr_info *info) {
     // If this is a user writing to a read-only page causing a protection violation, this could be a COW page
-    if ((info->error_code & PF_P) && (info->error_code & PF_U) && (info->error_code & PF_W)) {
-        void *faultaddr;
-        asm volatile ("mov %%cr2,%0" : "=a"(faultaddr));
-        if (clone_cow(faultaddr))
-            return;
+    if (info->error_code & PF_U) {
+        if ((info->error_code & PF_P) && (info->error_code & PF_W)) {
+            void *faultaddr;
+            asm volatile ("mov %%cr2,%0" : "=a"(faultaddr));
+            if (clone_cow(faultaddr))
+                return;
+        }
+
+        // TODO: send a signal instead
+        do_exit(256);
     }
+
     panic("#PF: 0x%x", info->error_code);
 }
 DEFINE_EXC_HANDLER(page_fault, INTR_EXC_PAGE_FAULT);
