@@ -78,33 +78,33 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
             .cwd       = current->cwd,
             .exe       = current->exe,
         };
-    }
 
-    if (current->mm) {
-        if (flags & CLONE_VM) {
-            atomic_inc(&current->mm->refcount);
-            task->mm = current->mm;
-        } else {
-            task->mm = kmalloc(sizeof(*task->mm));
-            atomic_set(&task->mm->refcount, 1);
-            task->mm->page_directory = clone_directory(current->mm->page_directory);
+        if (current->mm) {
+            if (flags & CLONE_VM) {
+                atomic_inc(&current->mm->refcount);
+                task->mm = current->mm;
+            } else {
+                task->mm = kmalloc(sizeof(*task->mm));
+                atomic_set(&task->mm->refcount, 1);
+                task->mm->page_directory = clone_directory(current->mm->page_directory);
+            }
         }
-    }
 
-    if (current->files) {
-        if (flags & CLONE_FILES) {
-            atomic_inc(&current->files->refcount);
-            task->files = current->files;
-        } else {
-            task->files = kmalloc(sizeof(*task->files));
-            task->files->files = (struct array){0};
-            atomic_set(&task->files->refcount, 1);
-            uint32_t i;
-            array_for_each(&current->files->files, i) {
-                struct file *file = array_get(&current->files->files, i);
-                if (file) {
-                    array_set(&task->files->files, i, file);
-                    atomic_inc(&file->refcount);
+        if (current->files) {
+            if (flags & CLONE_FILES) {
+                atomic_inc(&current->files->refcount);
+                task->files = current->files;
+            } else {
+                task->files = kmalloc(sizeof(*task->files));
+                task->files->files = (struct array){0};
+                atomic_set(&task->files->refcount, 1);
+                uint32_t i;
+                array_for_each(&current->files->files, i) {
+                    struct file *file = array_get(&current->files->files, i);
+                    if (file) {
+                        array_set(&task->files->files, i, file);
+                        atomic_inc(&file->refcount);
+                    }
                 }
             }
         }
