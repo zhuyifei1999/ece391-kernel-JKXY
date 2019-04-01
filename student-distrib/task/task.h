@@ -37,9 +37,8 @@ enum task_state {
 enum subsystem {
     SUBSYSTEM_ECE391,
     SUBSYSTEM_LINUX,
-
-    NUM_SUBSYSTEMS,
 };
+#define NUM_SUBSYSTEMS 2
 
 struct task_struct {
     uint16_t pid;

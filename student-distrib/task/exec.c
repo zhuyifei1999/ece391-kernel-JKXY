@@ -4,6 +4,8 @@
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
 #include "../vfs/file.h"
+#include "../vfs/device.h"
+#include "../vfs/path.h"
 #include "../panic.h"
 #include "../eflags.h"
 #include "../err.h"
@@ -49,12 +51,31 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         filp_close(current->exe);
     current->exe = exe;
 
-    uint32_t i;
-    array_for_each(&current->files->files, i) {
-        struct file *file = array_get(&current->files->files, i);
-        if (file && (file->flags & O_CLOEXEC)) {
-            filp_close(file);
-            array_set(&current->files->files, i, NULL);
+    if (current->files) {
+        uint32_t i;
+        array_for_each(&current->files->files, i) {
+            struct file *file = array_get(&current->files->files, i);
+            if (file && (file->flags & O_CLOEXEC)) {
+                filp_close(file);
+                array_set(&current->files->files, i, NULL);
+            }
+        }
+    } else {
+        current->files = kmalloc(sizeof(*current->files));
+        atomic_set(&current->files->refcount, 1);
+        current->files->files = (struct array){0};
+        switch (subsystem) {
+        case SUBSYSTEM_LINUX:;
+            struct file *tty = filp_open_anondevice(MKDEV(5, 0), 0, S_IFCHR | 0666);
+            array_set(&current->files->files, 0, tty);
+            array_set(&current->files->files, 1, tty);
+            array_set(&current->files->files, 2, tty);
+            atomic_add(&tty->refcount, 2);
+            break;
+        case SUBSYSTEM_ECE391:
+            array_set(&current->files->files, 0, filp_open_anondevice(MKDEV(5, 0), 0, S_IFCHR | 0666));
+            array_set(&current->files->files, 1, filp_open_anondevice(MKDEV(5, 0), O_WRONLY, S_IFCHR | 0666));
+            break;
         }
     }
 
@@ -71,7 +92,10 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
 
     current->subsystem = subsystem;
 
-    // TODO: current->comm. set to last component of path?
+    if (argv && argv[0] && *argv[0])
+        strncpy(current->comm, argv[0], sizeof(current->comm) - 1);
+    else
+        strncpy(current->comm, list_peek_back(&exe->path->components), sizeof(current->comm) - 1);
 
     switch_directory(new_pagedir);
 
@@ -94,13 +118,12 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
             *(char *)ECE391_ARGSADDR = '\0';
 
         break;
-    default:
-        panic("Impossible subsystem\n");
     }
 
 err_close:
     kfree(filename);
 
+    uint32_t i;
     if (argv) {
         for (i = 0; argv[i]; i++)
             kfree(argv[i]);
