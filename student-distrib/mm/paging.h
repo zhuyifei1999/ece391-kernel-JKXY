@@ -17,7 +17,7 @@
 #define LEN_4M (1 << 22) // decimal value = 4194304
 
 /*
-#define LEN_4G (4 << 20) // decimal value = 4294967296
+#define LEN_4G (1 << 22) // decimal value = 4294967296
 #define ADDRESS_SPACE LEN_4G
 */
 
@@ -73,9 +73,8 @@
 #define KLOW_ADDR  LEN_4M  // kernel address
 #define VIDEO_ADDR 0xB8000 // video memory address
 
-#define KDIR_VIRT_ADDR (3 << 30)    // kernel directory virtual address
-/* GCC appearantly complains that ((3 << 30) >> 22) > (1 << 10) */
-#define KDIR_VIRT_PDIR_IDX 768      // PAGE_DIR_IDX(KDIR_VIRT_ADDR)
+#define KDIR_VIRT_ADDR (3U << 30)    // kernel directory virtual address
+#define KDIR_VIRT_PDIR_IDX PAGE_DIR_IDX(KDIR_VIRT_ADDR)
 #define KDIR_PHYS_ADDR (LEN_4M * 2) // kernel directory physical address
 
 #define KHEAP_ADDR (KDIR_VIRT_ADDR + LEN_4M) // kernel directory address

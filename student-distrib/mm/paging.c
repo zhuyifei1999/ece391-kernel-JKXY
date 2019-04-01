@@ -2,6 +2,7 @@
 #include "../task/task.h"
 #include "../lib/cli.h"
 #include "../lib/string.h"
+#include "../lib/limits.h"
 #include "../panic.h"
 #include "../multiboot.h"
 #include "../compiler.h"
@@ -756,6 +757,9 @@ uint32_t safe_buf(const void *buf, uint32_t nbytes, bool write) {
 }
 
 uint32_t safe_arr_null_term(const void *buf, uint32_t entry_size, bool write) {
+    if (entry_size == 1)
+        return safe_buf(buf, UINT_MAX, write);
+
     const char *buf_char = buf;
     uint32_t ret = 0;
 
