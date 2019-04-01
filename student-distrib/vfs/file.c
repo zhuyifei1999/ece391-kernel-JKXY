@@ -440,7 +440,14 @@ out_free:
     return res;
 }
 DEFINE_SYSCALL1(ECE391, open, /* const */ char *, filename) {
-    return do_sys_openat(AT_FDCWD, filename, O_RDWR, 0);
+    int fd = do_sys_openat(AT_FDCWD, filename, O_RDWR, 0);
+    if (fd < 8)
+        return fd;
+
+    // Seriously?! ECE391 subsystem must not obey zero-one-infinity rule?!
+    int32_t do_sys_close(int32_t fd);
+    do_sys_close(fd);
+    return -ENFILE;
 }
 DEFINE_SYSCALL3(LINUX, open, char *, path, uint32_t, flags, uint16_t, mode) {
     return do_sys_openat(AT_FDCWD, path, flags, mode);
@@ -472,6 +479,9 @@ int32_t do_sys_close(int32_t fd) {
     return 0;
 }
 DEFINE_SYSCALL1(ECE391, close, int32_t, fd) {
+    // This is so evil OMG
+    if (fd == 0 || fd == 1)
+        return -EIO;
     return do_sys_close(fd);
 }
 DEFINE_SYSCALL1(LINUX, close, int32_t, fd) {
