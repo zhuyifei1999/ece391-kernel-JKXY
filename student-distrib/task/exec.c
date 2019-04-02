@@ -141,6 +141,8 @@ err_close:
         return ret;
     }
 
+    printf("%#x\n", (uint32_t)current->mm->page_directory);
+
     set_all_regs(&regs);
 }
 

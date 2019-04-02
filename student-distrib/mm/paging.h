@@ -16,6 +16,8 @@
 #define LEN_1M (1 << 20) // decimal value = 1048576
 #define LEN_4M (1 << 22) // decimal value = 4194304
 
+#define LEN_1G (1 << 30) // decimal value = 1073741824
+
 /*
 #define LEN_4G (1 << 22) // decimal value = 4294967296
 #define ADDRESS_SPACE LEN_4G
@@ -90,6 +92,8 @@
 
 // (ADDRESS_SPACE - KHEAP_ADDR) / PAGE_SIZE_LARGE
 #define NUM_PAGE_TABLES ((LEN_1M - LEN_4K) / sizeof(page_table_t))
+
+#define NUM_KHEAP_PAGES ((LEN_1G - LEN_4M) / LEN_4K)
 
 // FIXME: GCC keeps sign-extending this
 #define KHEAP_ADDR_IDX 0xc0400 // KHEAP_ADDR / PAGE_SIZE_SMALL

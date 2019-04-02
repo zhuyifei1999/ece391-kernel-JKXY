@@ -254,7 +254,7 @@ static void use_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
 static page_table_t *find_userspace_page_table(struct page_directory_entry *dir_entry) {
     page_table_t *table = NULL;
     uint32_t i;
-    for (i = KHEAP_ADDR_IDX; i < KHEAP_ADDR_IDX + NUM_PAGE_TABLES; i++) {
+    for (i = KHEAP_ADDR_IDX; i < KHEAP_ADDR_IDX + NUM_KHEAP_PAGES; i++) {
         if (heap_tables[i].present && heap_tables[i].addr == dir_entry->addr) {
             table = (void *)PAGE_IDX_ADDR(i);
             break;
@@ -300,7 +300,7 @@ page_directory_t *current_page_directory() {
 
     page_directory_t *dir;
     uint32_t i;
-    for (i = KHEAP_ADDR_IDX; i < KHEAP_ADDR_IDX + NUM_PAGE_TABLES; i++) {
+    for (i = KHEAP_ADDR_IDX; i < KHEAP_ADDR_IDX + NUM_KHEAP_PAGES; i++) {
         if (heap_tables[i].present && heap_tables[i].addr == PAGE_IDX(physaddr)) {
             dir = (void *)PAGE_IDX_ADDR(i);
             break;
@@ -493,7 +493,7 @@ void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags) {
                 // Can't align this.
                 return NULL;
             for (start = KHEAP_ADDR_IDX;
-                    start <= KHEAP_ADDR_IDX + NUM_PAGE_TABLES - num;
+                    start <= KHEAP_ADDR_IDX + NUM_KHEAP_PAGES - num;
                     start += align_num) {
 
                 ret = (void *)(start * PAGE_SIZE_SMALL);

@@ -80,12 +80,14 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         };
 
         if (current->mm) {
+            printf("%#x\n", (uint32_t)current->mm->page_directory);
             if (flags & CLONE_VM) {
                 atomic_inc(&current->mm->refcount);
                 task->mm = current->mm;
             } else {
                 task->mm = kmalloc(sizeof(*task->mm));
                 atomic_set(&task->mm->refcount, 1);
+                printf("%#x\n", (uint32_t)current->mm->page_directory);
                 task->mm->page_directory = clone_directory(current->mm->page_directory);
             }
         }
