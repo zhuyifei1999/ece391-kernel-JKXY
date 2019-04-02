@@ -16,6 +16,7 @@ void path_destroy(struct path *path) {
         kfree(node->value);
     }
     list_destroy(&path->components);
+    kfree(path);
 }
 
 struct path *path_fromstr(char *pathstr) {
