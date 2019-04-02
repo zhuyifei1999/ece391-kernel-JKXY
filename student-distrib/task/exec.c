@@ -86,7 +86,7 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
             kfree(current->mm);
         }
     }
-    current->mm = kmalloc(sizeof(current->mm));
+    current->mm = kmalloc(sizeof(*current->mm));
     current->mm->page_directory = new_pagedir;
     atomic_set(&current->mm->refcount, 1);
 
@@ -140,8 +140,6 @@ err_close:
         filp_close(exe);
         return ret;
     }
-
-    printf("%#x\n", (uint32_t)current->mm->page_directory);
 
     set_all_regs(&regs);
 }
