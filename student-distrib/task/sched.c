@@ -42,9 +42,12 @@ void schedule(void) {
 void wake_up_process(struct task_struct *task) {
     if (task == current)
         return; // can't wake up self
-    if (list_contains(&schedule_queue, task))
-        return; // already woken up
-    list_insert_back(&schedule_queue, task);
+
+    unsigned long flags;
+    cli_and_save(flags);
+    if (!list_contains(&schedule_queue, task))
+        list_insert_back(&schedule_queue, task);
+    restore_flags(flags);
 }
 
 static void init_sched() {
