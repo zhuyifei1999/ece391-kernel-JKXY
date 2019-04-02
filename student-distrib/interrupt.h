@@ -10,6 +10,8 @@
 #include "compiler.h"
 
 struct intr_info {
+    uint32_t esp_cfi;
+    uint16_t ss_cfi __attribute__ ((aligned (4)));
     uint32_t edi;
     uint32_t esi;
     uint32_t intr_ebp;

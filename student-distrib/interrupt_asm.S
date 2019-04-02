@@ -19,23 +19,53 @@ ENTRY(ISR_\intr\()_hascode):
 .endm
 
 ISR_common:
+// These aren't strictly necessary, but it would be nice to see the frame information when gdbing
     pushl   8(%esp)
 .cfi_startproc
     pushl   %ebp
 .cfi_def_cfa_offset 8
 .cfi_offset ebp, -8
+.cfi_offset cs, 12
+.cfi_offset eflags, 12
     movl    %esp,%ebp
 .cfi_def_cfa_register ebp
     pushl   %gs
+.cfi_offset gs, -12
     pushl   %fs
+.cfi_offset gs, -16
     pushl   %es
+.cfi_offset es, -20
     pushl   %ds
+.cfi_offset ds, -20
     pushal
+.cfi_offset eax, -24
+.cfi_offset ecx, -28
+.cfi_offset edx, -32
+.cfi_offset ebx, -36
+.cfi_offset eax, -40
+.cfi_offset esi, -52
+.cfi_offset edi, -56
+// and now figure out the real esp and ss
+    cmpl    $KERNEL_CS,20(%ebp)
+    je      1f
+// interrupt from userspace
+    pushl   32(%ebp)
+    pushl   28(%ebp)
+    jmp     2f
+1:
+// interrupt from kernel space
+    pushl   %ss
+    leal    28(%ebp),%eax
+    pushl   %eax
+2:
+.cfi_offset ss, -60
+.cfi_offset esp, -64
     pushl   %esp
     cld
     call    do_interrupt
     addl    $4,%esp
 ENTRY(ISR_return):
+    addl    $8,%esp
     popal
     popl    %ds
     popl    %es
