@@ -35,7 +35,7 @@ DEFINE_SYSCALL1(ECE391, execute, char *, command) {
     if (!command_kern)
         return -ENOMEM;
 
-    struct task_struct *child = do_clone(SIGCHLD, ece391execute_child, command_kern, NULL, NULL);
+    struct task_struct *child = kernel_thread(&ece391execute_child, command_kern);
 
     if (IS_ERR(child)) {
         kfree(command_kern);
