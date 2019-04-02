@@ -33,7 +33,7 @@ static void switch_to(struct task_struct *task) {
 }
 
 void schedule(void) {
-    if (!is_boot_context() && current->state == TASK_RUNNING)
+    if (current->state == TASK_RUNNING)
         list_insert_back(&schedule_queue, current);
 
     switch_to(list_pop_front(&schedule_queue));

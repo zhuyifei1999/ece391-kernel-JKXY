@@ -35,8 +35,8 @@ enum task_state {
 };
 
 enum subsystem {
-    SUBSYSTEM_ECE391,
     SUBSYSTEM_LINUX,
+    SUBSYSTEM_ECE391,
 };
 #define NUM_SUBSYSTEMS 2
 
@@ -72,8 +72,6 @@ struct task_struct *get_current(void) {
 
 // to GDB this, ((struct task_struct *)((uint32_t)$esp & ~(4*(1<<12)-1)))
 #define current (get_current())
-
-#define is_boot_context() ((uint32_t)current < KDIR_VIRT_ADDR)
 
 static inline __always_inline noreturn
 void set_all_regs(struct intr_info *regs) {

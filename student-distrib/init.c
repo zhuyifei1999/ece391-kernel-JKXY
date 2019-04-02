@@ -145,5 +145,5 @@ void entry(unsigned long magic, unsigned long addr) {
 
     init_page(mbi);
 
-    exec_swapper_task();
+    kernel_main();
 }

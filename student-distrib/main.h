@@ -5,6 +5,6 @@
 
 extern struct task_struct *swapper_task;
 
-noreturn void exec_swapper_task(void);
+noreturn void kernel_main(void);
 
 #endif

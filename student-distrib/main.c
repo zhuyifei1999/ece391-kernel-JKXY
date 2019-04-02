@@ -39,12 +39,15 @@ static int run_init_process(void *args) {
         NULL
     };
     int32_t res = do_execve_heapify(argv[0], argv, envp);
-    panic("Could not set execute init: %d\n", res);
+    panic("Could not execute init: %d\n", res);
 }
 
-static int kernel_main(void *args) {
+noreturn void kernel_main(void) {
     swapper_task = current;
-    strcpy(swapper_task->comm, "swapper");
+    // DO NOT replace this with a single set. Other values must be zero-initialized.
+    *swapper_task = (struct task_struct){
+        .comm      = "swapper",
+    };
 
     // Initialize drivers
     DO_INITCALL(drivers);
@@ -78,13 +81,4 @@ static int kernel_main(void *args) {
             asm volatile ("hlt" : : : "memory");
         schedule();
     }
-}
-
-noreturn
-void exec_swapper_task(void) {
-    struct task_struct *task = kernel_thread(&kernel_main, NULL);
-    wake_up_process(task);
-    schedule();
-    // The scheduling will corrupt this stack. Boot context is unschedulable
-    panic("Boot context reschduled.\n");
 }
