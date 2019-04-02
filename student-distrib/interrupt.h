@@ -12,7 +12,7 @@
 struct intr_info {
     uint32_t edi;
     uint32_t esi;
-    uint32_t ebp;
+    uint32_t intr_ebp;
     uint32_t intr_esp;
     uint32_t ebx;
     uint32_t edx;
@@ -22,6 +22,8 @@ struct intr_info {
     uint16_t es __attribute__ ((aligned (4)));
     uint16_t fs __attribute__ ((aligned (4)));
     uint16_t gs __attribute__ ((aligned (4)));
+    uint32_t ebp;
+    uint32_t eip_copy;
     uint32_t intr_num;
     uint32_t error_code;
     uint32_t eip;

@@ -78,10 +78,11 @@ struct task_struct *get_current(void) {
 static inline __always_inline noreturn
 void set_all_regs(struct intr_info *regs) {
     asm volatile (
-        "mov %0,%%esp;"
+        "movl %%ebp,%0;"
+        "movl %1,%%esp;"
         "jmp ISR_return;"
         :
-        : "irm"(regs)
+        : "m"(regs->intr_ebp), "irm"(regs)
     );
     panic("GCC is nuts\n");
 }

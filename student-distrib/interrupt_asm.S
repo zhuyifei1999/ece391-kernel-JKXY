@@ -19,6 +19,13 @@ ENTRY(ISR_\intr\()_hascode):
 .endm
 
 ISR_common:
+    pushl   8(%esp)
+.cfi_startproc
+    pushl   %ebp
+.cfi_def_cfa_offset 8
+.cfi_offset ebp, -8
+    movl    %esp,%ebp
+.cfi_def_cfa_register ebp
     pushl   %gs
     pushl   %fs
     pushl   %es
@@ -27,15 +34,20 @@ ISR_common:
     pushl   %esp
     cld
     call    do_interrupt
-    add     $4,%esp
+    addl    $4,%esp
 ENTRY(ISR_return):
     popal
     popl    %ds
     popl    %es
     popl    %fs
     popl    %gs
-    add     $8,%esp
+    popl    %ebp
+.cfi_restore ebp
+.cfi_def_cfa esp, 16
+    addl    $12,%esp
+.cfi_def_cfa esp, 4
     iret
+.cfi_endproc
 
 // XXX: Find a better way of doing this iteration 0..NUM_VEC
 // for i in range(255): print(f'MAKE_ISR    0x{i:02X}')
