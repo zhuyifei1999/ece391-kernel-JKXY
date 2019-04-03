@@ -35,7 +35,7 @@ static void switch_to(struct task_struct *task) {
 void schedule(void) {
     extern struct task_struct *swapper_task;
 
-    if (current->pid && current->state == TASK_RUNNING)
+    if (current != swapper_task && current->state == TASK_RUNNING)
         list_insert_back(&schedule_queue, current);
 
     if (list_isempty(&schedule_queue)) {
