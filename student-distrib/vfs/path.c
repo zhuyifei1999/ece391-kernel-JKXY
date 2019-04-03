@@ -33,11 +33,10 @@ struct path *path_fromstr(char *pathstr) {
     char *splitter;
     while (*pathstr && (splitter = strchr(pathstr, '/'))) {
         uint32_t len = splitter - pathstr;
-        char *component = kcalloc(sizeof(*component), len + 1);
+        char *component = strndup(pathstr, len);
         if (!component)
             goto err_nomem_destroy;
 
-        strncpy(component, pathstr, len);
         list_insert_back(&path->components, component);
         pathstr = splitter + 1;
     }
@@ -45,11 +44,10 @@ struct path *path_fromstr(char *pathstr) {
     // maybe there's more after the last one
     if (*pathstr) {
         uint32_t len = strlen(pathstr);
-        char *component = kcalloc(sizeof(*component), len + 1);
+        char *component = strndup(pathstr, len);
         if (!component)
             goto err_nomem_destroy;
 
-        strncpy(component, pathstr, len);
         list_insert_back(&path->components, component);
     }
 
@@ -74,21 +72,19 @@ struct path *path_join(struct path *x, struct path *y) {
     struct list_node *node;
     list_for_each(&x->components, node) {
         uint32_t len = strlen(node->value);
-        char *component = kcalloc(sizeof(*component), len + 1);
+        char *component = strndup(node->value, len);
         if (!component)
             goto err_nomem_destroy;
 
-        strncpy(component, node->value, len);
         list_insert_back(&path->components, component);
     }
     // and from y
     list_for_each(&y->components, node) {
         uint32_t len = strlen(node->value);
-        char *component = kcalloc(sizeof(*component), len + 1);
+        char *component = strndup(node->value, len);
         if (!component)
             goto err_nomem_destroy;
 
-        strncpy(component, node->value, len);
         list_insert_back(&path->components, component);
     }
 
