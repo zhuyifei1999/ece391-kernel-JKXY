@@ -37,6 +37,9 @@ void schedule(void) {
         list_insert_back(&schedule_queue, current);
 
     switch_to(list_pop_front(&schedule_queue));
+
+    // we are safe to clean up whatever task that needs clean up here
+    do_free_tasks();
 }
 
 void wake_up_process(struct task_struct *task) {

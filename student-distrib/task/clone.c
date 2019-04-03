@@ -47,8 +47,6 @@ asmlinkage noreturn void clone_child(uint32_t flags, int (*fn)(void *args), void
 
 // TODO: handle OOMs, if fail I think they should just be SIGSEGV-ed
 struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, int *parent_tidptr, int *child_tidptr) {
-    do_free_tasks();
-
     struct task_struct *task = alloc_pages(TASK_STACK_PAGES, TASK_STACK_PAGES_POW, 0);
     if (!task)
         return ERR_PTR(-ENOMEM);
