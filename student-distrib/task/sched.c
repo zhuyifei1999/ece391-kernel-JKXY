@@ -33,10 +33,15 @@ static void switch_to(struct task_struct *task) {
 }
 
 void schedule(void) {
-    if (current->state == TASK_RUNNING)
+    extern struct task_struct *swapper_task;
+
+    if (current->pid && current->state == TASK_RUNNING)
         list_insert_back(&schedule_queue, current);
 
-    switch_to(list_pop_front(&schedule_queue));
+    if (list_isempty(&schedule_queue)) {
+        switch_to(swapper_task);
+    } else
+        switch_to(list_pop_front(&schedule_queue));
 
     // we are safe to clean up whatever task that needs clean up here
     do_free_tasks();
