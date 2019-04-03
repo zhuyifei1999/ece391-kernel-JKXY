@@ -456,7 +456,7 @@ out:
 }
 
 __attribute__((malloc))
-void *alloc_pages(uint32_t num, uint8_t align, uint32_t gfp_flags) {
+void *alloc_pages(uint32_t num, uint16_t align, uint32_t gfp_flags) {
     uint32_t align_num = 1 << align;
     uint32_t start, bigstart;
 
