@@ -5,6 +5,7 @@
 #include "../mm/paging.h"
 #include "../compiler.h"
 #include "../interrupt.h"
+#include "../char/tty.h"
 #include "../structure/list.h"
 #include "../structure/array.h"
 #include "../vfs/file.h"
@@ -48,6 +49,7 @@ struct task_struct {
     struct files_struct *files;
     struct file *cwd;
     struct file *exe;
+    struct tty *tty;
     struct intr_info *return_regs;
     enum task_state state;
     enum subsystem subsystem;

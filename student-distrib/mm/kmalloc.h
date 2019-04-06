@@ -3,9 +3,9 @@
 #ifndef _KMALLOC_H
 #define _KMALLOC_H
 
-#include "../lib/stdint.h"
-
 #ifndef ASM
+
+#include "../lib/stdint.h"
 
 __attribute__ ((malloc))
 extern void *kmalloc(uint32_t);

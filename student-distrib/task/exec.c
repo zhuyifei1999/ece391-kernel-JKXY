@@ -1,5 +1,6 @@
 #include "exec.h"
 #include "ece391exec_shim.h"
+#include "../char/tty.h"
 #include "../lib/string.h"
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
@@ -66,15 +67,15 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         current->files->files = (struct array){0};
         switch (subsystem) {
         case SUBSYSTEM_LINUX:;
-            struct file *tty = filp_open_anondevice(MKDEV(5, 0), 0, S_IFCHR | 0666);
+            struct file *tty = filp_open_anondevice(TTY_CURRENT, 0, S_IFCHR | 0666);
             array_set(&current->files->files, 0, tty);
             array_set(&current->files->files, 1, tty);
             array_set(&current->files->files, 2, tty);
             atomic_add(&tty->refcount, 2);
             break;
         case SUBSYSTEM_ECE391:
-            array_set(&current->files->files, 0, filp_open_anondevice(MKDEV(5, 0), 0, S_IFCHR | 0666));
-            array_set(&current->files->files, 1, filp_open_anondevice(MKDEV(5, 0), O_WRONLY, S_IFCHR | 0666));
+            array_set(&current->files->files, 0, filp_open_anondevice(TTY_CURRENT, 0, S_IFCHR | 0666));
+            array_set(&current->files->files, 1, filp_open_anondevice(TTY_CURRENT, O_WRONLY, S_IFCHR | 0666));
             break;
         }
     }

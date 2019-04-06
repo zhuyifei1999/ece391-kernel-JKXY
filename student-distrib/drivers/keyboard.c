@@ -1,6 +1,7 @@
 #include "ps2.h"
 #include "../irq.h"
 #include "../char/tty.h"
+#include "../vfs/device.h"
 #include "../lib/stdio.h"
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
@@ -24,28 +25,27 @@
 #define MSB 0x80
 
 // function keys map, 0x80 to 0xFF, unassigned have 0xFF
-#define DO_BKSP 0x80
-#define DO_GUI 0xFF
-#define DO_APPS 0xFF
-#define DO_ESC 0xFF
-#define DO_F1 0xFF
-#define DO_F2 0xFF
-#define DO_F3 0xFF
-#define DO_F4 0xFF
-#define DO_F5 0xFF
-#define DO_F6 0xFF
-#define DO_F7 0xFF
-#define DO_F8 0xFF
-#define DO_F9 0xFF
-#define DO_F10 0xFF
-#define DO_F11 0xFF
-#define DO_F12 0xFF
+#define DO_GUI    0xFF
+#define DO_APPS   0xFF
+#define DO_ESC    0xFF
+#define DO_F1     0x81
+#define DO_F2     0x82
+#define DO_F3     0x83
+#define DO_F4     0x84
+#define DO_F5     0x85
+#define DO_F6     0x86
+#define DO_F7     0x87
+#define DO_F8     0x88
+#define DO_F9     0x89
+#define DO_F10    0x8A
+#define DO_F11    0x8B
+#define DO_F12    0x8C
 #define DO_INSERT 0xFF
-#define DO_HOME 0xFF
-#define DO_PGUP 0xFF
+#define DO_HOME   0xFF
+#define DO_PGUP   0xFF
 #define DO_DELETE 0xFF
-#define DO_END 0xFF
-#define DO_PGDN 0xFF
+#define DO_END    0xFF
+#define DO_PGDN   0xFF
 #define DO_UARROW 0xFF
 #define DO_LARROW 0xFF
 #define DO_DARROW 0xFF
@@ -103,7 +103,7 @@ static unsigned char scancode_map[256] = {
     [0x33]=',',[0xB3]='<',
     [0x34]='.',[0xB4]='>',
     [0x35]='/',[0xB5]='?',
-    [0x0E]=DO_BKSP,[0x8E]=DO_BKSP, // function key
+    [0x0E]='\b',[0x8E]='\b', // function key
     [0x5B]=DO_GUI,[0xDB]=DO_GUI,
     [0x5C]=DO_GUI,[0xDC]=DO_GUI,
     [0x5D]=DO_APPS,[0xDD]=DO_APPS,
@@ -200,7 +200,7 @@ static void keyboard_handler(struct intr_info *info) {
             if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
                 scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
 
-                tty_keyboard(scancode_mapped);
+                tty_foreground_keyboard(scancode_mapped);
             } else { // function key
                 do_function(scancode_mapped);
             }
@@ -232,17 +232,11 @@ static unsigned char scancode_fixup_caps(unsigned char scancode, bool has_shift,
  *   SIDE EFFECTS: none
  */
 static void do_function(unsigned char scancode_mapped) {
-    switch (scancode_mapped) {
-        case DO_BKSP:
-            tty_keyboard('\b');
-            break;
-        default:
-            break;
-    }
-
     if (scancode_mapped == 'l' && has_ctrl) {
         // FIXME: this is ultra evil
-        tty_clear();
+        tty_foreground_clear();
+    } else if (has_alt && scancode_mapped >= DO_F1 && scancode_mapped <= DO_F12) {
+        tty_switch_foreground(MKDEV(TTY_MAJOR, scancode_mapped - DO_F1 + 1));
     }
 }
 

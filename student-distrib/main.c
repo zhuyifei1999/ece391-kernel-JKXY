@@ -15,6 +15,7 @@
 #include "vfs/mount.h"
 #include "lib/string.h"
 #include "lib/stdio.h"
+#include "lib/stdlib.h"
 #include "atomic.h"
 #include "err.h"
 
@@ -38,8 +39,50 @@ static int run_init_process(void *args) {
         // "TERM=linux"
         NULL
     };
+
+    if (args && !current->tty) {
+        // The args specify the TTY number
+        int *tty_num = args;
+        struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, *tty_num), 0, S_IFCHR | 0666);
+        kfree(args);
+
+        if (!IS_ERR(file)) {
+            filp_close(file);
+
+            if (current->tty) {
+                raw_tty_write(current->tty, "TTY", 3);
+                char num_buf[64];
+                itoa(MINOR(current->tty->device_num), num_buf, 10);
+                raw_tty_write(current->tty, num_buf, strlen(num_buf));
+                raw_tty_write(current->tty, "\n", 1);
+            }
+        }
+    }
+
     int32_t res = do_execve_heapify(argv[0], argv, envp);
     panic("Could not execute init: %d\n", res);
+}
+
+static int kernel_dummy_init(void *args) {
+    // The purpose of this dummy PID 1 is to fork off all the shells on different TTYs,
+    // because the ECE391 subsystem is too bad and can't self-govern.
+
+    tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
+
+    int i;
+    // Opening 3 shells on tty 1-3
+    for (i = 1; i <= 3; i++) {
+        int *kthread_arg = kmalloc(sizeof(*kthread_arg));
+        *kthread_arg = i;
+
+        wake_up_process(kthread(&run_init_process, kthread_arg));
+    }
+
+    // TODO: Make a centain signal do the subsystem switch
+    while (1) {
+        current->state = TASK_INTERRUPTIBLE;
+        schedule();
+    }
 }
 
 noreturn void kernel_main(void) {
@@ -63,7 +106,7 @@ noreturn void kernel_main(void) {
     if (IS_ERR(swapper_task->cwd))
         panic("Could not set working directory to root directory: %d\n", PTR_ERR(swapper_task->cwd));
 
-    struct task_struct *init_task = kernel_thread(&run_init_process, NULL);
+    struct task_struct *init_task = kernel_thread(&kernel_dummy_init, NULL);
 
     struct task_struct *kthreadd_task = kernel_thread(&kthreadd, NULL);
     wake_up_process(kthreadd_task);

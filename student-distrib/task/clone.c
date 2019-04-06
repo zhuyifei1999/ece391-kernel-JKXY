@@ -54,6 +54,8 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
     atomic_inc(&current->cwd->refcount);
     if (current->exe)
         atomic_inc(&current->exe->refcount);
+    if (current->tty)
+        atomic_inc(&current->tty->refcount);
     *task = (struct task_struct){
         .pid       = next_pid(),
         .ppid      = (flags & CLONE_PARENT) ? current->ppid : current->pid,
@@ -62,6 +64,7 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         .subsystem = current->subsystem,
         .cwd       = current->cwd,
         .exe       = current->exe,
+        .tty       = current->tty,
     };
 
     if (current->mm) {

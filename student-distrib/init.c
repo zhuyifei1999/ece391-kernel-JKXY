@@ -22,9 +22,6 @@ asmlinkage noreturn
 void entry(unsigned long magic, unsigned long addr) {
     struct multiboot_info *mbi;
 
-    /* Clear the screen. */
-    clear();
-
     /* Am I booted by a Multiboot-compliant boot loader? */
     if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
         panic("Invalid magic number: 0x%#x\n", (unsigned)magic);

@@ -33,6 +33,8 @@ void do_exit(int exitcode) {
     filp_close(current->cwd);
     if (current->exe)
         filp_close(current->exe);
+    if (current->exe)
+        tty_put(current->tty);
 
     if (current->files) {
         if (!atomic_dec(&current->files->refcount)) {

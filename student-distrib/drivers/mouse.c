@@ -36,9 +36,6 @@ static int32_t mouse_x, mouse_y;
  *   mouse_handler
  *   DESCRIPTION: handle interupt comes from the mouse
  *   INPUTS: intr_info
- *   OUTPUTS: none
- *   RETURN VALUE: none
- *   SIDE EFFECTS: none
  */
 static void mouse_handler(struct intr_info *info){
     // mouse's package
@@ -67,18 +64,15 @@ static void mouse_handler(struct intr_info *info){
         mouse_y = 0;
     else if (mouse_y >= NUM_ROWS * SLOW_FACTOR_Y)
         mouse_y = NUM_ROWS * SLOW_FACTOR_Y -1;
-    update_mouse(mouse_x / SLOW_FACTOR_X, mouse_y / SLOW_FACTOR_Y);
+    // update_mouse(mouse_x / SLOW_FACTOR_X, mouse_y / SLOW_FACTOR_Y);
 }
 
 /*
  *   init_mouse
- *   DESCRIPTION: initialize the keyboard driver
- *   INPUTS: none
- *   OUTPUTS: none
- *   RETURN VALUE: none
- *   SIDE EFFECTS: none
+ *   DESCRIPTION: initialize the mouse driver
  */
+__attribute__((unused)) // TODO: Migrate to TTY
 static void init_mouse() {
     set_irq_handler(MOUSE_IRQ, &mouse_handler);
 }
-DEFINE_INITCALL(init_mouse, drivers);
+// DEFINE_INITCALL(init_mouse, drivers);

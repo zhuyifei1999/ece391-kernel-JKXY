@@ -3,68 +3,23 @@
 #include "string.h"
 #include "cli.h"
 #include "io.h"
+#include "../char/tty.h"
 
-#define VIDEO       0xB8000
-#define NUM_COLS    80
-#define NUM_ROWS    25
-#define ATTRIB      0x7
-
-static int screen_x;
-static int screen_y;
-static char *video_mem = (char *)VIDEO;
-
-/* static inline void update_cursor(void);
- * Inputs: void
- * Return Value: none
- * Function: Updates cursor position */
-static inline void update_cursor(void) {
-    unsigned int cursor_loc = NUM_COLS * screen_y + screen_x;
-
-    outb(0x0F, 0x3D4);
-    outb((unsigned char)cursor_loc, 0x3D5);
-    outb(0x0E, 0x3D4);
-    outb((unsigned char)(cursor_loc>>8), 0x3D5);
-}
-
-void backspace() {
-    unsigned long flags;
-    cli_and_save(flags);
-
-    update_cursor();
-    restore_flags(flags);
-}
-static uint32_t mouse_x_prev, mouse_y_prev;
-void update_mouse(uint32_t x, uint32_t y){
-    if(x>79 || y>24){
-        return;
-    }
-    int32_t i;
-    i = (NUM_COLS * mouse_y_prev + mouse_x_prev);    
-    *(uint8_t *)(video_mem + (i << 1) + 1) = ATTRIB; 
-    mouse_y_prev = y;
-    mouse_x_prev = x;
-    i = (NUM_COLS * y + x); 
-    *(uint8_t *)(video_mem + (i << 1) + 1) = 0x70; 
-}
+// TODO: Migrate to TTY
+// void update_mouse(uint32_t x, uint32_t y) {
+//     static uint32_t mouse_x_prev, mouse_y_prev;
+//     video_mem[(NUM_COLS * mouse_y_prev + mouse_y_prev) * 2 + 1] = ATTRIB;
+//     mouse_y_prev = y;
+//     mouse_x_prev = x;
+//     i = (NUM_COLS * y + x);
+//     video_mem[(NUM_COLS * y + x) * 2 + 1] = 0x70;
+// }
 
 /* void clear(void);
  * Inputs: void
  * Return Value: none
  * Function: Clears video memory */
-void clear(void) {
-    unsigned long flags;
-    cli_and_save(flags);
 
-    int32_t i;
-    for (i = 0; i < NUM_ROWS * NUM_COLS; i++) {
-        video_mem[i * 2] = ' ';
-        video_mem[i * 2 + 1] = ATTRIB;
-    }
-    screen_x = screen_y = 0;
-    update_cursor();
-
-    restore_flags(flags);
-}
 
 /* Standard printf().
  * Only supports the following format strings:
@@ -210,54 +165,5 @@ int32_t puts(int8_t *s) {
  * Return Value: void
  *  Function: Output a character to the console */
 void putc(uint8_t c) {
-    unsigned long flags;
-    cli_and_save(flags);
-
-    if (c == '\n' || c == '\r') {
-        if (c == '\n')
-            screen_y++;
-        screen_x = 0;
-    } else if (c == '\b') {
-        if (!screen_x) {
-            if (screen_y) {
-                screen_y--;
-                screen_x = NUM_COLS - 1;
-            }
-        } else {
-            screen_x--;
-        }
-        video_mem[(NUM_COLS * screen_y + screen_x) * 2] = ' ';
-        video_mem[(NUM_COLS * screen_y + screen_x) * 2 + 1] = ATTRIB;
-    } else if (c == '\t') {
-        // TODO
-        return putc(' ');
-    } else {
-        video_mem[(NUM_COLS * screen_y + screen_x) * 2] = c;
-        video_mem[(NUM_COLS * screen_y + screen_x) * 2 + 1] = ATTRIB;
-        screen_x++;
-    }
-
-    if (screen_x == NUM_COLS) {
-        screen_x = 0;
-        screen_y++;
-    }
-
-    if (screen_y == NUM_ROWS) {
-        screen_y--;
-
-        // do scrolling
-        int32_t i;
-        for (i = 0; i < (NUM_ROWS - 1) * NUM_COLS; i++) {
-            video_mem[i * 2] = video_mem[(i + NUM_COLS) * 2];
-            //video_mem[i * 2 + 1] = video_mem[(i + NUM_COLS) * 2 + 1];
-        }
-        for (i = (NUM_ROWS - 1) * NUM_COLS; i < NUM_ROWS * NUM_COLS; i++) {
-            video_mem[i * 2] = ' ';
-            //video_mem[i * 2 + 1] = ATTRIB;
-        }
-    }
-
-    update_cursor();
-
-    restore_flags(flags);
+    tty_foreground_putc(c);
 }

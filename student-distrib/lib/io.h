@@ -6,10 +6,9 @@
 /* Port read functions */
 /* Inb reads a byte and returns its value as a zero-extended 32-bit
  * unsigned int */
-static inline uint32_t inb(port) {
-    uint32_t val;
+static inline uint8_t inb(uint16_t port) {
+    uint8_t val;
     asm volatile ("             \n\
-            xorl %0, %0         \n\
             inb  (%w1), %b0     \n\
             "
             : "=a"(val)
@@ -22,10 +21,9 @@ static inline uint32_t inb(port) {
 /* Reads two bytes from two consecutive ports, starting at "port",
  * concatenates them little-endian style, and returns them zero-extended
  * */
-static inline uint32_t inw(port) {
-    uint32_t val;
+static inline uint16_t inw(uint16_t port) {
+    uint16_t val;
     asm volatile ("             \n\
-            xorl %0, %0         \n\
             inw  (%w1), %w0     \n\
             "
             : "=a"(val)
@@ -37,7 +35,7 @@ static inline uint32_t inw(port) {
 
 /* Reads four bytes from four consecutive ports, starting at "port",
  * concatenates them little-endian style, and returns them */
-static inline uint32_t inl(port) {
+static inline uint32_t inl(uint16_t port) {
     uint32_t val;
     asm volatile ("inl (%w1), %0"
             : "=a"(val)
@@ -48,40 +46,36 @@ static inline uint32_t inl(port) {
 }
 
 /* Writes a byte to a port */
-#define outb(data, port)                \
-do {                                    \
-    asm volatile ("outb %b1, (%w0)"     \
-            :                           \
-            : "d"(port), "a"(data)      \
-            : "memory", "cc"            \
-    );                                  \
-} while (0)
+static inline void outb(uint8_t data, uint16_t port) {
+    asm volatile ("outb %b1, (%w0)"
+            :
+            : "d"(port), "a"(data)
+            : "memory", "cc"
+    );
+}
 
 /* Writes a byte to a port and delay */
-#define outb_p(data, port)              \
-do {                                    \
-    outb((data), (port));               \
-    asm volatile ("pause");             \
-} while (0)
+static inline void outb_p(uint8_t data, uint16_t port) {
+    outb(data, port);
+    asm volatile ("pause");
+}
 
 /* Writes two bytes to two consecutive ports */
-#define outw(data, port)                \
-do {                                    \
-    asm volatile ("outw %w1, (%w0)"     \
-            :                           \
-            : "d"(port), "a"(data)      \
-            : "memory", "cc"            \
-    );                                  \
-} while (0)
+static inline void outw(uint8_t data, uint16_t port) {
+    asm volatile ("outw %w1, (%w0)"
+            :
+            : "d"(port), "a"(data)
+            : "memory", "cc"
+    );
+}
 
 /* Writes four bytes to four consecutive ports */
-#define outl(data, port)                \
-do {                                    \
-    asm volatile ("outl %l1, (%w0)"     \
-            :                           \
-            : "d"(port), "a"(data)      \
-            : "memory", "cc"            \
-    );                                  \
-} while (0)
+static inline void outl(uint8_t data, uint16_t port) {
+    asm volatile ("outl %l1, (%w0)"
+            :
+            : "d"(port), "a"(data)
+            : "memory", "cc"
+    );
+}
 
 #endif
