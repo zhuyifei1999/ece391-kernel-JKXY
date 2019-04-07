@@ -1,5 +1,6 @@
 #include "rtc.h"
 #include "../irq.h"
+#include "../task/sched.h"
 #include "../lib/cli.h"
 #include "../lib/io.h"
 #include "../structure/list.h"
@@ -32,6 +33,8 @@ static void rtc_hw_handler(struct intr_info *info) {
         void (*handler)(void) = node->value;
         (*handler)();
     }
+
+    rtc_schedule(info);
 }
 
 static void rtc_set_rate(unsigned char rate) {

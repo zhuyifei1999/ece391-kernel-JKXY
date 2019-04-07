@@ -7,16 +7,24 @@
 
 struct list schedule_queue;
 
+static uint32_t schedule_rtc_counter;
+
 // Actually, this won't return, but jump directly to ISR return
-static void schedule_handler(struct intr_info *info) {
+static void _switch_to(struct task_struct *task, struct intr_info *info) {
+    schedule_rtc_counter = 0;
     current->return_regs = info;
-    struct task_struct *task = (struct task_struct *)info->eax;
+
     if (task->mm) // this task has userspace, update page directory
         switch_directory(task->mm->page_directory);
 
     tss.ss0 = KERNEL_DS;
     tss.esp0 = (uint32_t)task + TASK_STACK_PAGES * PAGE_SIZE_SMALL;
     set_all_regs(task->return_regs);
+}
+
+static void schedule_handler(struct intr_info *info) {
+    struct task_struct *task = (struct task_struct *)info->eax;
+    _switch_to(task, info);
 }
 
 static void switch_to(struct task_struct *task) {
@@ -45,6 +53,18 @@ void schedule(void) {
 
     // we are safe to clean up whatever task that needs clean up here
     do_free_tasks();
+}
+
+void rtc_schedule(struct intr_info *info) {
+    if (list_isempty(&schedule_queue))
+        return;
+    if (++schedule_rtc_counter < 8)
+        return; // Let's schedule every 16 ticks
+    if (info->cs == KERNEL_CS)
+        return; // In kernel mode. Don't prempt.
+
+    list_insert_back(&schedule_queue, current);
+    _switch_to(list_pop_front(&schedule_queue), info);
 }
 
 void wake_up_process(struct task_struct *task) {
