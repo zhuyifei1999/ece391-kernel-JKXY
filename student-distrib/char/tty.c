@@ -21,6 +21,10 @@
 // We are gonna support (practically) infinite TTYs, because why not?
 static struct list ttys;
 
+struct tty early_console = {
+    .video_mem = (char *)VIDEO,
+};
+
 struct tty *foreground_tty;
 
 // meh... Can't this logic be in userspace?
@@ -232,13 +236,13 @@ void tty_foreground_keyboard(char chr) {
 
     if (chr == '\b') {
         if (foreground_tty->buffer_end) {
-            putc(chr);
+            tty_foreground_putc(chr);
             foreground_tty->buffer_end--;
         }
     } else {
         if (foreground_tty->buffer_end < TTY_BUFFER_SIZE) {
             foreground_tty->buffer[foreground_tty->buffer_end++] = chr;
-            putc(chr);
+            tty_foreground_putc(chr);
 
             if (chr == WAKEUP_CHAR && foreground_tty->task) {
                 wake_up_process(foreground_tty->task);
@@ -248,8 +252,12 @@ void tty_foreground_keyboard(char chr) {
 }
 
 void tty_foreground_putc(const char c) {
+    struct tty *tty = foreground_tty;
+    if (!tty)
+        tty = &early_console;
+
     char buf[1] = {c};
-    raw_tty_write(foreground_tty, buf, 1);
+    raw_tty_write(tty, buf, 1);
 }
 
 static struct file_operations tty_dev_op = {
