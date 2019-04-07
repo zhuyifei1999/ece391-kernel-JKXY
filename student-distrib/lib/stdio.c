@@ -1,6 +1,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "stdbool.h"
+#include "stdarg.h"
 #include "string.h"
 #include "cli.h"
 #include "io.h"
@@ -62,7 +63,7 @@ static void printf_emit(struct printf_target *target, const char *string) {
  *       the beginning), but I think it's more flexible this way.
  *       Also note: %x is the only conversion specifier that can use
  *       the "#" modifier to alter output. */
-static int32_t do_printf(struct printf_target *target, const char *format, uint32_t *va_args) {
+static int32_t do_printf(struct printf_target *target, const char *format, va_list ap) {
     for (; *format; format++) {
         if (*format != '%') {
             printf_emit(target, (char []){*format, 0});
@@ -88,12 +89,12 @@ format_char_switch:
         case 'x': {
             char conv_buf[20];
             if (!alternate) {
-                itoa(*((uint32_t *)va_args), conv_buf, 16);
+                itoa(va_arg(ap, uint32_t), conv_buf, 16);
                 printf_emit(target, conv_buf);
             } else {
                 int32_t starting_index;
                 int32_t i;
-                itoa(*((uint32_t *)va_args), &conv_buf[8], 16);
+                itoa(va_arg(ap, uint32_t), &conv_buf[8], 16);
                 i = starting_index = strlen(&conv_buf[8]);
                 while (i < 8) {
                     conv_buf[i] = '0';
@@ -101,7 +102,6 @@ format_char_switch:
                 }
                 printf_emit(target, &conv_buf[starting_index]);
             }
-            va_args++;
             break;
 
         }
@@ -109,16 +109,15 @@ format_char_switch:
         /* Print a number in unsigned int form */
         case 'u': {
             char conv_buf[36];
-            itoa(*((uint32_t *)va_args), conv_buf, 10);
+            itoa(va_arg(ap, uint32_t), conv_buf, 10);
             printf_emit(target, conv_buf);
-            va_args++;
             break;
         }
 
         /* Print a number in signed int form */
         case 'd': {
             char conv_buf[36];
-            int32_t value = *((int32_t *)va_args);
+            int32_t value = va_arg(ap, int32_t);
             if(value < 0) {
                 conv_buf[0] = '-';
                 itoa(-value, &conv_buf[1], 10);
@@ -126,20 +125,17 @@ format_char_switch:
                 itoa(value, conv_buf, 10);
             }
             printf_emit(target, conv_buf);
-            va_args++;
             break;
         }
 
         /* Print a single character */
         case 'c':
-            printf_emit(target, (char []){*va_args, 0});
-            va_args++;
+            printf_emit(target, (char []){va_arg(ap, char), 0});
             break;
 
         /* Print a NULL-terminated string */
         case 's':
-            printf_emit(target, *(char **)va_args);
-            va_args++;
+            printf_emit(target, va_arg(ap, char *));
             break;
 
         default:
@@ -150,29 +146,49 @@ format_char_switch:
     return target->len_printed;
 }
 
+int32_t vprintf(const char *format, va_list ap) {
+    struct printf_target target = {0};
+    return do_printf(&target, format, ap);
+}
+
+int32_t vfprintf(struct file *file, const char *format, va_list ap) {
+    struct printf_target target = { .file = file };
+    return do_printf(&target, format, ap);
+}
+int32_t vsnprintf(char *str, uint32_t size, const char *format, va_list ap) {
+    struct printf_target target = { .buf = str, .bufsize = size };
+    return do_printf(&target, format, ap);
+}
+
 __printf(1, 2)
 int32_t printf(const char *format, ...) {
-    /* Stack pointer for the other parameters */
-    uint32_t *va_args = (uint32_t *)&format + 1;
-    struct printf_target target = {0};
+    va_list ap;
+    va_start(ap, format);
 
-    return do_printf(&target, format, va_args);
+    int32_t res = vprintf(format, ap);
+
+    va_end(ap);
+    return res;
 }
 
 __printf(2, 3)
 int32_t fprintf(struct file *file, const char *format, ...) {
-    /* Stack pointer for the other parameters */
-    uint32_t *va_args = (uint32_t *)&format + 1;
-    struct printf_target target = { .file = file };
+    va_list ap;
+    va_start(ap, format);
 
-    return do_printf(&target, format, va_args);
+    int32_t res = vfprintf(file, format, ap);
+
+    va_end(ap);
+    return res;
 }
 
 __printf(3, 4)
 int32_t snprintf(char *str, uint32_t size, const char *format, ...) {
-    /* Stack pointer for the other parameters */
-    uint32_t *va_args = (uint32_t *)&format + 1;
-    struct printf_target target = { .buf = str, .bufsize = size };
+    va_list ap;
+    va_start(ap, format);
 
-    return do_printf(&target, format, va_args);
+    int32_t res = vsnprintf(str, size, format, ap);
+
+    va_end(ap);
+    return res;
 }
