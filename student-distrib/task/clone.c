@@ -72,20 +72,24 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
     if (!task)
         return ERR_PTR(-ENOMEM);
     // TODO: handle OOMs, if fail I think they should just be SIGSEGV-ed
+
     atomic_inc(&current->cwd->refcount);
     // increase reference count
     if (current->exe)
         atomic_inc(&current->exe->refcount);
+
     // set new pid, and copy the other task state 
     *task = (struct task_struct){
         .pid       = next_pid(),
         .ppid      = (flags & CLONE_PARENT) ? current->ppid : current->pid,
-        .comm      = current->comm,
         .state     = TASK_RUNNING,
         .subsystem = current->subsystem,
         .cwd       = current->cwd,
         .exe       = current->exe,
     };
+
+    strncpy(task->comm, current->comm, sizeof(task->comm));
+
     // if share the memory, increase the reference count of these pages. otherwise get new cow memory 
     if (current->mm) {
         if (flags & CLONE_VM) {
@@ -97,6 +101,7 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
             task->mm->page_directory = clone_directory(current->mm->page_directory);
         }
     }
+
     // if share the files, increase the reference count of these files. otherwise copy the file table
     if (current->files) {
         if (flags & CLONE_FILES) {
@@ -145,6 +150,7 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
     };
     // store registers for scheduler to switch to new task
     task->return_regs = regs;
+
     // so we know this PID is used
     list_insert_back(&tasks[task->pid & (PID_BUCKETS - 1)], task);
 
