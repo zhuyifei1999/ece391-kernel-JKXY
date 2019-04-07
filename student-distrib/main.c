@@ -20,11 +20,13 @@
 #include "err.h"
 
 struct task_struct *swapper_task;
+struct task_struct *init_task;
 
 #if RUN_TESTS
 static int kselftest(void *args) {
     strcpy(current->comm, "kselftest");
     launch_tests();
+    wake_up_process(init_task);
     return 0;
 }
 #endif
@@ -106,17 +108,17 @@ noreturn void kernel_main(void) {
     if (IS_ERR(swapper_task->cwd))
         panic("Could not set working directory to root directory: %d\n", PTR_ERR(swapper_task->cwd));
 
-    struct task_struct *init_task = kernel_thread(&kernel_dummy_init, NULL);
+    init_task = kernel_thread(&kernel_dummy_init, NULL);
 
-    struct task_struct *kthreadd_task = kernel_thread(&kthreadd, NULL);
-    wake_up_process(kthreadd_task);
+    wake_up_process(kernel_thread(&kthreadd, NULL));
     schedule();
 
-    wake_up_process(init_task);
-
 #if RUN_TESTS
-    // start the tests in a seperate kthread
-    wake_up_process(kthread(&kselftest, NULL));
+    // start the tests in a seperate kthread, and let that start init
+    struct task_struct *kselftest_task = kthread(&kselftest, NULL);
+    wake_up_process(kselftest_task);
+#else
+    wake_up_process(init_task);
 #endif
 
     for (;;) {
