@@ -5,12 +5,13 @@
 
 #if RUN_TESTS
 
-// test infrastructure, supported by initcall, interrupts, list, and magic
+// test infrastructure, supported by initcall, interrupts, list, files, and magic
 #include "initcall.h"
 #include "interrupt.h"
 #include "lib/stdint.h"
 #include "lib/stdio.h"
 #include "lib/stdbool.h"
+#include "vfs/file.h"
 #include "compiler.h"
 
 // anything prefixed with "_test_" are for internal use only. just because they
@@ -57,6 +58,7 @@ extern volatile bool _test_status;
 extern bool _test_verbose;
 extern char *_test_current_name;
 extern char *_test_failmsg;
+extern struct file *_test_output_file;
 
 bool _test_wrapper(initcall_t *wrap_fn, initcall_t *fn);
 
@@ -67,8 +69,8 @@ bool _test_wrapper(initcall_t *wrap_fn, initcall_t *fn);
 
 #define test_printf(...) do {                     \
     if (_test_verbose) {                          \
-        printf("[Test %s] ", _test_current_name); \
-        printf(__VA_ARGS__);                      \
+        fprintf(_test_output_file, "[Test %s] ", _test_current_name); \
+        fprintf(_test_output_file, __VA_ARGS__);                      \
     }                                             \
 } while (0)
 
@@ -118,7 +120,7 @@ DEFINE_INITCALL(tests_ ## fn, tests)
 } while (0)
 
 // test launcher
-void launch_tests();
+bool launch_tests();
 
 #endif
 

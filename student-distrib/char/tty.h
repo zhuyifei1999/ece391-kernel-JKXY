@@ -3,6 +3,7 @@
 
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
+#include "../vfs/device.h"
 #include "../atomic.h"
 
 #define TTY_MAJOR 4
@@ -30,7 +31,7 @@ void tty_put(struct tty *tty);
 int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes);
 
 void tty_foreground_keyboard(char chr);
-void tty_foreground_putc(const char c);
+void tty_foreground_puts(const char *s);
 void tty_foreground_clear();
 
 void tty_switch_foreground(uint32_t device_num);

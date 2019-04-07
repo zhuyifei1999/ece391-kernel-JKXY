@@ -25,8 +25,8 @@ struct task_struct *init_task;
 #if RUN_TESTS
 static int kselftest(void *args) {
     strcpy(current->comm, "kselftest");
-    launch_tests();
-    wake_up_process(init_task);
+    if (!launch_tests())
+        tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
     return 0;
 }
 #endif
@@ -63,9 +63,6 @@ static int run_init_process(void *args) {
 static int kernel_dummy_init(void *args) {
     // The purpose of this dummy PID 1 is to fork off all the shells on different TTYs,
     // because the ECE391 subsystem is too bad and can't self-govern.
-
-    tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
-
     int i;
     // Opening 3 shells on tty 1-3
     for (i = 1; i <= 3; i++) {
@@ -108,12 +105,12 @@ noreturn void kernel_main(void) {
     wake_up_process(kernel_thread(&kthreadd, NULL));
     schedule();
 
+    wake_up_process(init_task);
+
 #if RUN_TESTS
     // start the tests in a seperate kthread, and let that start init
     struct task_struct *kselftest_task = kthread(&kselftest, NULL);
     wake_up_process(kselftest_task);
-#else
-    wake_up_process(init_task);
 #endif
 
     for (;;) {

@@ -39,7 +39,8 @@ static void printf_emit(struct printf_target *target, const char *string) {
         if (target->file) {
             target->len_printed += filp_write(target->file, string, len);
         } else {
-            target->len_printed += puts(string);
+            target->len_printed += len;
+            tty_foreground_puts(string);
         }
     }
 }
@@ -167,23 +168,11 @@ int32_t fprintf(struct file *file, const char *format, ...) {
     return do_printf(&target, format, va_args);
 }
 
-/* int32_t puts(const char *s);
- *   Inputs: int_8* s = pointer to a string of characters
- *   Return Value: Number of bytes written
- *    Function: Output a string to the console */
-int32_t puts(const char *s) {
-    register int32_t index = 0;
-    while (s[index] != '\0') {
-        putc(s[index]);
-        index++;
-    }
-    return index;
-}
+__printf(3, 4)
+int32_t snprintf(char *str, uint32_t size, const char *format, ...) {
+    /* Stack pointer for the other parameters */
+    uint32_t *va_args = (uint32_t *)&format + 1;
+    struct printf_target target = { .buf = str, .bufsize = size };
 
-/* void putc(uint8_t c);
- * Inputs: uint_8* c = character to print
- * Return Value: void
- *  Function: Output a character to the console */
-void putc(const char c) {
-    tty_foreground_putc(c);
+    return do_printf(&target, format, va_args);
 }

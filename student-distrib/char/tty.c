@@ -236,13 +236,13 @@ void tty_foreground_keyboard(char chr) {
 
     if (chr == '\b') {
         if (foreground_tty->buffer_end) {
-            tty_foreground_putc(chr);
+            tty_foreground_puts((char []){chr, 0});
             foreground_tty->buffer_end--;
         }
     } else {
         if (foreground_tty->buffer_end < TTY_BUFFER_SIZE) {
             foreground_tty->buffer[foreground_tty->buffer_end++] = chr;
-            tty_foreground_putc(chr);
+            tty_foreground_puts((char []){chr, 0});
 
             if (chr == WAKEUP_CHAR && foreground_tty->task) {
                 wake_up_process(foreground_tty->task);
@@ -251,12 +251,12 @@ void tty_foreground_keyboard(char chr) {
     }
 }
 
-void tty_foreground_putc(const char c) {
+void tty_foreground_puts(const char *s) {
     struct tty *tty = foreground_tty;
     if (!tty)
         tty = &early_console;
 
-    raw_tty_write(tty, (char []){c}, 1);
+    raw_tty_write(tty, s, strlen(s));
 }
 
 static struct file_operations tty_dev_op = {

@@ -4,6 +4,7 @@
 #include "lib/cli.h"
 #include "lib/stdio.h"
 #include "task/task.h"
+#include "char/tty.h"
 #include "interrupt.h"
 
 #if RUN_TESTS
@@ -14,6 +15,7 @@ volatile bool _test_status = TEST_PASS;
 char *_test_current_name;
 char *_test_failmsg;
 bool _test_verbose = false;
+struct file *_test_output_file;
 static volatile int test_passed, test_failed;
 
 static struct list failed_tests;
@@ -53,10 +55,10 @@ bool _test_wrapper(initcall_t *wrap_fn, initcall_t *fn) {
     if (!_test_verbose) {
         if (_test_status == TEST_PASS) {
             test_passed++;
-            putc('.');
+            fprintf(_test_output_file, ".");
         } else {
             test_failed++;
-            putc('F');
+            fprintf(_test_output_file, "F");
             list_insert_back(&failed_tests, wrap_fn);
         }
     }
@@ -77,27 +79,28 @@ void _test_longjmp(struct intr_info *info) {
 }
 
 /* Test suite entry point */
-void launch_tests() {
+bool launch_tests() {
     // Test must run with interrupts enabled, but this is critical section
     cli();
     if (tests_running)
-        return;
+        return true;
     tests_running = true;
     sti();
 
     _test_verbose = false;
     // _test_verbose = true;
     test_passed = test_failed = 0;
+    _test_output_file = filp_open_anondevice(TTY_CONSOLE, O_RDWR | O_NOCTTY, S_IFCHR | 0666);
 
-    printf("Kernel self-test running in PID %d Comm: %s\n", current->pid, current->comm);
-    printf("Legend: . = PASS, F = FAIL\n");
+    fprintf(_test_output_file, "Kernel self-test running in PID %d Comm: %s\n", current->pid, current->comm);
+    fprintf(_test_output_file, "Legend: . = PASS, F = FAIL\n");
 
     DO_INITCALL(tests);
 
-    printf("\nResults: %d tests ran, %d passed, %d failed\n", test_passed+ test_failed, test_passed, test_failed);
+    fprintf(_test_output_file, "\nResults: %d tests ran, %d passed, %d failed\n", test_passed+ test_failed, test_passed, test_failed);
 
     if (test_failed) {
-        printf("Rerunning failed tests verbosely\n");
+        fprintf(_test_output_file, "Rerunning failed tests verbosely\n");
         _test_verbose = true;
         while (!list_isempty(&failed_tests)) {
             initcall_t *wrap_fn = list_pop_back(&failed_tests);
@@ -107,9 +110,13 @@ void launch_tests() {
 
     list_destroy(&failed_tests);
 
-    printf("Kernel self-test complete\n");
+    fprintf(_test_output_file, "Kernel self-test complete\n");
+
+    filp_close(_test_output_file);
 
     tests_running = false;
+
+    return test_failed;
 }
 
 static void init_tests() {
