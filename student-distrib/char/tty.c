@@ -256,8 +256,7 @@ void tty_foreground_putc(const char c) {
     if (!tty)
         tty = &early_console;
 
-    char buf[1] = {c};
-    raw_tty_write(tty, buf, 1);
+    raw_tty_write(tty, (char []){c}, 1);
 }
 
 static struct file_operations tty_dev_op = {

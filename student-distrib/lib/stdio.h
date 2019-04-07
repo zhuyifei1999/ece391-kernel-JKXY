@@ -4,9 +4,9 @@
 #include "stdint.h"
 #include "../compiler.h"
 
-__printf(1, 2) int32_t printf(int8_t *format, ...);
-void putc(uint8_t c);
-int32_t puts(int8_t *s);
+__printf(1, 2) int32_t printf(const char *format, ...);
+void putc(const char c);
+int32_t puts(const char *s);
 
 void clear(void);
 
