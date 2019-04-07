@@ -45,19 +45,14 @@ static int run_init_process(void *args) {
     if (args && !current->tty) {
         // The args specify the TTY number
         int *tty_num = args;
-        struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, *tty_num), 0, S_IFCHR | 0666);
+        struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, *tty_num), O_RDWR, S_IFCHR | 0666);
         kfree(args);
 
         if (!IS_ERR(file)) {
-            filp_close(file);
-
             if (current->tty) {
-                raw_tty_write(current->tty, "TTY", 3);
-                char num_buf[64];
-                itoa(MINOR(current->tty->device_num), num_buf, 10);
-                raw_tty_write(current->tty, num_buf, strlen(num_buf));
-                raw_tty_write(current->tty, "\n", 1);
+                fprintf(file, "TTY%d\n", MINOR(current->tty->device_num));
             }
+            filp_close(file);
         }
     }
 
