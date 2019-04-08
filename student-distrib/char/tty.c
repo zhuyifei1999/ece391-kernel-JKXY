@@ -345,8 +345,9 @@ DEFINE_SYSCALL1(ECE391, vidmap, void **, screen_start) {
     if (safe_buf(screen_start, sizeof(*screen_start), true) < sizeof(*screen_start))
         return -EFAULT;
 
-    // TODO: OOM checking
     struct vidmaps_entry *vidmap = kmalloc(sizeof(*vidmap));
+    if (!vidmap)
+        return -ENOMEM;
     *vidmap = (struct vidmaps_entry){
         .task = current,
     };

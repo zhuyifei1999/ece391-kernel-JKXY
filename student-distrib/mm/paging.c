@@ -572,6 +572,8 @@ void remap_to_user(void *src, struct page_table_entry **dest, void **newmap_addr
             }
         }
 
+        return; // OOM here
+
     allocated:;
         page_directory_t *directory = current_page_directory();
         struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)addr)];
