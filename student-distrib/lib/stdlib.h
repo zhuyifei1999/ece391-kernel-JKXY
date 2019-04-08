@@ -3,6 +3,7 @@
 
 #include "stdint.h"
 
-int8_t *itoa(uint32_t value, int8_t *buf, int32_t radix);
+char *itoa(uint32_t value, char *buf, int32_t radix);
+uint32_t atoi(const char *nptr, const char **endptr);
 
 #endif

@@ -27,6 +27,9 @@ static void rtc_handler() {
     case 2:
         if (second != last_second) {
             last_calibration = rtc_counter;
+            if (!last_calibration)
+                last_calibration = 1;
+
             seconds++;
             rtc_counter = 0;
         }

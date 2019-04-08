@@ -12,13 +12,7 @@ static void do_printk_line(char *line) {
     struct timer_data timer;
     get_timer(&timer);
 
-    // TODO: Make %03d in printf
-    char millis_buf[16] = {'0', '0', '0'};
-    char *millis_ptr = millis_buf;
-    millis_ptr += snprintf(millis_buf + 3, 15, "%d", timer.millis);
-    millis_ptr[3] = '\0';
-
-    printf("[%d.%s] %s\n", timer.seconds, millis_ptr, line);
+    printf("[%d.%03d] %s\n", timer.seconds, timer.millis, line);
 }
 
 __printf(1, 2)

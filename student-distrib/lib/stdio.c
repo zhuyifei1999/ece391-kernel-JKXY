@@ -71,74 +71,244 @@ static int32_t do_printf(struct printf_target *target, const char *format, va_li
             continue;
         }
 
+        format++;
+
         bool alternate = false;
+        bool zero_pad = false;
+        bool left_adjust = false;
+        bool space = false;
+        bool always_sign = false;
 
-format_char_switch:
-        /* Conversion specifiers */
-        switch (*(++format)) {
-        /* Print a literal '%' character */
-        case '%':
-            printf_emit(target, "%");
-            break;
+// flags:
+        for (; *format; format++) {
+            switch (*format) {
+            case '#':
+                alternate = true;
+                break;
+            case '0':
+                zero_pad = true;
+                break;
+            case '-':
+                left_adjust = true;
+                break;
+            case ' ':
+                space = true;
+                break;
+            case '+':
+                always_sign = true;
+                break;
+            default:
+                goto width;
+            }
+        }
 
-        /* Use alternate formatting */
-        case '#':
-            alternate = true;
-            goto format_char_switch;
+        if (left_adjust)
+            zero_pad = false;
+        if (always_sign)
+            space = false;
 
-        /* Print a number in hexadecimal form */
-        case 'x': {
+width:;
+        uint32_t width = atoi(format, &format);
+
+// precision:
+        bool precision_given = false;
+        uint32_t precision = 0;
+        if (*format == '.') {
+            format++;
+            precision = atoi(format, &format);
+            precision_given = true;
+        } else if (zero_pad) {
+            precision = width;
+            width = 0;
+            precision_given = true;
+        }
+        zero_pad = false;
+
+// length:
+        int8_t size = 32;
+        if (format[0] == 'h' && format[1] == 'h') {
+            size = 8;
+            format += 2;
+        } else if (format[0] == 'h') {
+            size = 16;
+            format += 1;
+        } else if (format[0] == 'l' || format[0] == 'j' || format[0] == 'z' || format[0] == 't') {
+            format += 1;
+        }
+
+// specifier:
+        switch (*format) {
+        case 'd':
+        case 'i': {
+            int32_t value;
+            switch (size) {
+            case 8:
+                value = va_arg(ap, int8_t);
+                break;
+            case 16:
+                value = va_arg(ap, int16_t);
+                break;
+            case 32:
+                value = va_arg(ap, int32_t);
+                break;
+            }
+            int32_t value_abs = value < 0 ? -value : value;
+
             char conv_buf[20];
-            if (!alternate) {
-                itoa(va_arg(ap, uint32_t), conv_buf, 16);
-                printf_emit(target, conv_buf);
-            } else {
-                int32_t starting_index;
-                int32_t i;
-                itoa(va_arg(ap, uint32_t), &conv_buf[8], 16);
-                i = starting_index = strlen(&conv_buf[8]);
-                while (i < 8) {
-                    conv_buf[i] = '0';
-                    i++;
+            itoa(value_abs, conv_buf, 10);
+
+            if (!precision_given)
+                precision = 1;
+
+            if (!value && !precision)
+                conv_buf[0] = '\0';
+
+            int32_t num_len = strlen(conv_buf);
+            int32_t precision_pad = precision - num_len;
+            if (precision_pad < 0)
+                precision_pad = 0;
+
+            int32_t space_pad = width - precision - (value < 0 || space || always_sign);
+            if (space_pad < 0)
+                space_pad = 0;
+
+            int i;
+
+            if (!left_adjust) {
+                for (i = 0; i < space_pad; i++)
+                    printf_emit(target, (char []){' ', 0});
+            }
+
+            if (value < 0)
+                printf_emit(target, (char []){'-', 0});
+            else if (always_sign)
+                printf_emit(target, (char []){'+', 0});
+            else if (space)
+                printf_emit(target, (char []){' ', 0});
+
+            for (i = 0; i < precision_pad; i++)
+                printf_emit(target, (char []){'0', 0});
+
+            printf_emit(target, conv_buf);
+
+            if (left_adjust) {
+                for (i = 0; i < space_pad; i++)
+                    printf_emit(target, (char []){' ', 0});
+            }
+            break;
+        }
+        case 'o':
+        case 'u':
+        case 'p':
+        case 'x':
+        case 'X': {
+            if (*format == 'p') {
+                alternate = true;
+                size = 32;
+            }
+
+            uint32_t value;
+            switch (size) {
+            case 8:
+                value = va_arg(ap, uint8_t);
+                break;
+            case 16:
+                value = va_arg(ap, uint16_t);
+                break;
+            case 32:
+                value = va_arg(ap, uint32_t);
+                break;
+            }
+
+            char *prefix = "";
+            if (alternate) {
+                switch (*format) {
+                case 'o':
+                    prefix = "0";
+                    break;
+                case 'p':
+                case 'x':
+                case 'X':
+                    precision_given = true;
+                    precision = 8;
+                    prefix = "0x";
+                    break;
                 }
-                printf_emit(target, &conv_buf[starting_index]);
             }
-            break;
 
-        }
-
-        /* Print a number in unsigned int form */
-        case 'u': {
-            char conv_buf[36];
-            itoa(va_arg(ap, uint32_t), conv_buf, 10);
-            printf_emit(target, conv_buf);
-            break;
-        }
-
-        /* Print a number in signed int form */
-        case 'd': {
-            char conv_buf[36];
-            int32_t value = va_arg(ap, int32_t);
-            if(value < 0) {
-                conv_buf[0] = '-';
-                itoa(-value, &conv_buf[1], 10);
-            } else {
+            char conv_buf[20];
+            switch (*format) {
+            case 'o':
+                itoa(value, conv_buf, 8);
+                break;
+            case 'u':
                 itoa(value, conv_buf, 10);
+                break;
+            default:
+                itoa(value, conv_buf, 16);
+                break;
             }
+
+            if (!precision_given)
+                precision = 1;
+
+            if (!value && !precision)
+                conv_buf[0] = '\0';
+
+            int32_t num_len = strlen(conv_buf);
+            int32_t precision_pad = precision - num_len;
+            if (precision_pad < 0)
+                precision_pad = 0;
+
+            int32_t space_pad = width - precision - strlen(prefix);
+            if (space_pad < 0)
+                space_pad = 0;
+
+            int i;
+
+            if (*format == 'x' || *format == 'p') {
+                for (i = 0; i < num_len; i++) {
+                    if (conv_buf[i] >= 'A' && conv_buf[i] <= 'F')
+                        conv_buf[i] = conv_buf[i] - 'A' + 'a';
+                }
+            }
+
+            if (!left_adjust) {
+                for (i = 0; i < space_pad; i++)
+                    printf_emit(target, (char []){' ', 0});
+            }
+
+            printf_emit(target, prefix);
+
+            for (i = 0; i < precision_pad; i++)
+                printf_emit(target, (char []){'0', 0});
+
             printf_emit(target, conv_buf);
+
+            if (left_adjust) {
+                for (i = 0; i < space_pad; i++)
+                    printf_emit(target, (char []){' ', 0});
+            }
             break;
         }
-
-        /* Print a single character */
         case 'c':
             printf_emit(target, (char []){va_arg(ap, char), 0});
             break;
-
-        /* Print a NULL-terminated string */
-        case 's':
-            printf_emit(target, va_arg(ap, char *));
+        case 's': {
+            char *value = va_arg(ap, char *);
+            if (!precision_given || precision >= strlen(value))
+                printf_emit(target, value);
+            else {
+                int i;
+                for (i = 0; i < precision; i++) {
+                    printf_emit(target, (char []){value[i], 0});
+                }
+            }
             break;
-
+        }
+        case '%':
+            printf_emit(target, "%");
+            break;
         default:
             break;
         }

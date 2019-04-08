@@ -54,6 +54,6 @@ static void page_fault(struct intr_info *info) {
         do_exit(256);
     }
 
-    panic("#PF: 0x%x; EIP: 0x%#x", info->error_code, info->eip);
+    panic("#PF: 0x%x; EIP: %#x", info->error_code, info->eip);
 }
 DEFINE_EXC_HANDLER(page_fault, INTR_EXC_PAGE_FAULT);

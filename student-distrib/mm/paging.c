@@ -219,19 +219,19 @@ static void free_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
 
     cli_and_save(flags);
     if (*dir_entry == PHYS_DIR_UNUSED)
-        panic("Freeing already freed physical memory at addr 0x%#x\n", (uint32_t)addr);
+        panic("Freeing already freed physical memory at addr %p\n", addr);
     if (*dir_entry == PHYS_DIR_UNAVAIL)
-        panic("Freeing unavailable physical memory at addr 0x%#x\n", (uint32_t)addr);
+        panic("Freeing unavailable physical memory at addr %p\n", addr);
     if (*dir_entry == PHYS_DIR_KERNEL) {
         if (gfp_flags & GFP_USER)
-            panic("Freeing kernel physical memory for userspace at addr 0x%#x\n", (uint32_t)addr);
+            panic("Freeing kernel physical memory for userspace at addr %p\n", addr);
         *dir_entry = PHYS_DIR_UNUSED;
     } else if (*dir_entry > 0) {
         if (!(gfp_flags & GFP_USER))
-            panic("Freeing userspace physical memory for kernel at addr 0x%#x\n", (uint32_t)addr);
+            panic("Freeing userspace physical memory for kernel at addr %p\n", addr);
         (*dir_entry)--;
     } else {
-        panic("Corrupted physical memory entry at addr 0x%#x, value = %d\n", (uint32_t)addr, (uint32_t)*dir_entry);
+        panic("Corrupted physical memory entry at addr %p, value = %d\n", addr, *dir_entry);
     }
     restore_flags(flags);
 }
@@ -242,9 +242,9 @@ static void use_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
 
     cli_and_save(flags);
     if (*dir_entry <= 0)
-        panic("Can't add uses to physical memory entry at addr 0x%#x, value = %d\n", (uint32_t)addr, (uint32_t)*dir_entry);
+        panic("Can't add uses to physical memory entry at addr %p, value = %hd\n", addr, *dir_entry);
     if (!(gfp_flags & GFP_USER))
-        panic("Can't add uses to physical memory for kernel at addr 0x%#x\n", (uint32_t)addr);
+        panic("Can't add uses to physical memory for kernel at addr %p\n", addr);
     (*dir_entry)++;
     restore_flags(flags);
 }
@@ -262,8 +262,8 @@ static page_table_t *find_userspace_page_table(struct page_directory_entry *dir_
     }
     if (!table)
         panic("Unable to find virtual address for page table "
-              "at physical address 0x%#x\n",
-              (unsigned)PAGE_IDX_ADDR(dir_entry->addr));
+              "at physical address %p\n",
+              (void *)PAGE_IDX_ADDR(dir_entry->addr));
     return table;
 }
 

@@ -1,15 +1,15 @@
 #include "stdlib.h"
 #include "string.h"
 
-/* int8_t *itoa(uint32_t value, int8_t *buf, int32_t radix);
+/* char *itoa(uint32_t value, char *buf, int32_t radix);
  * Inputs: uint32_t value = number to convert
- *            int8_t *buf = allocated buffer to place string in
+ *            char *buf = allocated buffer to place string in
  *          int32_t radix = base system. hex, oct, dec, etc.
  * Return Value: number of bytes written
  * Function: Convert a number to its ASCII representation, with base "radix" */
-int8_t *itoa(uint32_t value, int8_t *buf, int32_t radix) {
-    static int8_t lookup[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    int8_t *newbuf = buf;
+char *itoa(uint32_t value, char *buf, int32_t radix) {
+    static const char lookup[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    char *newbuf = buf;
     int32_t i;
     uint32_t newval = value;
 
@@ -37,4 +37,21 @@ int8_t *itoa(uint32_t value, int8_t *buf, int32_t radix) {
 
     /* Reverse the string and return */
     return strrev(buf);
+}
+
+uint32_t atoi(const char *nptr, const char **endptr) {
+    const char *end;
+    if (!endptr)
+        endptr = &end;
+
+    *endptr = nptr;
+    uint32_t ret = 0;
+
+    for (; **endptr; (*endptr)++) {
+        if (**endptr < '0' || **endptr > '9')
+            break;
+        ret = ret * 10 + (**endptr - '0');
+    }
+
+    return ret;
 }
