@@ -41,15 +41,18 @@ if (ALIGNMENT > 1) {                                                 \
 #define LIBALLOC_MAGIC 0xc001c0de
 #define LIBALLOC_DEAD  0xdeaddead
 
+// #define DEBUG
+#define INFO
+
 #if defined DEBUG || defined INFO
-#include "../lib/stdio.h"
+#include "../printk.h"
 
 #ifdef DEBUG
-#define debug_printf(...) printf(__VA_ARGS__)
+#define debug_printf(...) printk(__VA_ARGS__)
 #else
 #define debug_printf(...) do {} while (0)
 #endif /* DEBUG */
-#define  info_printf(...) printf(__VA_ARGS__)
+#define  info_printf(...) printk(__VA_ARGS__)
 #else
 #define  info_printf(...) do {} while (0)
 #define debug_printf(...) do {} while (0)
@@ -134,22 +137,22 @@ static void liballoc_dump() {
 #endif
 
     info_printf("liballoc: ------ Memory data ---------------\n");
-    info_printf("liballoc: System memory allocated: %i bytes\n", l_allocated);
-    info_printf("liballoc: Memory in used (malloc'ed): %i bytes\n", l_inuse);
-    info_printf("liballoc: Warning count: %i\n", l_warningCount);
-    info_printf("liballoc: Error count: %i\n", l_errorCount);
-    info_printf("liballoc: Possible overruns: %i\n", l_possibleOverruns);
+    info_printf("liballoc: System memory allocated: %li bytes\n", l_allocated);
+    info_printf("liballoc: Memory in used (malloc'ed): %li bytes\n", l_inuse);
+    info_printf("liballoc: Warning count: %li\n", l_warningCount);
+    info_printf("liballoc: Error count: %li\n", l_errorCount);
+    info_printf("liballoc: Possible overruns: %li\n", l_possibleOverruns);
 
 #ifdef DEBUG
         while (maj != NULL) {
-            debug_printf("liballoc: %x: total = %i, used = %i\n",
+            debug_printf("liballoc: %p: total = %i, used = %i\n",
                         maj,
                         maj->size,
                         maj->usage);
 
             min = maj->first;
             while (min != NULL) {
-                debug_printf("liballoc:    %x: %i bytes\n",
+                debug_printf("liballoc:    %p: %i bytes\n",
                             min,
                             min->size);
                 min = min->next;
@@ -198,7 +201,7 @@ static struct liballoc_major *allocate_new_page(unsigned int size) {
 
     l_allocated += maj->size;
 
-    debug_printf("liballoc: Resource allocated %x of %i pages (%i bytes) for %i size.\n", maj, st, maj->size, size);
+    debug_printf("liballoc: Resource allocated %p of %i pages (%i bytes) for %i size.\n", maj, st, maj->size, size);
 
     debug_printf("liballoc: Total memory usage = %i KB\n", (int)((l_allocated / (1024))));
 
@@ -206,7 +209,7 @@ static struct liballoc_major *allocate_new_page(unsigned int size) {
 }
 
 __attribute__ ((malloc))
-void *PREFIX(malloc)(size_t req_size) {
+void *kmalloc(size_t req_size) {
     unsigned long flags;
     int startedBet = 0;
     unsigned long bestSize = 0;
@@ -228,30 +231,30 @@ void *PREFIX(malloc)(size_t req_size) {
 
     if (size == 0) {
         l_warningCount += 1;
-        info_printf("liballoc: WARNING: alloc(0) called from %x\n",
+        info_printf("liballoc: WARNING: alloc(0) called from %#x\n",
                             __builtin_return_address(0));
         liballoc_unlock(&flags);
-        return PREFIX(malloc)(1);
+        return kmalloc(1);
     }
 
     if (l_memRoot == NULL) {
         #if defined DEBUG || defined INFO
         debug_printf("liballoc: initialization of liballoc " VERSION "\n");
-        atexit(liballoc_dump);
+        // atexit(liballoc_dump);
         #endif
 
         // This is the first time we are being used.
         l_memRoot = allocate_new_page(size);
         if (l_memRoot == NULL) {
             liballoc_unlock(&flags);
-            debug_printf("liballoc: initial l_memRoot initialization failed\n", p);
+            debug_printf("liballoc: initial l_memRoot initialization failed\n");
             return NULL;
         }
 
-        debug_printf("liballoc: set up first memory major %x\n", l_memRoot);
+        debug_printf("liballoc: set up first memory major %p\n", l_memRoot);
     }
 
-    debug_printf("liballoc: %x PREFIX(malloc)(%i): ",
+    debug_printf("liballoc: %#x kmalloc(%li): ",
                  __builtin_return_address(0),
                  size);
 
@@ -283,7 +286,7 @@ void *PREFIX(malloc)(size_t req_size) {
 #ifdef USE_CASE1
         // CASE 1:  There is not enough space in this major block.
         if (diff < (size + sizeof(struct liballoc_minor))) {
-            debug_printf("CASE 1: Insufficient space in block %x\n", maj);
+            debug_printf("CASE 1: Insufficient space in block %p\n", maj);
 
             // Another major block next to this one?
             if (maj->next != NULL) {
@@ -328,7 +331,7 @@ void *PREFIX(malloc)(size_t req_size) {
 
             ALIGN(p);
 
-            debug_printf("CASE 2: returning %x\n", p);
+            debug_printf("CASE 2: returning %p\n", p);
             liballoc_unlock(&flags);
             return p;
         }
@@ -358,7 +361,7 @@ void *PREFIX(malloc)(size_t req_size) {
             p = (void *)((uintptr_t)(maj->first) + sizeof(struct liballoc_minor));
             ALIGN(p);
 
-            debug_printf("CASE 3: returning %x\n", p);
+            debug_printf("CASE 3: returning %p\n", p);
             liballoc_unlock(&flags);
             return p;
         }
@@ -396,7 +399,7 @@ void *PREFIX(malloc)(size_t req_size) {
                     p = (void *)((uintptr_t)min + sizeof(struct liballoc_minor));
                     ALIGN(p);
 
-                    debug_printf("CASE 4.1: returning %x\n", p);
+                    debug_printf("CASE 4.1: returning %p\n", p);
                     liballoc_unlock(&flags);
                     return p;
                 }
@@ -430,7 +433,7 @@ void *PREFIX(malloc)(size_t req_size) {
                     p = (void *)((uintptr_t)new_min + sizeof(struct liballoc_minor));
                     ALIGN(p);
 
-                    debug_printf("CASE 4.2: returning %x\n", p);
+                    debug_printf("CASE 4.2: returning %p\n", p);
 
                     liballoc_unlock(&flags);
                     return p;
@@ -466,20 +469,20 @@ void *PREFIX(malloc)(size_t req_size) {
 
     debug_printf("All cases exhausted. No memory available.\n");
     #if defined DEBUG || defined INFO
-    info_printf("liballoc: WARNING: PREFIX(malloc)(%i) returning NULL.\n", size);
+    info_printf("liballoc: WARNING: kmalloc(%li) returning NULL.\n", size);
     liballoc_dump();
     #endif
     return NULL;
 }
 
-void PREFIX(free)(void *ptr) {
+void kfree(void *ptr) {
     unsigned long flags;
     struct liballoc_minor *min;
     struct liballoc_major *maj;
 
     if (ptr == NULL) {
         l_warningCount += 1;
-        info_printf("liballoc: WARNING: PREFIX(free)(NULL) called from %x\n",
+        info_printf("liballoc: WARNING: kfree(NULL) called from %#x\n",
                             __builtin_return_address(0));
         return;
     }
@@ -500,17 +503,17 @@ void PREFIX(free)(void *ptr) {
             ((min->magic & 0xFF) == (LIBALLOC_MAGIC & 0xFF))
         ) {
             l_possibleOverruns += 1;
-            info_printf("liballoc: ERROR: Possible 1-3 byte overrun for magic %x != %x\n",
+            info_printf("liballoc: ERROR: Possible 1-3 byte overrun for magic %#x != %#x\n",
                         min->magic,
                         LIBALLOC_MAGIC);
         }
 
         if (min->magic == LIBALLOC_DEAD) {
-            info_printf("liballoc: ERROR: multiple PREFIX(free)() attempt on %x from %x.\n",
+            info_printf("liballoc: ERROR: multiple kfree() attempt on %p from %#x.\n",
                         ptr,
                         __builtin_return_address(0));
         } else {
-            info_printf("liballoc: ERROR: Bad PREFIX(free)(%x) called from %x\n",
+            info_printf("liballoc: ERROR: Bad kfree(%p) called from %#x\n",
                         ptr,
                         __builtin_return_address(0));
         }
@@ -520,7 +523,7 @@ void PREFIX(free)(void *ptr) {
         return;
     }
 
-    debug_printf("liballoc: %x PREFIX(free)(%x): ",
+    debug_printf("liballoc: %#x kfree(%p): ",
                  __builtin_return_address(0),
                  ptr);
 
@@ -563,13 +566,13 @@ void PREFIX(free)(void *ptr) {
 }
 
 __attribute__ ((malloc))
-void *PREFIX(calloc)(size_t nobj, size_t size) {
+void *kcalloc(size_t nobj, size_t size) {
     int real_size;
     void *p;
 
     real_size = nobj * size;
 
-    p = PREFIX(malloc)(real_size);
+    p = kmalloc(real_size);
 
     liballoc_memset(p, 0, real_size);
 
@@ -577,7 +580,7 @@ void *PREFIX(calloc)(size_t nobj, size_t size) {
 }
 
 __attribute__ ((warn_unused_result))
-void *PREFIX(realloc)(void *p, size_t size) {
+void *krealloc(void *p, size_t size) {
     unsigned long flags;
     void *ptr;
     struct liballoc_minor *min;
@@ -585,12 +588,12 @@ void *PREFIX(realloc)(void *p, size_t size) {
 
     // Honour the case of size == 0 => free old and return NULL
     if (size == 0) {
-        PREFIX(free)(p);
+        kfree(p);
         return NULL;
     }
 
     // In the case of a NULL pointer, return a simple malloc.
-    if (p == NULL) return PREFIX(malloc)(size);
+    if (p == NULL) return kmalloc(size);
 
     // Unalign the pointer if required.
     ptr = p;
@@ -611,17 +614,17 @@ void *PREFIX(realloc)(void *p, size_t size) {
             ((min->magic & 0xFF) == (LIBALLOC_MAGIC & 0xFF))
         ) {
             l_possibleOverruns += 1;
-            info_printf("liballoc: ERROR: Possible 1-3 byte overrun for magic %x != %x\n",
+            info_printf("liballoc: ERROR: Possible 1-3 byte overrun for magic %#x != %#x\n",
                                 min->magic,
                                 LIBALLOC_MAGIC);
         }
 
         if (min->magic == LIBALLOC_DEAD) {
-            info_printf("liballoc: ERROR: multiple PREFIX(free)() attempt on %x from %x.\n",
+            info_printf("liballoc: ERROR: multiple kfree() attempt on %p from %#x.\n",
                                     ptr,
                                     __builtin_return_address(0));
         } else {
-            info_printf("liballoc: ERROR: Bad PREFIX(free)(%x) called from %x\n",
+            info_printf("liballoc: ERROR: Bad kfree(%p) called from %#x\n",
                                 ptr,
                                 __builtin_return_address(0));
         }
@@ -644,9 +647,9 @@ void *PREFIX(realloc)(void *p, size_t size) {
     liballoc_unlock(&flags);
 
     // If we got here then we're reallocating to a block bigger than us.
-    ptr = PREFIX(malloc)(size);                    // We need to allocate new memory
+    ptr = kmalloc(size);                    // We need to allocate new memory
     liballoc_memcpy(ptr, p, real_size);
-    PREFIX(free)(p);
+    kfree(p);
 
     return ptr;
 }

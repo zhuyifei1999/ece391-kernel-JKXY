@@ -19,11 +19,6 @@
 typedef uint32_t size_t;
 typedef uint32_t uintptr_t;
 
-
-//This lets you prefix malloc and friends
-#define PREFIX(func)        k ## func
-
-
 /** This function is supposed to lock the memory data structures. It
  * could be as simple as disabling interrupts or acquiring a spinlock.
  * It's up to you to decide.
@@ -59,12 +54,12 @@ extern int liballoc_free(void *, size_t);
 
 
 __attribute__ ((malloc))
-extern void *PREFIX(malloc)(size_t);          ///< The standard function.
+extern void *kmalloc(size_t);          ///< The standard function.
 __attribute__ ((warn_unused_result))
-extern void *PREFIX(realloc)(void *, size_t); ///< The standard function.
+extern void *krealloc(void *, size_t); ///< The standard function.
 __attribute__ ((malloc))
-extern void *PREFIX(calloc)(size_t, size_t);  ///< The standard function.
-extern void  PREFIX(free)(void *);            ///< The standard function.
+extern void *kcalloc(size_t, size_t);  ///< The standard function.
+extern void  kfree(void *);            ///< The standard function.
 
 
 #endif
