@@ -5,12 +5,14 @@
 #include "../task/sched.h"
 #include "../drivers/vga.h"
 #include "../structure/list.h"
+#include "../mm/paging.h"
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
 #include "../lib/string.h"
 #include "../lib/cli.h"
 #include "../printk.h"
 #include "../initcall.h"
+#include "../syscall.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -26,6 +28,11 @@ struct tty early_console = {
 };
 
 struct tty *foreground_tty;
+
+struct vidmaps_entry {
+    struct task_struct *task;
+    struct page_table_entry *table;
+};
 
 // meh... Can't this logic be in userspace?
 #define tty_should_read(tty) (tty->buffer_end && tty->buffer[tty->buffer_end - 1] == WAKEUP_CHAR)
@@ -78,6 +85,7 @@ struct tty *tty_get(uint32_t device_num) {
         .video_mem = video_mem,
     };
     atomic_set(&ret->refcount, 1);
+    list_init(&ret->vidmaps);
 
     list_insert_back(&ttys, ret);
 
@@ -307,6 +315,12 @@ void tty_switch_foreground(uint32_t device_num) {
         memcpy(video_mem_save, vga_mem, LEN_4K);
         foreground_tty->video_mem = video_mem_save;
 
+        struct list_node *node;
+        list_for_each(&foreground_tty->vidmaps, node) {
+            struct vidmaps_entry *vidmap = node->value;
+            remap_to_user(foreground_tty->video_mem, &vidmap->table, NULL);
+        }
+
         tty_put(foreground_tty);
     }
 
@@ -316,9 +330,42 @@ void tty_switch_foreground(uint32_t device_num) {
 
     tty_commit_cursor(tty);
 
-    // TODO: invoke paging
+    struct list_node *node;
+    list_for_each(&tty->vidmaps, node) {
+        struct vidmaps_entry *vidmap = node->value;
+        remap_to_user(tty->video_mem, &vidmap->table, NULL);
+    }
+
 out:
     restore_flags(flags);
+}
+
+DEFINE_SYSCALL1(ECE391, vidmap, void **, screen_start) {
+    // sanity check
+    if (safe_buf(screen_start, sizeof(*screen_start), true) < sizeof(*screen_start))
+        return -EFAULT;
+
+    // TODO: OOM checking
+    struct vidmaps_entry *vidmap = kmalloc(sizeof(*vidmap));
+    *vidmap = (struct vidmaps_entry){
+        .task = current,
+    };
+
+    remap_to_user(current->tty->video_mem, &vidmap->table, screen_start);
+    if (!*screen_start)
+        return -ENOMEM;
+
+    list_insert_back(&current->tty->vidmaps, vidmap);
+    return 0;
+}
+
+void exit_vidmap_cb() {
+    if (!current->tty)
+        return;
+    list_remove_on_cond_extra(&current->tty->vidmaps, struct vidmaps_entry *, vidmap, vidmap->task == current, ({
+        vidmap->table->present = 0;
+        kfree(vidmap);
+    }));
 }
 
 static void init_tty_char() {

@@ -30,10 +30,13 @@ void do_exit(int exitcode) {
     current->exitcode = exitcode;
     current->state = TASK_ZOMBIE;
 
+    // HACK
+    exit_vidmap_cb();
+
     filp_close(current->cwd);
     if (current->exe)
         filp_close(current->exe);
-    if (current->exe)
+    if (current->tty)
         tty_put(current->tty);
 
     if (current->files) {

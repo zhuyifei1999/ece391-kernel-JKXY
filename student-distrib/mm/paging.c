@@ -512,17 +512,16 @@ static void free_one_page(void *page, uint32_t gfp_flags) {
 
     if (gfp_flags & GFP_USER) {
         page_directory_t *directory = current_page_directory();
-        struct page_directory_entry *dir_entry = &(*directory)[addr / PAGE_SIZE_LARGE];
+        struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX(addr)];
         if (dir_entry->present && dir_entry->user) {
             if ((gfp_flags & GFP_LARGE) && dir_entry->size) {
-                phys = dir_entry->addr * PAGE_SIZE_SMALL;
+                phys = PAGE_IDX_ADDR(dir_entry->addr);
                 *dir_entry = (struct page_directory_entry){0};
             } else if (!dir_entry->size) {
                 page_table_t *table = find_userspace_page_table(dir_entry);
-                struct page_table_entry *table_entry = &(*table)[
-                    (addr % PAGE_SIZE_LARGE) / PAGE_SIZE_SMALL];
+                struct page_table_entry *table_entry = &(*table)[PAGE_TABLE_IDX(addr)];
                 if (table_entry->present && table_entry->user) {
-                    phys = table_entry->addr * PAGE_SIZE_SMALL;
+                    phys = PAGE_IDX_ADDR(table_entry->addr);
                     *table_entry = (struct page_table_entry){0};
                 }
             }
@@ -534,7 +533,7 @@ static void free_one_page(void *page, uint32_t gfp_flags) {
             if (addr >= KHEAP_ADDR) {
                 struct page_table_entry *table_entry = &heap_tables[PAGE_IDX(addr)];
                 if (table_entry->present && !table_entry->user) {
-                    phys = table_entry->addr * PAGE_SIZE_SMALL;
+                    phys = PAGE_IDX_ADDR(table_entry->addr);
                     *table_entry = (struct page_table_entry){0};
                 }
             }
@@ -551,6 +550,52 @@ void free_pages(void *page, uint32_t num, uint32_t gfp_flags) {
     uint32_t i;
     for (i = 0; i < num; i++)
         free_one_page((void *)((uint32_t)page + page_size(gfp_flags) * i), gfp_flags);
+}
+
+// DO NOT USE aside from vidmap(). THIS IS A UNSAFE HACK
+// The ECE391 task that holds this must not execute()
+void remap_to_user(void *src, struct page_table_entry **dest, void **newmap_addr) {
+    unsigned long flags;
+    cli_and_save(flags);
+
+    if (!*dest) {
+        uint32_t start, bigstart;
+        void *addr;
+        for (bigstart = NUM_PREALLOCATE_LARGE; bigstart < NUM_ENTRIES; bigstart++) {
+            for (start = 0; start < NUM_ENTRIES; start++) {
+                addr = (void *)(bigstart* PAGE_SIZE_LARGE + start * PAGE_SIZE_SMALL);
+                addr = request_pages(addr, 1, GFP_USER);
+                if (addr) {
+                    *newmap_addr = addr;
+                    goto allocated;
+                }
+            }
+        }
+
+    allocated:;
+        page_directory_t *directory = current_page_directory();
+        struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)addr)];
+
+        page_table_t *table = find_userspace_page_table(dir_entry);
+        struct page_table_entry *table_entry = &(*table)[PAGE_TABLE_IDX((uint32_t)addr)];
+
+        free_phys_mem((void __physaddr *)PAGE_IDX_ADDR(table_entry->addr), GFP_USER);
+
+        *dest = table_entry;
+    }
+
+    if ((uint32_t)src >= KHEAP_ADDR) {
+        struct page_table_entry *table_entry = &heap_tables[PAGE_IDX((uint32_t)src)];
+        src = (void __physaddr *)PAGE_IDX_ADDR(table_entry->addr);
+    }
+
+    (*dest)->addr = PAGE_IDX((uint32_t)src);
+
+    // Because we don't always know the destination virtual address, and I'm too
+    // lazy to write code that tries to, just do a full TLB flush.
+    asm volatile ("mov %%cr3,%%eax; mov %%eax,%%cr3" : : : "eax");
+
+    restore_flags(flags);
 }
 
 page_directory_t *clone_directory(page_directory_t *src) {

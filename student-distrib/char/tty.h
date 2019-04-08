@@ -4,6 +4,7 @@
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
 #include "../vfs/device.h"
+#include "../structure/list.h"
 #include "../atomic.h"
 
 #define TTY_MAJOR 4
@@ -17,6 +18,7 @@ struct tty {
     uint32_t device_num;
     struct task_struct *task; // The task that's reading the tty
     char *video_mem;
+    struct list vidmaps;
     uint16_t cursor_x;
     uint16_t cursor_y;
     // FIXME: This should be handled by the line discipline
@@ -35,5 +37,7 @@ void tty_foreground_puts(const char *s);
 void tty_foreground_clear();
 
 void tty_switch_foreground(uint32_t device_num);
+
+void exit_vidmap_cb();
 
 #endif
