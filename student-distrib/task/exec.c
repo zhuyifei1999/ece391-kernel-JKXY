@@ -14,22 +14,33 @@
 
 static char elf_magic[4] = {0x7f, 0x45, 0x4c, 0x46};
 
+/*
+ *   do_execve
+ *   DESCRIPTION: do execution
+ *   INPUTS: char *filename, char *argv[], char *envp[]
+ *   RETURN VALUE: int32_t error code
+ */
 int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     struct file *exe = filp_open(filename, 0, 0); // TODO: permission check for execute bit
+    //check if exe is valid
     if (IS_ERR(exe))
         return PTR_ERR(exe);
 
     int32_t ret = 0;
     // check for magic
     char buf[sizeof(elf_magic)];
+    //read the exe into buf for sizeof(elf_magic)
     ret = filp_read(exe, buf, sizeof(elf_magic));
     if (ret < 0)
         goto err_close;
+
+    //check if the content in buf is correct
     if (strncmp(buf, elf_magic, sizeof(elf_magic))) {
         ret = -ENOEXEC;
         goto err_close;
     }
-
+    
+    // initialize the ret varible 
     ret = 0;
 
     // TODO: determine subsystem
@@ -48,24 +59,30 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         .ss = USER_DS,
     };
 
+    //replace current's execution by function's arg 
     if (current->exe)
         filp_close(current->exe);
     current->exe = exe;
 
+    //check if the current thread have a file 
     if (current->files) {
         uint32_t i;
         array_for_each(&current->files->files, i) {
             struct file *file = array_get(&current->files->files, i);
             if (file && (file->flags & O_CLOEXEC)) {
                 filp_close(file);
+                //replace current's execution by function's arg 
                 array_set(&current->files->files, i, NULL);
             }
         }
+    //if there is no file, create files and break
     } else {
+        //create space in kernel for current thread
         current->files = kmalloc(sizeof(*current->files));
         atomic_set(&current->files->refcount, 1);
         current->files->files = (struct array){0};
         switch (subsystem) {
+        // case 0 execute in linux mode
         case SUBSYSTEM_LINUX:;
             struct file *tty = filp_open_anondevice(TTY_CURRENT, O_RDWR, S_IFCHR | 0666);
             array_set(&current->files->files, 0, tty);
@@ -73,6 +90,7 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
             array_set(&current->files->files, 2, tty);
             atomic_add(&tty->refcount, 2);
             break;
+        // case 1 execute in ece391 mode
         case SUBSYSTEM_ECE391:
             array_set(&current->files->files, 0, filp_open_anondevice(TTY_CURRENT, 0, S_IFCHR | 0666));
             array_set(&current->files->files, 1, filp_open_anondevice(TTY_CURRENT, O_WRONLY, S_IFCHR | 0666));
@@ -80,19 +98,23 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         }
     }
 
+    // new page directory
     page_directory_t *new_pagedir = new_directory();
     if (current->mm) {
+        // if refount is 0
         if (!atomic_dec(&current->mm->refcount)) {
+            // free the page directory
             free_directory(current->mm->page_directory);
             kfree(current->mm);
         }
     }
+    // malloc the mm for current 
     current->mm = kmalloc(sizeof(*current->mm));
     current->mm->page_directory = new_pagedir;
     atomic_set(&current->mm->refcount, 1);
-
     current->subsystem = subsystem;
 
+    // check if the content and pointer of argv are valid
     if (argv && argv[0] && *argv[0])
         strncpy(current->comm, argv[0], sizeof(current->comm) - 1);
     else
@@ -112,7 +134,7 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         filp_read(exe, (void *)(ECE391_PAGEADDR + ECE391_MAPADDR), LEN_4M - ECE391_MAPADDR);
         regs.eip = *(uint32_t *)(ECE391_PAGEADDR + ECE391_MAPADDR + 24);
         regs.esp = ECE391_PAGEADDR + LEN_4M;
-
+        // copy the argv to ECE391_PAGEADDR 0x08000000
         if (argv && argv[0] && argv[1])
             strncpy((char *)ECE391_ARGSADDR, argv[1], ECE391_MAPADDR);
         else
@@ -121,9 +143,11 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         break;
     }
 
+// error situation, free the memory
 err_close:
     kfree(filename);
 
+    // if argv is valid 
     uint32_t i;
     if (argv) {
         for (i = 0; argv[i]; i++)
@@ -131,12 +155,14 @@ err_close:
         kfree(argv);
     }
 
+    // if enviroment pointer is valid 
     if (envp) {
         for (i = 0; envp[i]; i++)
             kfree(envp[i]);
         kfree(envp);
     }
 
+    // if ret is valid 
     if (ret) {
         filp_close(exe);
         return ret;
@@ -146,6 +172,13 @@ err_close:
 }
 
 // TODO: ENOMEM
+/*
+ *   do_execve_heapify
+ *   DESCRIPTION: do the execution and store mempry in heap
+ *   instead of stack
+ *   INPUTS: char *filename, char *argv[], char *envp[]
+ *   RETURN VALUE: int32_t error code
+ */
 int32_t do_execve_heapify(char *filename, char *argv[], char *envp[]) {
     // do_execve expect all args to be on heap so it can free it. if it's not, use this instead.
     char *filename_h = strdup(filename);
@@ -153,18 +186,22 @@ int32_t do_execve_heapify(char *filename, char *argv[], char *envp[]) {
     char **argv_h = NULL;
     char **envp_h = NULL;
 
+    // if argv is valid 
     if (argv) {
         uint32_t length;
         for (length = 0; argv[length]; length++);
         argv_h = kcalloc(length + 1, sizeof(*argv));
+        // copy the argv to heap malloc space in kernel
         for (length = 0; argv[length]; length++)
             argv_h[length] = strdup(argv[length]);
     }
 
+    // if enviroment pointer is valid 
     if (envp) {
         uint32_t length;
         for (length = 0; envp[length]; length++);
         envp_h = kcalloc(length + 1, sizeof(*envp));
+        // copy the envp to heap malloc space in kernel
         for (length = 0; envp[length]; length++)
             envp_h[length] = strdup(envp[length]);
     }
