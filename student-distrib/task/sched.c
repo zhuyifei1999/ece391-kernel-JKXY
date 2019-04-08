@@ -30,7 +30,7 @@ static void schedule_handler(struct intr_info *info) {
 static void switch_to(struct task_struct *task) {
     // #include "../printk.h"
     // printk("Switching to task %p\n", task);
-    // printf(" Comm: %s\n", task->comm);
+    // printk(" Comm: %s\n", task->comm);
     if (task == current)
         return;
     asm volatile (
