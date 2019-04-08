@@ -1,11 +1,13 @@
 #include "clone.h"
 #include "../mm/kmalloc.h"
+#include "../lib/string.h"
 #include "../eflags.h"
 #include "../panic.h"
 #include "../x86_desc.h"
 #include "../signal.h"
 #include "../err.h"
 #include "../errno.h"
+
 /*
  *   _next_pid
  *   DESCRIPTION: loop over all pid numbers
@@ -26,6 +28,7 @@ static uint16_t _next_pid() {
 
     return ret;
 }
+
 /*
  *   next_pid
  *   DESCRIPTION: get next available pid number
@@ -39,6 +42,7 @@ static uint16_t next_pid() {
     } while (PTR_ERR(get_task_from_pid(pid)) != -ESRCH);
     return pid;
 }
+
 /*
  *   clone_child
  *   DESCRIPTION: clone a child task from the parent
@@ -60,6 +64,7 @@ asmlinkage noreturn void clone_child(uint32_t flags, int (*fn)(void *args), void
         set_all_regs(&regs);
     }
 }
+
 /*
  *   do_clone
  *   DESCRIPTION: clone a child task from the parent
@@ -159,6 +164,7 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
 
     return task;
 }
+
 /*
  *   kernel_thread
  *   DESCRIPTION: make a new kernel thread
