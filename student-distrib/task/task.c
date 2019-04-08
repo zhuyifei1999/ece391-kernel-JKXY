@@ -67,7 +67,7 @@ void do_exit(int exitcode) {
     // TODO: reparent children
     schedule();
 
-    panic("Dead process scheduled.\n");
+    BUG();
 }
 
 DEFINE_SYSCALL1(ECE391, halt, uint8_t, status) {

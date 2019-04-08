@@ -84,7 +84,7 @@ void set_all_regs(struct intr_info *regs) {
         :
         : "m"(regs->intr_ebp), "irm"(regs)
     );
-    panic("GCC is nuts\n");
+    BUG();
 }
 
 extern struct list tasks[PID_BUCKETS];

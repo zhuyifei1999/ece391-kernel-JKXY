@@ -18,6 +18,8 @@
     abort();                                    \
 } while (0)
 
+#define BUG() panic("BUG: failure at %s:%d/%s()!\n", __FILE__, __LINE__, __func__)
+
 #endif
 
 #endif
