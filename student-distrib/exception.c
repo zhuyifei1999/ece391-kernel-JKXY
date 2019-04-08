@@ -11,6 +11,20 @@
 #define PF_RSVG 8
 #define PF_I 16
 
+static void dump_handler(struct intr_info *info) {
+    printk("PID: %d Comm: %s\n", current->pid, current->comm);
+    printk("EIP: %04x:%08x\n", info->cs, info->eip);
+    printk("ESP: %04x:%08x\n", info->ss_cfi, info->esp_cfi);
+    printk("EAX: %08x EBX: %08x ECX: %08x EDX: %08x\n", info->eax, info->ebx, info->ecx, info->edx);
+    printk("ESI: %08x EDI: %08x EBP: %08x\n", info->esi, info->edi, info->ebp);
+}
+
+static void init_dump() {
+    intr_setaction(INTR_DUMP, (struct intr_action){
+        .handler = &dump_handler } );
+}
+DEFINE_INITCALL(init_dump, early);
+
 #define DEFINE_EXC_HANDLER(fn, intr) static void init_exc_ ## fn() { \
     intr_setaction(intr, (struct intr_action){                       \
         .handler = &fn } );                                          \
@@ -18,10 +32,12 @@
 DEFINE_INITCALL(init_exc_ ## fn, early)
 
 // create stub exception handler
-#define STUB_EXC_HANDLER(mnemonic, fn_name, intr)      \
-static noreturn void fn_name(struct intr_info *info) { \
-    panic(mnemonic ": 0x%x", info->error_code);        \
-}                                                      \
+#define STUB_EXC_HANDLER(mnemonic, fn_name, intr)       \
+static noreturn void fn_name(struct intr_info *info) {  \
+    panic_msgonly(mnemonic ": 0x%x\n", info->error_code); \
+    dump_handler(info);                                 \
+    abort();                                            \
+}                                                       \
 DEFINE_EXC_HANDLER(fn_name, intr)
 
 // initialize stub exception handlers
@@ -41,19 +57,23 @@ STUB_EXC_HANDLER("#VE", virtualization_exception,      INTR_EXC_VIRTUALIZATION_E
 
 
 static void page_fault(struct intr_info *info) {
+    void *faultaddr;
+    asm volatile ("mov %%cr2,%0" : "=a"(faultaddr));
+
     // If this is a user writing to a read-only page causing a protection violation, this could be a COW page
     if (info->error_code & PF_U) {
         if ((info->error_code & PF_P) && (info->error_code & PF_W)) {
-            void *faultaddr;
-            asm volatile ("mov %%cr2,%0" : "=a"(faultaddr));
             if (clone_cow(faultaddr))
                 return;
         }
 
         // TODO: send a signal instead
+        printk("%s[%d]: segfault at %p ip %#x sp %#x error %d\n", current->comm, current->pid, faultaddr, info->eip, info->esp, info->error_code);
         do_exit(256);
     }
 
-    panic("#PF: 0x%x; EIP: %#x", info->error_code, info->eip);
+    panic_msgonly("#PF: %d ADDR: %p\n", info->error_code, faultaddr);
+    dump_handler(info);
+    abort();
 }
 DEFINE_EXC_HANDLER(page_fault, INTR_EXC_PAGE_FAULT);

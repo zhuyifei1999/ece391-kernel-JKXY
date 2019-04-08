@@ -5,8 +5,6 @@
 #include "../interrupt.h"
 #include "task.h"
 
-#define INTR_SCHED 0x81
-
 extern struct list schedule_queue;
 
 void schedule(void);

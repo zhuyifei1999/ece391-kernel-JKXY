@@ -5,12 +5,17 @@
 
 #include "compiler.h"
 #include "abort.h"
+#include "interrupt.h"
 #include "printk.h"
 
-// this will print a panic message and call abort
-#define panic(...) do {                   \
+#define panic_msgonly(...) do {           \
     printk("KERNEL PANIC: " __VA_ARGS__); \
-    abort();                              \
+} while (0)
+
+#define panic(...) do {                         \
+    panic_msgonly(__VA_ARGS__);                 \
+    asm volatile ("int %0" : : "i"(INTR_DUMP)); \
+    abort();                                    \
 } while (0)
 
 #endif

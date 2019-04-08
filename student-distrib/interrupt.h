@@ -79,6 +79,8 @@ struct intr_info {
 #define INTR_IRQ_MIN INTR_IRQ0
 
 #define INTR_SYSCALL 0x80
+#define INTR_SCHED   0x81
+#define INTR_DUMP    0x82
 
 typedef void intr_handler_t(struct intr_info *info);
 

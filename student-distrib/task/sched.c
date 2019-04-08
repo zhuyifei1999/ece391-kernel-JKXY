@@ -84,7 +84,5 @@ static void init_sched() {
 
     intr_setaction(INTR_SCHED, (struct intr_action){
         .handler = &schedule_handler } );
-
-    // TODO: Do periodic scheduling
 }
 DEFINE_INITCALL(init_sched, early);
