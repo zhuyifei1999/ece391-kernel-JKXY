@@ -5,11 +5,11 @@
 
 #include "compiler.h"
 #include "abort.h"
-#include "lib/stdio.h"
+#include "printk.h"
 
 // this will print a panic message and call abort
 #define panic(...) do {                   \
-    printf("KERNEL PANIC: " __VA_ARGS__); \
+    printk("KERNEL PANIC: " __VA_ARGS__); \
     abort();                              \
 } while (0)
 

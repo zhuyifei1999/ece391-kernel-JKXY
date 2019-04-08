@@ -2,7 +2,6 @@
 #include "clone.h"
 #include "sched.h"
 #include "../structure/list.h"
-#include "../lib/stdio.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
 #include "../initcall.h"

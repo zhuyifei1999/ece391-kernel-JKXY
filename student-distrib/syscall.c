@@ -1,5 +1,5 @@
 #include "syscall.h"
-#include "lib/stdio.h"
+#include "printk.h"
 #include "errno.h"
 
 intr_handler_t *syscall_handlers[NUM_SUBSYSTEMS][MAX_SYSCALL];
@@ -9,7 +9,7 @@ static void syscall_handler(struct intr_info *info) {
     if (info->eax < MAX_SYSCALL)
         handler = syscall_handlers[current->subsystem][info->eax];
     if (!handler) {
-        printf("Unknown syscall: %d\n", info->eax);
+        printk("Unknown syscall: %d\n", info->eax);
         info->eax = -ENOSYS;
     } else {
         (*handler)(info);

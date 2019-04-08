@@ -7,9 +7,9 @@
 #include "../structure/list.h"
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
-#include "../lib/stdio.h"
 #include "../lib/string.h"
 #include "../lib/cli.h"
+#include "../printk.h"
 #include "../initcall.h"
 #include "../err.h"
 #include "../errno.h"
@@ -329,6 +329,6 @@ static void init_tty_char() {
 
     tty_switch_foreground(TTY_CONSOLE);
 
-    printf("Console attached to TTY0\n");
+    printk("Console attached to TTY0\n");
 }
 DEFINE_INITCALL(init_tty_char, drivers);

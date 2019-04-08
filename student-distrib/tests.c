@@ -92,12 +92,14 @@ bool launch_tests() {
     test_passed = test_failed = 0;
     _test_output_file = filp_open_anondevice(TTY_CONSOLE, O_RDWR | O_NOCTTY, S_IFCHR | 0666);
 
-    fprintf(_test_output_file, "Kernel self-test running in PID %d Comm: %s\n", current->pid, current->comm);
+    printk("Kernel self-test running in PID %d Comm: %s\n", current->pid, current->comm);
     fprintf(_test_output_file, "Legend: . = PASS, F = FAIL\n");
 
     DO_INITCALL(tests);
 
-    fprintf(_test_output_file, "\nResults: %d tests ran, %d passed, %d failed\n", test_passed+ test_failed, test_passed, test_failed);
+    fprintf(_test_output_file, "\n");
+
+    printk("Results: %d tests ran, %d passed, %d failed\n", test_passed+ test_failed, test_passed, test_failed);
 
     if (test_failed) {
         fprintf(_test_output_file, "Rerunning failed tests verbosely\n");
@@ -110,7 +112,7 @@ bool launch_tests() {
 
     list_destroy(&failed_tests);
 
-    fprintf(_test_output_file, "Kernel self-test complete\n");
+    printk("Kernel self-test complete\n");
 
     filp_close(_test_output_file);
 

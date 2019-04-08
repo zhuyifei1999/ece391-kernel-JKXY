@@ -1,7 +1,6 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "stdbool.h"
-#include "stdarg.h"
 #include "string.h"
 #include "cli.h"
 #include "io.h"
@@ -30,10 +29,12 @@ struct printf_target {
 
 static void printf_emit(struct printf_target *target, const char *string) {
     if (target->buf) {
-        while (target->bufsize && *string) {
-            *(target->buf++) = *(string++);
+        while (*string) {
+            if (target->bufsize) {
+                *(target->buf++) = *(string++);
+                target->bufsize--;
+            }
             target->len_printed++;
-            target->bufsize--;
         }
     } else {
         uint32_t len = strlen(string);
@@ -157,7 +158,10 @@ int32_t vfprintf(struct file *file, const char *format, va_list ap) {
 }
 int32_t vsnprintf(char *str, uint32_t size, const char *format, va_list ap) {
     struct printf_target target = { .buf = str, .bufsize = size };
-    return do_printf(&target, format, ap);
+    int32_t res = do_printf(&target, format, ap);
+    if (res < size)
+        str[res] = '\0';
+    return res;
 }
 
 __printf(1, 2)

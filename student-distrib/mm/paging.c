@@ -791,41 +791,34 @@ out:
  *
  * print Values contained in paging structures
  */
-static void print_binary_32(int32_t a) {
-    int PRINT_BINARY_idx = 31;
-    for (; PRINT_BINARY_idx >= 0; PRINT_BINARY_idx--) {
-        printf("%d", (a >> PRINT_BINARY_idx) & 1);
-    }
-    printf("\n");
-}
 __testfunc
 static void paging_content_test() {
     // This test is full of "magic numbers" because we are assering the values
     // to be equal to some human-written values, not something processed by a
     // preprocessor
-    printf("################################################\n");
+    // printf("################################################\n");
 
-    printf("first two of paging directory:\n");
+    // printf("first two of paging directory:\n");
     int32_t *a = (void *)&(init_page_directory[0]);
-    print_binary_32(*a);
+    // print_binary_32(*a);
     a = (void *)&(init_page_directory[1]);
     TEST_ASSERT(((*a)>>22) == 1 && ((*a)&3) == 3);
-    print_binary_32(*a);
+    // print_binary_32(*a);
 
-    printf("address of video paging table is:\n");
-    print_binary_32((int32_t)zero_page_table);
+    // printf("address of video paging table is:\n");
+    // print_binary_32((int32_t)zero_page_table);
 
-    printf("at idx:\n");
-    print_binary_32((int32_t)PAGE_TABLE_IDX(VIDEO_ADDR));
+    // printf("at idx:\n");
+    // print_binary_32((int32_t)PAGE_TABLE_IDX(VIDEO_ADDR));
 
-    printf("the content is:\n");
+    // printf("the content is:\n");
     a = (void *)&(zero_page_table[PAGE_TABLE_IDX(VIDEO_ADDR)]);
     TEST_ASSERT(((*a)>>12) == 0xb8 && ((*a)&3) == 3);
-    print_binary_32(*a);
+    // print_binary_32(*a);
 
-    printf("################################################\n");
+    // printf("################################################\n");
 }
-// DEFINE_TEST(paging_content_test);
+DEFINE_TEST(paging_content_test);
 
 /* Page fault tests, good accesses
  *

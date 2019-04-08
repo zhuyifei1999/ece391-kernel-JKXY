@@ -1,7 +1,7 @@
 #include "irq.h"
 #include "drivers/i8259.h"
 #include "interrupt.h"
-#include "lib/stdio.h"
+#include "printk.h"
 
 // set up the array to function pointer
 static intr_handler_t *irq_handlers[IRQ_NUM];
@@ -13,7 +13,7 @@ static void irq_handler(struct intr_info *info) {
     if (irq_handlers[irq_num]) {
         (*irq_handlers[irq_num])(info);
     } else {
-        printf("[Unhandled IRQ] number = 0x%x\n", irq_num);
+        printk("[Unhandled IRQ] number = 0x%x\n", irq_num);
     }
 }
 

@@ -1,6 +1,7 @@
 #include "timer.h"
 #include "lib/cli.h"
 #include "drivers/rtc.h"
+#include "initcall.h"
 
 static uint32_t last_calibration = rtc_rate_to_freq(RTC_HW_RATE);
 static uint32_t rtc_counter = 0;

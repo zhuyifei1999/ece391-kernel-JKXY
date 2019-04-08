@@ -4,7 +4,7 @@
 
 #include "multiboot.h"
 #include "x86_desc.h"
-#include "lib/stdio.h"
+#include "printk.h"
 #include "lib/cli.h"
 #include "initcall.h"
 #include "panic.h"
@@ -31,33 +31,33 @@ void entry(unsigned long magic, unsigned long addr) {
     mbi = (struct multiboot_info *) addr;
 
     /* Print out the flags. */
-    printf("flags = 0x%#x\n", (unsigned)mbi->flags);
+    printk("flags = 0x%#x\n", (unsigned)mbi->flags);
 
     /* Are mem_* valid? */
     if (CHECK_FLAG(mbi->flags, 0))
-        printf("mem_lower = %uKB, mem_upper = %uKB\n", (unsigned)mbi->mem_lower, (unsigned)mbi->mem_upper);
+        printk("mem_lower = %uKB, mem_upper = %uKB\n", (unsigned)mbi->mem_lower, (unsigned)mbi->mem_upper);
 
     /* Is boot_device valid? */
     if (CHECK_FLAG(mbi->flags, 1))
-        printf("boot_device = 0x%#x\n", (unsigned)mbi->boot_device);
+        printk("boot_device = 0x%#x\n", (unsigned)mbi->boot_device);
 
     /* Is the command line passed? */
     if (CHECK_FLAG(mbi->flags, 2))
-        printf("cmdline = %s\n", (char *)mbi->cmdline);
+        printk("cmdline = %s\n", (char *)mbi->cmdline);
 
     if (CHECK_FLAG(mbi->flags, 3)) {
         int mod_count = 0;
         int i;
         struct multiboot_module *mod = (struct multiboot_module *)mbi->mods_addr;
         while (mod_count < mbi->mods_count) {
-            printf("Module %d loaded at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_start);
-            printf("Module %d ends at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_end);
-            printf("First few bytes of module:\n");
+            printk("Module %d loaded at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_start);
+            printk("Module %d ends at address: 0x%#x\n", mod_count, (unsigned int)mod->mod_end);
+            printk("First few bytes of module:\n");
             for (i = 0; i < 16; i++) {
-                printf("0x%x ", *((char *)(mod->mod_start+i)));
+                printk("0x%x ", *((char *)(mod->mod_start+i)));
             }
             load_initrd_addr((void *)mod->mod_start, mod->mod_end - mod->mod_start);
-            printf("\n");
+            printk("\n");
             mod_count++;
             mod++;
         }
@@ -70,7 +70,7 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Is the section header table of ELF valid? */
     if (CHECK_FLAG(mbi->flags, 5)) {
         struct multiboot_elf_section_header_table *elf_sec = &(mbi->elf_sec);
-        printf("elf_sec: num = %u, size = 0x%#x, addr = 0x%#x, shndx = 0x%#x\n",
+        printk("elf_sec: num = %u, size = 0x%#x, addr = 0x%#x, shndx = 0x%#x\n",
                 (unsigned)elf_sec->num, (unsigned)elf_sec->size,
                 (unsigned)elf_sec->addr, (unsigned)elf_sec->shndx);
     }
@@ -78,12 +78,12 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Are mmap_* valid? */
     if (CHECK_FLAG(mbi->flags, 6)) {
         struct multiboot_memory_map *mmap;
-        printf("mmap_addr = 0x%#x, mmap_length = 0x%x\n",
+        printk("mmap_addr = 0x%#x, mmap_length = 0x%x\n",
                 (unsigned)mbi->mmap_addr, (unsigned)mbi->mmap_length);
         for (mmap = (struct multiboot_memory_map *)mbi->mmap_addr;
                 (unsigned long)mmap < mbi->mmap_addr + mbi->mmap_length;
                 mmap = (struct multiboot_memory_map *)((unsigned long)mmap + mmap->size + sizeof (mmap->size)))
-            printf("    size = 0x%x, base_addr = 0x%#x%#x\n    type = 0x%x,  length    = 0x%#x%#x\n",
+            printk("    size = 0x%x, base_addr = 0x%#x%#x\n    type = 0x%x,  length    = 0x%#x%#x\n",
                     (unsigned)mmap->size,
                     (unsigned)mmap->base_addr_high,
                     (unsigned)mmap->base_addr_low,
@@ -137,7 +137,7 @@ void entry(unsigned long magic, unsigned long addr) {
     DO_INITCALL(early);
 
     /* Enable interrupts */
-    printf("Enabling Interrupts\n");
+    printk("Enabling Interrupts\n");
     sti();
 
     init_page(mbi);

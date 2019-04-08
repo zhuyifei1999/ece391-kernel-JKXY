@@ -2,7 +2,6 @@
 #include "../irq.h"
 #include "../char/tty.h"
 #include "../vfs/device.h"
-#include "../lib/stdio.h"
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
 #include "../lib/cli.h"

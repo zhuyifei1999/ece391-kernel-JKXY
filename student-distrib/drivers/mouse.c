@@ -1,6 +1,5 @@
 #include "ps2.h"
 #include "../irq.h"
-#include "../lib/stdio.h"
 #include "../lib/stdbool.h"
 #include "../lib/cli.h"
 #include "../lib/io.h"

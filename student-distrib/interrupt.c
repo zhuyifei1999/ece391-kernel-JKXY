@@ -1,5 +1,5 @@
-#include "lib/stdio.h"
 #include "interrupt.h"
+#include "printk.h"
 #include "x86_desc.h"
 #include "initcall.h"
 #include "task/sched.h"
@@ -11,7 +11,7 @@ void do_interrupt(struct intr_info *info) {
     if (action.handler) {
         (*action.handler)(info);
     } else {
-        printf("[Unhandled interrupt] number = 0x%x, code = 0x%x\n",
+        printk("[Unhandled interrupt] number = 0x%x, code = 0x%x\n",
                info->intr_num, info->error_code);
     }
 }
