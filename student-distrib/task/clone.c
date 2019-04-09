@@ -5,6 +5,7 @@
 #include "../panic.h"
 #include "../x86_desc.h"
 #include "../signal.h"
+#include "../initcall.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -44,26 +45,40 @@ static uint16_t next_pid() {
 }
 
 /*
- *   clone_child
- *   DESCRIPTION: clone a child task from the parent
- *   INPUTS: uint32_t flags, int (*fn)(void *args), void *args, int *tidptr
- *   SIDE EFFECTS: none
+ *   clone_entry_handler
+ *   DESCRIPTION: child entry point
  */
-asmlinkage noreturn void clone_child(uint32_t flags, int (*fn)(void *args), void *args, int *tidptr) {
+static void clone_entry_handler(struct intr_info *info) {
+    uint32_t flags = info->eax;
+    int (*fn)(void *args) = (void *)info->ebx;
+    void *args = (void *)info->ecx;
+    int *tidptr = (void *)info->edx;
+
     if (flags & CLONE_PARENT_SETTID)
         *tidptr = current->pid;
 
+    current->entry_regs = info;
+
     if (fn) {
-        // kernel thread
-        do_exit((*fn)(args));
+        int exitcode = (*fn)(args);
+        if (exitcode || current->entry_regs->cs == KERNEL_CS)
+            do_exit(exitcode);
     } else {
-        // userspace clone
-        // copy infr_info into our stack and free the original
-        struct intr_info regs = *(struct intr_info *)args;
+        *info = *(struct intr_info *)args;
         kfree(args);
-        set_all_regs(&regs);
     }
+
+    if (current->entry_regs->cs == KERNEL_CS)
+        BUG();
+
+    // return to userspace
 }
+
+static void init_clone_entry() {
+    intr_setaction(INTR_ENTRY, (struct intr_action){
+        .handler = &clone_entry_handler } );
+}
+DEFINE_INITCALL(init_clone_entry, early);
 
 /*
  *   do_clone

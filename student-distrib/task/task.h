@@ -50,7 +50,8 @@ struct task_struct {
     struct file *cwd;
     struct file *exe;
     struct tty *tty;
-    struct intr_info *return_regs;
+    struct intr_info *entry_regs;  // for kernel execve
+    struct intr_info *return_regs; // for scheduler
     enum task_state state;
     enum subsystem subsystem;
     int exitcode;

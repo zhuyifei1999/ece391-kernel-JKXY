@@ -63,15 +63,7 @@ void cond_schedule(void) {
 }
 
 void rtc_schedule(struct intr_info *info) {
-    if (++schedule_rtc_counter < SCHEDULE_TICK)
-        return; // Let's schedule every 16 ticks
-    if (info->cs == KERNEL_CS)
-        return; // In kernel mode. Don't prempt.
-    if (list_isempty(&schedule_queue))
-        return;
-
-    list_insert_back(&schedule_queue, current);
-    _switch_to(list_pop_front(&schedule_queue), info);
+    schedule_rtc_counter++;
 }
 
 void wake_up_process(struct task_struct *task) {

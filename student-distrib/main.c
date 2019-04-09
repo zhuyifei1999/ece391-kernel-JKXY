@@ -56,8 +56,11 @@ static int run_init_process(void *args) {
         }
     }
 
-    int32_t res = do_execve_heapify(argv[0], argv, envp);
-    panic("Could not execute init: %d\n", res);
+    int32_t res = do_execve(argv[0], argv, envp);
+    if (res)
+        panic("Could not execute init: %d\n", res);
+
+    return res;
 }
 
 static int kernel_dummy_init(void *args) {

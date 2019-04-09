@@ -46,7 +46,7 @@ ISR_common:
 .cfi_offset esi, -52
 .cfi_offset edi, -56
 // and now figure out the real esp and ss
-    cmpl    $KERNEL_CS,20(%ebp)
+    cmpw    $KERNEL_CS,20(%ebp)
     je      1f
 // interrupt from userspace
     pushl   32(%ebp)
@@ -65,6 +65,13 @@ ISR_common:
     call    do_interrupt
     addl    $4,%esp
 ENTRY(ISR_return):
+    cmpw    $KERNEL_CS,76(%esp)
+    je      3f
+    pushl   %esp
+    cld
+    call    return_to_userspace
+    addl    $4,%esp
+3:
     addl    $8,%esp
     popal
     popl    %ds

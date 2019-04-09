@@ -28,8 +28,6 @@ static void syscall_handler(struct intr_info *info) {
     // Evil ece391 subsystem shim
     if ((int32_t)info->eax < 0)
         info->eax = -1;
-
-    cond_schedule();
 }
 
 /*

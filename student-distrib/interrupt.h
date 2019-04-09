@@ -3,39 +3,6 @@
 #ifndef _INTERRUPT_H
 #define _INTERRUPT_H
 
-#ifndef ASM
-
-#include "lib/stdint.h"
-#include "x86_desc.h"
-#include "compiler.h"
-
-struct intr_info {
-    uint32_t esp_cfi;
-    uint16_t ss_cfi __attribute__ ((aligned (4)));
-    uint32_t edi;
-    uint32_t esi;
-    uint32_t intr_ebp;
-    uint32_t intr_esp;
-    uint32_t ebx;
-    uint32_t edx;
-    uint32_t ecx;
-    uint32_t eax;
-    uint16_t ds __attribute__ ((aligned (4)));
-    uint16_t es __attribute__ ((aligned (4)));
-    uint16_t fs __attribute__ ((aligned (4)));
-    uint16_t gs __attribute__ ((aligned (4)));
-    uint32_t ebp;
-    uint32_t eip_copy;
-    uint32_t intr_num;
-    uint32_t error_code;
-    uint32_t eip;
-    uint16_t cs __attribute__ ((aligned (4)));
-    uint32_t eflags;
-    // ss:esp is only saved on TSS / CS changes
-    uint32_t esp;
-    uint16_t ss __attribute__ ((aligned (4)));
-};
-
 // list source: https://wiki.osdev.org/Exceptions
 #define INTR_EXC_DIVIDE_BY_ZERO_ERROR          0x00
 #define INTR_EXC_DEBUG                         0x01
@@ -80,7 +47,41 @@ struct intr_info {
 
 #define INTR_SYSCALL 0x80
 #define INTR_SCHED   0x81
-#define INTR_DUMP    0x82
+#define INTR_ENTRY   0x82
+#define INTR_DUMP    0x83
+
+#ifndef ASM
+
+#include "lib/stdint.h"
+#include "x86_desc.h"
+#include "compiler.h"
+
+struct intr_info {
+    uint32_t esp_cfi;
+    uint16_t ss_cfi __attribute__ ((aligned (4)));
+    uint32_t edi;
+    uint32_t esi;
+    uint32_t intr_ebp;
+    uint32_t intr_esp;
+    uint32_t ebx;
+    uint32_t edx;
+    uint32_t ecx;
+    uint32_t eax;
+    uint16_t ds __attribute__ ((aligned (4)));
+    uint16_t es __attribute__ ((aligned (4)));
+    uint16_t fs __attribute__ ((aligned (4)));
+    uint16_t gs __attribute__ ((aligned (4)));
+    uint32_t ebp;
+    uint32_t eip_copy;
+    uint32_t intr_num;
+    uint32_t error_code;
+    uint32_t eip;
+    uint16_t cs __attribute__ ((aligned (4)));
+    uint32_t eflags;
+    // ss:esp is only saved on TSS / CS changes
+    uint32_t esp;
+    uint16_t ss __attribute__ ((aligned (4)));
+};
 
 typedef void intr_handler_t(struct intr_info *info);
 

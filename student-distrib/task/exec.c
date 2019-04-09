@@ -62,7 +62,7 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     filp_seek(exe, 0, SEEK_SET);
     // TODO: start of point of no return. If anything fails here deliver SIGSEGV
 
-    struct intr_info regs = {
+    *current->entry_regs = (struct intr_info){
         .eflags = EFLAGS_BASE | IF,
         .cs = USER_CS,
         .ds = USER_DS,
@@ -142,8 +142,8 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         // with stack bottom at the end of the page
         request_pages((void *)ECE391_PAGEADDR, 1, GFP_USER | GFP_LARGE);
         filp_read(exe, (void *)(ECE391_PAGEADDR + ECE391_MAPADDR), LEN_4M - ECE391_MAPADDR);
-        regs.eip = *(uint32_t *)(ECE391_PAGEADDR + ECE391_MAPADDR + 24);
-        regs.esp = ECE391_PAGEADDR + LEN_4M;
+        current->entry_regs->eip = *(uint32_t *)(ECE391_PAGEADDR + ECE391_MAPADDR + 24);
+        current->entry_regs->esp = ECE391_PAGEADDR + LEN_4M;
         // copy the argv to ECE391_PAGEADDR 0x08000000
         if (argv && argv[0] && argv[1])
             strncpy((char *)ECE391_ARGSADDR, argv[1], ECE391_MAPADDR);
@@ -154,66 +154,8 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     }
 
 err_close:
-    kfree(filename);
-
-    // free argv
-    uint32_t i;
-    if (argv) {
-        for (i = 0; argv[i]; i++)
-            kfree(argv[i]);
-        kfree(argv);
-    }
-
-    // free envp
-    if (envp) {
-        for (i = 0; envp[i]; i++)
-            kfree(envp[i]);
-        kfree(envp);
-    }
-
-    // errored
-    if (ret) {
+    if (ret)
         filp_close(exe);
-        return ret;
-    }
 
-    set_all_regs(&regs);
-}
-
-// TODO: ENOMEM
-/*
- *   do_execve_heapify
- *   DESCRIPTION: do the execution and store mempry in heap
- *   instead of stack
- *   INPUTS: char *filename, char *argv[], char *envp[]
- *   RETURN VALUE: int32_t error code
- */
-int32_t do_execve_heapify(char *filename, char *argv[], char *envp[]) {
-    // do_execve expect all args to be on heap so it can free it. if it's not, use this instead.
-    char *filename_h = strdup(filename);
-
-    char **argv_h = NULL;
-    char **envp_h = NULL;
-
-    // if argv is valid
-    if (argv) {
-        uint32_t length;
-        for (length = 0; argv[length]; length++);
-        argv_h = kcalloc(length + 1, sizeof(*argv));
-        // copy the argv to heap malloc space in kernel
-        for (length = 0; argv[length]; length++)
-            argv_h[length] = strdup(argv[length]);
-    }
-
-    // if enviroment pointer is valid
-    if (envp) {
-        uint32_t length;
-        for (length = 0; envp[length]; length++);
-        envp_h = kcalloc(length + 1, sizeof(*envp));
-        // copy the envp to heap malloc space in kernel
-        for (length = 0; envp[length]; length++)
-            envp_h[length] = strdup(envp[length]);
-    }
-
-    return do_execve(filename_h, argv_h, envp_h);
+    return ret;
 }

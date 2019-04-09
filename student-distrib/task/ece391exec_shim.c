@@ -27,9 +27,17 @@ static int ece391execute_child(void *args) {
         argv[1] = strdup(space + 1);
     } else
         argv[0] = strdup(cmd_full);
-    // free cmd_full
+
     kfree(cmd_full);
-    return do_execve(strdup(argv[0]), argv, NULL);
+
+    int32_t res = do_execve(strdup(argv[0]), argv, NULL);
+
+    kfree(argv[0]);
+    if (argv[1])
+        kfree(argv[1]);
+    kfree(argv);
+
+    return res;
 }
 
 DEFINE_SYSCALL1(ECE391, execute, char *, command) {

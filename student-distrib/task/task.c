@@ -26,6 +26,11 @@ struct task_struct *get_task_from_pid(uint16_t pid) {
     return ERR_PTR(-ESRCH);
 }
 
+asmlinkage
+void return_to_userspace(struct intr_info *info) {
+    cond_schedule();
+}
+
 noreturn
 void do_exit(int exitcode) {
     current->exitcode = exitcode;
