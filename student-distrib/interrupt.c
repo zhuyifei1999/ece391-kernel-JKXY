@@ -1,7 +1,7 @@
 #include "interrupt.h"
 #include "printk.h"
 #include "x86_desc.h"
-#include "lib/cli.h
+#include "lib/cli.h"
 #include "task/sched.h"
 #include "initcall.h"
 #include "tests.h"

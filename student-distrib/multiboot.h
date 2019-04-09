@@ -67,6 +67,8 @@ struct multiboot_memory_map {
     uint32_t type;
 };
 
+void multiboot_info(unsigned long magic, struct multiboot_info *mbi);
+
 #endif /* ASM */
 
 #endif /* _MULTIBOOT_H */
