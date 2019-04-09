@@ -22,45 +22,46 @@ void entry(unsigned long magic, struct multiboot_info *mbi) {
     }
 
     /* Construct an LDT entry in the GDT */
-    {
-        struct seg_desc the_ldt_desc;
-        the_ldt_desc.granularity = 0x0;
-        the_ldt_desc.opsize      = 0x1;
-        the_ldt_desc.reserved    = 0x0;
-        the_ldt_desc.avail       = 0x0;
-        the_ldt_desc.present     = 0x1;
-        the_ldt_desc.dpl         = 0x0;
-        the_ldt_desc.sys         = 0x0;
-        the_ldt_desc.type        = 0x2;
+    ldt_desc_ptr = (struct seg_desc){
+        .granularity = 0x0,
+        .opsize      = 0x1,
+        .reserved    = 0x0,
+        .avail       = 0x0,
+        .present     = 0x1,
+        .dpl         = 0x0,
+        .sys         = 0x0,
+        .type        = 0x2,
 
-        SET_LDT_PARAMS(the_ldt_desc, &ldt, ldt_size);
-        ldt_desc_ptr = the_ldt_desc;
-        lldt(KERNEL_LDT);
-    }
+        .base_31_24 = ((uint32_t)(&ldt) & 0xFF000000) >> 24,
+        .base_23_16 = ((uint32_t)(&ldt) & 0x00FF0000) >> 16,
+        .base_15_00 = (uint32_t)(&ldt) & 0x0000FFFF,
+        .seg_lim_19_16 = ((ldt_size) & 0x000F0000) >> 16,
+        .seg_lim_15_00 = (ldt_size) & 0x0000FFFF,
+    };
+    lldt(KERNEL_LDT);
 
     /* Construct a TSS entry in the GDT */
-    {
-        struct seg_desc the_tss_desc;
-        the_tss_desc.granularity   = 0x0;
-        the_tss_desc.opsize        = 0x0;
-        the_tss_desc.reserved      = 0x0;
-        the_tss_desc.avail         = 0x0;
-        the_tss_desc.seg_lim_19_16 = TSS_SIZE & 0x000F0000;
-        the_tss_desc.present       = 0x1;
-        the_tss_desc.dpl           = 0x0;
-        the_tss_desc.sys           = 0x0;
-        the_tss_desc.type          = 0x9;
-        the_tss_desc.seg_lim_15_00 = TSS_SIZE & 0x0000FFFF;
+    tss_desc_ptr = (struct seg_desc){
+        .granularity   = 0x0,
+        .opsize        = 0x0,
+        .reserved      = 0x0,
+        .avail         = 0x0,
+        .present       = 0x1,
+        .dpl           = 0x0,
+        .sys           = 0x0,
+        .type          = 0x9,
 
-        SET_TSS_PARAMS(the_tss_desc, &tss, tss_size);
+        .base_31_24 = ((uint32_t)(&tss) & 0xFF000000) >> 24,
+        .base_23_16 = ((uint32_t)(&tss) & 0x00FF0000) >> 16,
+        .base_15_00 = (uint32_t)(&tss) & 0x0000FFFF,
+        .seg_lim_19_16 = ((tss_size) & 0x000F0000) >> 16,
+        .seg_lim_15_00 = (tss_size) & 0x0000FFFF,
+    };
 
-        tss_desc_ptr = the_tss_desc;
-
-        tss.ldt_segment_selector = KERNEL_LDT;
-        tss.ss0 = KERNEL_DS;
-        tss.esp0 = 0x800000;
-        ltr(KERNEL_TSS);
-    }
+    tss.ldt_segment_selector = KERNEL_LDT;
+    tss.ss0 = KERNEL_DS;
+    tss.esp0 = 0x800000;
+    ltr(KERNEL_TSS);
 
     /* Do early initialization calls */
     DO_INITCALL(early);
