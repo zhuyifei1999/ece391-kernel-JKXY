@@ -67,6 +67,7 @@ ISR_common:
 ENTRY(ISR_return):
     cmpw    $KERNEL_CS,76(%esp)
     je      3f
+    sti
     pushl   %esp
     cld
     call    return_to_userspace

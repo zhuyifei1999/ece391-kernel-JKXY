@@ -136,11 +136,8 @@ void entry(unsigned long magic, unsigned long addr) {
     /* Do early initialization calls */
     DO_INITCALL(early);
 
-    /* Enable interrupts */
-    printk("Enabling Interrupts\n");
-    sti();
-
     init_page(mbi);
+    sti();
 
     kernel_main();
 }

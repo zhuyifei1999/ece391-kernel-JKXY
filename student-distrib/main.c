@@ -1,5 +1,4 @@
 #include "main.h"
-#include "task/task.h"
 #include "task/sched.h"
 #include "task/kthread.h"
 #include "task/clone.h"

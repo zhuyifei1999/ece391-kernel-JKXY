@@ -1,8 +1,9 @@
 #include "interrupt.h"
 #include "printk.h"
 #include "x86_desc.h"
-#include "initcall.h"
+#include "lib/cli.h
 #include "task/sched.h"
+#include "initcall.h"
 #include "tests.h"
 
 asmlinkage
@@ -14,6 +15,9 @@ void do_interrupt(struct intr_info *info) {
         printk("[Unhandled interrupt] number = 0x%x, code = 0x%x\n",
                info->intr_num, info->error_code);
     }
+
+    sti();
+    // TODO: Do BH.
 }
 
 void intr_setaction(uint8_t intr_num, struct intr_action action) {
