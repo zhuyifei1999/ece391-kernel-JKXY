@@ -1,6 +1,7 @@
 #include "interrupt.h"
 #include "mm/paging.h"
 #include "task/task.h"
+#include "task/exit.h"
 #include "panic.h"
 #include "initcall.h"
 #include "compiler.h"

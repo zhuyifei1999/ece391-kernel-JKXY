@@ -1,4 +1,5 @@
 #include "clone.h"
+#include "exit.h"
 #include "../mm/kmalloc.h"
 #include "../lib/string.h"
 #include "../eflags.h"

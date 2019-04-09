@@ -1,4 +1,5 @@
 #include "sched.h"
+#include "exit.h"
 #include "../x86_desc.h"
 #include "../mm/paging.h"
 #include "../interrupt.h"

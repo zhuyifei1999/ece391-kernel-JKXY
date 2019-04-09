@@ -103,9 +103,4 @@ extern struct list tasks[PID_BUCKETS];
 
 struct task_struct *get_task_from_pid(uint16_t pid);
 
-noreturn void do_exit(int exitcode);
-int do_wait(struct task_struct *task);
-
-void do_free_tasks();
-
 #endif

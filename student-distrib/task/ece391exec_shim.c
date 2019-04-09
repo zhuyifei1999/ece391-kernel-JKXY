@@ -3,6 +3,7 @@
 #include "sched.h"
 #include "clone.h"
 #include "exec.h"
+#include "exit.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
 #include "../syscall.h"
