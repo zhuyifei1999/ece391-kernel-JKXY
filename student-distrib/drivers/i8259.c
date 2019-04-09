@@ -14,9 +14,6 @@ uint8_t slave_mask = 0xff;  /* IRQs 8-15 */
 
 /* Initialize the 8259 PIC */
 void i8259_init(void) {
-    unsigned long flags;
-    cli_and_save(flags);
-
     outb(0xff, MASTER_8259_IMR_PORT);    /* mask all of 8259A-1 */
 
     /*
@@ -53,9 +50,6 @@ void i8259_init(void) {
     // restore original masking
     outb(master_mask, MASTER_8259_IMR_PORT);
     outb(slave_mask, SLAVE_8259_IMR_PORT);
-
-    // restore flags
-    restore_flags(flags);
 }
 DEFINE_INITCALL(i8259_init, early);
 

@@ -96,7 +96,7 @@ static void init_IDT() {
     init_IDT_entry(INTR_ENTRY,   IDT_TYPE_TRAP,      KERNEL_DPL, nocode);
     init_IDT_entry(INTR_DUMP,    IDT_TYPE_INTERRUPT, KERNEL_DPL, nocode);
 
-    lidt(idt_desc_ptr);
+    lidt(idt_desc);
 }
 DEFINE_INITCALL(init_IDT, early);
 

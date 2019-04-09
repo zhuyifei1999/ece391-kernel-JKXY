@@ -31,6 +31,7 @@ static page_directory_t init_page_directory = {
         .user    = 0, // only kernel has access
         .rw      = 1,
         .global  = 1,
+        // .addr    = PAGE_IDX((uint32_t)&zero_page_table),
     },
     [PAGE_DIR_IDX(KLOW_ADDR)] = {
         .present = 1,
