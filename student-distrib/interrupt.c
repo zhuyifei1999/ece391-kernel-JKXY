@@ -3,6 +3,7 @@
 #include "x86_desc.h"
 #include "lib/cli.h"
 #include "task/sched.h"
+#include "eflags.h"
 #include "initcall.h"
 #include "tests.h"
 
@@ -37,7 +38,6 @@ struct intr_action intr_getaction(uint8_t intr_num) {
         .offset_15_00 = addr,                               \
         .offset_31_16 = addr >> 16,                         \
         .seg_selector = KERNEL_CS,                          \
-        .size         = 1, /* 32 bit handler */             \
         .dpl          = _dpl,                               \
         .present      = 1,                                  \
         .type         = _type,                              \
@@ -55,8 +55,14 @@ static void init_IDT() {
     init_IDT_entry(INTR_EXC_BOUND_RANGE_EXCEEDED,          IDT_TYPE_TRAP,      USER_DPL,   nocode);
     init_IDT_entry(INTR_EXC_INVALID_OPCODE,                IDT_TYPE_TRAP,      KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_DEVICE_NOT_AVAILABLE,          IDT_TYPE_TRAP,      KERNEL_DPL, nocode);
-    // TODO: make double fault use a seperate TSS with task gate
-    init_IDT_entry(INTR_EXC_DOUBLE_FAULT,                  IDT_TYPE_INTERRUPT, KERNEL_DPL, hascode);
+
+    idt[INTR_EXC_DOUBLE_FAULT] = (struct idt_desc){
+        .seg_selector = DUBFLT_TSS,
+        .dpl          = KERNEL_DPL,
+        .present      = 1,
+        .type         = IDT_TYPE_TASK,
+    };
+
     init_IDT_entry(INTR_EXC_COPROCESSOR_SEGMENT_OVERRUN,   IDT_TYPE_TRAP,      KERNEL_DPL, nocode);
     init_IDT_entry(INTR_EXC_INVALID_TSS,                   IDT_TYPE_TRAP,      KERNEL_DPL, hascode);
     init_IDT_entry(INTR_EXC_SEGMENT_NOT_PRESENT,           IDT_TYPE_TRAP,      KERNEL_DPL, hascode);
@@ -100,6 +106,50 @@ static void init_IDT() {
 }
 DEFINE_INITCALL(init_IDT, early);
 
+static noreturn void double_fault_entry(uint32_t error_code) {
+    unsigned long flags;
+    cli_and_save(flags);
+
+    struct intr_info info = {
+        .intr_num   = INTR_EXC_DOUBLE_FAULT,
+        .error_code = error_code,
+
+        .eip        = tss.eip,
+        .eflags     = tss.eflags,
+        .eax        = tss.eax,
+        .ebx        = tss.ebx,
+        .ecx        = tss.ecx,
+        .edx        = tss.edx,
+        .esp_cfi    = tss.esp,
+        .ebp        = tss.ebp,
+        .esi        = tss.esi,
+        .edi        = tss.edi,
+        .es         = tss.es,
+        .cs         = tss.cs,
+        .ss_cfi     = tss.ss,
+        .ds         = tss.ds,
+        .fs         = tss.fs,
+        .gs         = tss.gs,
+    };
+    do_interrupt(&info);
+    // The CR3 does not seem to be saved. If we are going to return to userspace
+    // then too bad it will be killed.
+    // Software task switch is used because we don't want to save our state.
+
+    // Reset the task busy-ness. busy type = 0xb
+    gdt[KERNEL_TSS_IDX].type = 0x9;
+    gdt[DUBFLT_TSS_IDX].type = 0x9;
+
+    ltr(KERNEL_TSS);
+    flags &= ~NT;
+    restore_flags(flags);
+    set_all_regs(&info);
+}
+static void init_isr_double_fault() {
+    dubflt_tss.eip = (uint32_t)double_fault_entry;
+    dubflt_tss.cs = KERNEL_CS;
+}
+DEFINE_INITCALL(init_isr_double_fault, early);
 
 #if RUN_TESTS
 /* IDT Entry Test
@@ -111,7 +161,7 @@ __testfunc
 static void idt_entry_test() {
     int i;
     for (i = 0; i < 10; ++i){
-        TEST_ASSERT(idt[i].offset_15_00 || idt[i].offset_31_16);
+        TEST_ASSERT(idt[i].present);
     }
 }
 DEFINE_TEST(idt_entry_test);
@@ -148,4 +198,22 @@ static void idt_uninitialized_GP() {
     }));
 }
 DEFINE_TEST(idt_uninitialized_GP);
+
+/* No handler #GP test
+ *
+ * Asserts uninitialized IDT entries cause a #GP and we can register a handler
+ * Coverage: #GP handler can be registered, IDT for 0xFF is not initialized
+ */
+__testfunc
+static void idt_DF() {
+    TEST_ASSERT_INTR(INTR_EXC_DOUBLE_FAULT, ({
+        asm volatile ("mov $0,%esp; mov (%esp),%esp");
+    }));
+    TEST_ASSERT_INTR(INTR_EXC_DOUBLE_FAULT, ({
+        asm volatile ("mov $0,%esp; mov (%esp),%esp");
+    }));
+    // Recover twice. If not recovered, should panic
+    // asm volatile ("mov $0,%esp; mov (%esp),%esp");
+}
+DEFINE_TEST(idt_DF);
 #endif

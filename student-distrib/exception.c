@@ -46,6 +46,7 @@ STUB_EXC_HANDLER("#DE", divide_by_zero,                INTR_EXC_DIVIDE_BY_ZERO_E
 STUB_EXC_HANDLER("#BR", bound_range_exceeded,          INTR_EXC_BOUND_RANGE_EXCEEDED);
 STUB_EXC_HANDLER("#UD", invalid_opcode,                INTR_EXC_INVALID_OPCODE);
 STUB_EXC_HANDLER("#NM", device_not_available,          INTR_EXC_DEVICE_NOT_AVAILABLE);
+STUB_EXC_HANDLER("#DF", double_fault,                  INTR_EXC_DOUBLE_FAULT);
 STUB_EXC_HANDLER("#TS", invalid_tss,                   INTR_EXC_INVALID_TSS);
 STUB_EXC_HANDLER("#NP", segment_not_present,           INTR_EXC_SEGMENT_NOT_PRESENT);
 STUB_EXC_HANDLER("#SS", stack_segment,                 INTR_EXC_STACK_SEGMENT_FAULT);

@@ -137,6 +137,9 @@ struct page_table_entry {        // contains of page table, 32 bits long
 typedef struct page_directory_entry page_directory_t[NUM_ENTRIES];
 typedef struct page_table_entry page_table_t[NUM_ENTRIES];
 
+page_table_t zero_page_table;
+page_directory_t init_page_directory;
+
 void init_page();
 
 page_directory_t *current_page_directory();

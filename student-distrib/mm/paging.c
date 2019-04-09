@@ -12,7 +12,7 @@
  *  set that page
  */
 __attribute__((aligned(PAGE_SIZE_SMALL)))
-static page_table_t zero_page_table = {
+page_table_t zero_page_table = {
     [PAGE_TABLE_IDX(VIDEO_ADDR)] = {
         .present = 1,
         .rw      = 1,                    // can be read and write
@@ -25,7 +25,7 @@ static page_table_t zero_page_table = {
  *  set the page table information for video memory and kernel memory
  */
 __attribute__((aligned(PAGE_SIZE_SMALL)))
-static page_directory_t init_page_directory = {
+page_directory_t init_page_directory = {
     [PAGE_DIR_IDX(VIDEO_ADDR)] = {
         .present = 1,
         .user    = 0, // only kernel has access

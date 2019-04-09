@@ -18,6 +18,8 @@
 #define USER_DS_IDX     5
 #define KERNEL_TSS_IDX  6
 #define KERNEL_LDT_IDX  7
+#define DUBFLT_TSS_IDX  8
+
 
 #define SELECTOR(IDX, RPL) ((IDX << 3) + RPL)
 
@@ -28,6 +30,8 @@
 #define USER_DS     SELECTOR(USER_DS_IDX, USER_DPL)
 #define KERNEL_TSS  SELECTOR(KERNEL_TSS_IDX, KERNEL_DPL)
 #define KERNEL_LDT  SELECTOR(KERNEL_LDT_IDX, KERNEL_DPL)
+#define DUBFLT_TSS  SELECTOR(DUBFLT_TSS_IDX, KERNEL_DPL)
+
 
 /* Number of vectors in the interrupt descriptor table (IDT) */
 #define NUM_VEC     256
@@ -118,24 +122,20 @@ struct tss {
 /* Some external descriptors declared in .S files */
 extern struct x86_desc gdt_desc;
 
-// extern uint16_t ldt_desc;
-extern uint32_t ldt_size;
-extern struct seg_desc *ldt_seg;
-extern struct x86_desc gdt_desc;
+extern struct seg_desc gdt[];
+
 extern struct seg_desc ldt[];
 
-extern uint32_t tss_size;
-extern struct seg_desc *tss_seg;
 extern struct tss tss;
+extern struct tss dubflt_tss;
 
 /* An interrupt descriptor entry (goes into the IDT) */
 struct idt_desc {
     uint16_t offset_15_00;
     uint16_t seg_selector;
-    uint8_t  reserved1;
-    uint32_t type      : 3;
-    uint32_t size      : 1;
-    uint32_t reserved0 : 1;
+    uint8_t  reserved;
+    uint32_t type      : 4;
+    uint32_t stor_seg  : 1;
     uint32_t dpl       : 2;
     uint32_t present   : 1;
     uint16_t offset_31_16;
@@ -146,8 +146,9 @@ extern struct idt_desc idt[NUM_VEC];
 /* The descriptor used to load the IDTR */
 extern struct x86_desc idt_desc;
 
-#define IDT_TYPE_INTERRUPT 6
-#define IDT_TYPE_TRAP 7
+#define IDT_TYPE_TASK      5
+#define IDT_TYPE_INTERRUPT 14
+#define IDT_TYPE_TRAP      15
 
 /* Load task register.  This macro takes a 16-bit index into the GDT,
  * which points to the TSS entry.  x86 then reads the GDT's TSS
