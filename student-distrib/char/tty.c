@@ -22,6 +22,7 @@
 
 // We are gonna support (practically) infinite TTYs, because why not?
 static struct list ttys;
+LIST_STATIC_INIT(ttys);
 
 struct tty early_console = {
     .video_mem = (char *)VIDEO,
@@ -370,7 +371,6 @@ void exit_vidmap_cb() {
 }
 
 static void init_tty_char() {
-    list_init(&ttys);
     register_dev(S_IFCHR, MKDEV(TTY_MAJOR, MINORMASK), &tty_dev_op);
     register_dev(S_IFCHR, TTY_CURRENT, &tty_dev_op);
     register_dev(S_IFCHR, TTY_CONSOLE, &tty_dev_op);

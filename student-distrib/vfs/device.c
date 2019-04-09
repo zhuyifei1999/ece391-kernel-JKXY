@@ -1,9 +1,9 @@
 #include "device.h"
 #include "../errno.h"
-#include "../initcall.h"
 #include "../mm/kmalloc.h"
 
 struct list dev_registry;
+LIST_STATIC_INIT(dev_registry);
 
 int32_t register_dev(uint32_t type, uint32_t dev, struct file_operations *file_op) {
     fill_default_file_op(file_op);
@@ -38,8 +38,3 @@ struct file_operations *get_dev_file_op(uint32_t type, uint32_t dev) {
     }
     return NULL;
 }
-
-static void init_device_reg() {
-    list_init(&dev_registry);
-}
-DEFINE_INITCALL(init_device_reg, early);

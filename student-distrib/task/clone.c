@@ -176,7 +176,7 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
     task->return_regs = regs;
 
     // so we know this PID is used
-    list_insert_back(&tasks[task->pid & (PID_BUCKETS - 1)], task);
+    list_insert_back(&tasks, task);
 
     return task;
 }

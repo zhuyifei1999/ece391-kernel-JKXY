@@ -5,9 +5,9 @@
 #include "../panic.h"
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
-#include "../initcall.h"
 
 static struct list free_tasks;
+LIST_STATIC_INIT(free_tasks);
 
 noreturn
 void do_exit(int exitcode) {
@@ -78,8 +78,7 @@ int do_wait(struct task_struct *task) {
 
     task->state = TASK_DEAD;
 
-    uint16_t pid = task->pid;
-    list_remove(&tasks[pid & (PID_BUCKETS - 1)], task);
+    list_remove(&tasks, task);
 
     list_insert_back(&free_tasks, task);
 
@@ -92,8 +91,3 @@ void do_free_tasks() {
         free_pages(task, TASK_STACK_PAGES, 0);
     }
 }
-
-static void init_exit() {
-    list_init(&free_tasks);
-}
-DEFINE_INITCALL(init_exit, early);

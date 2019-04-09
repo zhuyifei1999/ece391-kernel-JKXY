@@ -21,6 +21,7 @@ struct rtc_private {
 };
 
 struct list rtc_privates;
+LIST_STATIC_INIT(rtc_privates);
 
 /*
  *   rtc_read
@@ -183,7 +184,6 @@ static void rtc_handler() {
  *   SIDE EFFECTS: none
  */
 static void init_rtc_char() {
-    list_init(&rtc_privates);
     register_rtc_handler(&rtc_handler);
     register_dev(S_IFCHR, RTC_DEV, &rtc_dev_op);
 }

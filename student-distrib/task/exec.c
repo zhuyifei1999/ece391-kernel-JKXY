@@ -48,11 +48,14 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     // Grading criteria. Nothing can be said...
     if (subsystem == SUBSYSTEM_ECE391) {
         uint32_t ece391_cnt = 0;
-        struct task_struct *task;
-        FOR_EACH_TASK(task, ({
+
+        struct list_node *node;
+        list_for_each(&tasks, node) {
+            struct task_struct *task = node->value;
             if (task->mm && task->subsystem == SUBSYSTEM_ECE391 && task != current)
                 ece391_cnt++;
-        }));
+        }
+
         if (ece391_cnt >= 6) {
             ret = -EAGAIN;
             goto err_close;

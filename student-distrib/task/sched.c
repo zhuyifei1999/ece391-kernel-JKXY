@@ -7,6 +7,7 @@
 #include "../panic.h"
 
 struct list schedule_queue;
+LIST_STATIC_INIT(schedule_queue);
 
 static uint32_t schedule_rtc_counter;
 
@@ -79,8 +80,6 @@ void wake_up_process(struct task_struct *task) {
 }
 
 static void init_sched() {
-    list_init(&schedule_queue);
-
     intr_setaction(INTR_SCHED, (struct intr_action){
         .handler = &schedule_handler } );
 }

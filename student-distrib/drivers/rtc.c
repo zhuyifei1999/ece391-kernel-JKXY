@@ -7,6 +7,7 @@
 #include "../initcall.h"
 
 struct list rtc_handlers;
+LIST_STATIC_INIT(rtc_handlers);
 
 // some source from https://wiki.osdev.org/RTC
 
@@ -99,11 +100,6 @@ DEFINE_INITCALL(init_rtc, drivers);
 void register_rtc_handler(void (*handler)(void)) {
     list_insert_back(&rtc_handlers, handler);
 }
-
-static void init_rtc_registry() {
-    list_init(&rtc_handlers);
-}
-DEFINE_INITCALL(init_rtc_registry, early);
 
 uint8_t rtc_get_second() {
     unsigned long flags;

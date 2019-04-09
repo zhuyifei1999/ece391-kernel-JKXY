@@ -4,6 +4,7 @@
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
 #include "../lib/cli.h"
+#include "../initcall.h"
 
 // This doublely linked list uses sentinel nodes for both first node
 // and last node
@@ -63,5 +64,10 @@ void list_remove(struct list *list, void *value);
 
 #define list_remove_on_cond(list, typ, name, cond) \
     list_remove_on_cond_extra(list, typ, name, cond, ({}))
+
+#define LIST_STATIC_INIT(list) static void __init_list_ ## list() { \
+    list_init(&list);                                               \
+}                                                                   \
+DEFINE_INITCALL(__init_list_ ## list, early)
 
 #endif

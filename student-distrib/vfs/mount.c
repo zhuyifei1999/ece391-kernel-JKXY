@@ -3,11 +3,11 @@
 #include "path.h"
 #include "../mm/kmalloc.h"
 #include "../atomic.h"
-#include "../initcall.h"
 #include "../err.h"
 #include "../errno.h"
 
 struct list mounttable;
+LIST_STATIC_INIT(mounttable);
 
 int32_t do_mount(struct file *dev, struct super_block_operations *sb_op, struct path *path) {
     struct super_block *super_block = kmalloc(sizeof(*super_block));
@@ -75,8 +75,3 @@ err_free_sb:
 out:
     return res;
 }
-
-static void init_mount() {
-    list_init(&mounttable);
-}
-DEFINE_INITCALL(init_mount, drivers);

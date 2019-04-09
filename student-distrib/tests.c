@@ -19,6 +19,7 @@ struct file *_test_output_file;
 static volatile int test_passed, test_failed;
 
 static struct list failed_tests;
+LIST_STATIC_INIT(failed_tests);
 
 static volatile struct intr_info saved_context;
 
@@ -120,10 +121,4 @@ bool launch_tests() {
 
     return test_failed;
 }
-
-static void init_tests() {
-    list_init(&failed_tests);
-}
-DEFINE_INITCALL(init_tests, early);
-
 #endif

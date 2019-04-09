@@ -4,13 +4,13 @@
 #include "../structure/list.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
-#include "../initcall.h"
 #include "../err.h"
 #include "../errno.h"
 
 struct task_struct *kthreadd_task;
 
 static struct list kthread_create_queue;
+LIST_STATIC_INIT(kthread_create_queue);
 
 struct create_entry {
     int (*fn)(void *args);
@@ -66,8 +66,3 @@ out_free:
     kfree(entry);
     return ret;
 }
-
-static void init_kthread() {
-    list_init(&kthread_create_queue);
-}
-DEFINE_INITCALL(init_kthread, early);

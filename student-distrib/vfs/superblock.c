@@ -3,10 +3,10 @@
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
 #include "../atomic.h"
-#include "../initcall.h"
 #include "../errno.h"
 
 struct list sb_op_registry;
+LIST_STATIC_INIT(sb_op_registry);
 
 int32_t default_sb_init(struct super_block *sb, struct file *dev) {
     // sb->op set by caller
@@ -58,8 +58,3 @@ struct super_block_operations *get_sb_op_by_name(char *name) {
     }
     return NULL;
 }
-
-static void init_superblock() {
-    list_init(&sb_op_registry);
-}
-DEFINE_INITCALL(init_superblock, early);
