@@ -165,7 +165,7 @@ page_directory_t *clone_directory(page_directory_t *src);
 
 page_directory_t *new_directory();
 
-bool clone_cow(void *addr);
+bool clone_cow(const void *addr);
 
 void free_directory(page_directory_t *dir);
 

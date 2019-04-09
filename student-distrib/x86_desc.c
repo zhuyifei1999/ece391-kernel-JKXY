@@ -1,5 +1,4 @@
 #include "x86_desc.h"
-#include "lib/stdint.h"
 #include "initcall.h"
 
 // Segmentation will not be used

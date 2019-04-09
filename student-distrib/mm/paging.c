@@ -178,7 +178,7 @@ void init_page(struct multiboot_info __physaddr *mbi) {
     restore_flags(flags); // restore interrupts
 }
 
-static int16_t *get_phys_dir_entry(void __physaddr *addr, uint32_t gfp_flags) {
+static int16_t *get_phys_dir_entry(const void __physaddr *addr, uint32_t gfp_flags) {
     uint32_t idx = (uint32_t)addr / page_size(gfp_flags);
     return &phys_dir[idx];
 }
@@ -288,7 +288,7 @@ static page_table_t *mk_user_table(struct page_directory_entry *dir_entry) {
     return table;
 }
 
-static inline __always_inline void invlpg(void *addr) {
+static inline __always_inline void invlpg(const void *addr) {
     asm volatile ("invlpg %0" : : "m"(*(char *)addr));
 }
 
@@ -658,8 +658,7 @@ page_directory_t *new_directory() {
     return clone_directory(&init_page_directory);
 }
 
-bool clone_cow(void *addr) {
-    page_directory_t *directory = current_page_directory();
+static bool _clone_cow(page_directory_t *directory, const void *addr) {
     struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)addr)];
     if (!dir_entry->present || !dir_entry->user)
         return false;
@@ -684,7 +683,7 @@ bool clone_cow(void *addr) {
 
             dir_entry->addr = PAGE_IDX((uint32_t)physaddr);
             invlpg(addr);
-            memcpy(addr, tempmem, PAGE_SIZE_LARGE);
+            memcpy((void *)addr, tempmem, PAGE_SIZE_LARGE);
 
             free_phys_mem(old_physaddr, GFP_USER | GFP_LARGE);
             free_pages(tempmem, 1, GFP_USER | GFP_LARGE);
@@ -714,7 +713,7 @@ bool clone_cow(void *addr) {
 
             table_entry->addr = PAGE_IDX((uint32_t)physaddr);
             invlpg(addr);
-            memcpy(addr, tempmem, PAGE_SIZE_SMALL);
+            memcpy((void *)addr, tempmem, PAGE_SIZE_SMALL);
 
             free_phys_mem(old_physaddr, GFP_USER);
             free_pages(tempmem, 1, GFP_USER);
@@ -722,6 +721,9 @@ bool clone_cow(void *addr) {
     }
 
     return true;
+}
+bool clone_cow(const void *addr) {
+    return _clone_cow(current_page_directory(), addr);
 }
 
 void free_directory(page_directory_t *dir) {
@@ -777,7 +779,7 @@ static bool addr_is_safe(page_directory_t *directory, const void *addr, bool wri
         if (!table_entry->present)
             return false;
         if (write && !dir_entry->rw)
-            return false;
+            return _clone_cow(directory, addr);
     }
     return true;
 }
