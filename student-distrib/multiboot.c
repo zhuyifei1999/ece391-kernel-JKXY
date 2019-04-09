@@ -7,7 +7,7 @@
 
 /* Check if MAGIC is valid and print the Multiboot information structure
    pointed by ADDR. */
-void multiboot_info(unsigned long magic, struct multiboot_info *mbi) {
+void multiboot_info(unsigned long magic, struct multiboot_info *mbi_in) {
     /* Am I booted by a Multiboot-compliant boot loader? */
     if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
         panic("Invalid magic number: %#lx\n", magic);
@@ -73,4 +73,6 @@ void multiboot_info(unsigned long magic, struct multiboot_info *mbi) {
                     mmap->length_high,
                     mmap->length_low);
     }
+
+    mbi = mbi_in;
 }

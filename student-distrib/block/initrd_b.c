@@ -1,9 +1,15 @@
-#include "initrd_b.h"
+#include "../lib/stdint.h"
 #include "../lib/string.h"
 #include "../vfs/file.h"
 #include "../vfs/device.h"
+#include "../multiboot.h"
 #include "../errno.h"
 #include "../initcall.h"
+
+// Initrd is a the first multiboot module. Its address should be in Kernel Low.
+// Other multiboot modules are ignored. (TODO: support them?!)
+
+#define INITRD_DEV_MAJOR 1
 
 struct initrd_entry {
     char *start_addr;
@@ -68,11 +74,14 @@ static struct file_operations initrd_dev_op = {
     .seek = &initrd_seek,
 };
 
-
-void load_initrd_addr(char *start_addr, uint32_t size) {
-    our_only_initrd_entry.start_addr = start_addr;
-    our_only_initrd_entry.size = size;
+static void load_initrd_addr() {
+    if (mbi->flags & (1 << 3) && mbi->mods_count) {
+        struct multiboot_module *mod = (struct multiboot_module *)mbi->mods_addr;
+        our_only_initrd_entry.start_addr = (void *)mod->mod_start;
+        our_only_initrd_entry.size = mod->mod_end - mod->mod_start;
+    }
 }
+DEFINE_INITCALL(load_initrd_addr, early);
 
 static void init_initrd_block() {
     register_dev(S_IFBLK, MKDEV(INITRD_DEV_MAJOR, 0), &initrd_dev_op);
