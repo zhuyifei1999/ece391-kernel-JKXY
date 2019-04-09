@@ -129,9 +129,9 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
 
     // check if the content and pointer of argv are valid
     if (argv && argv[0] && *argv[0])
-        strncpy(current->comm, argv[0], sizeof(current->comm) - 1);
+        set_current_comm(argv[0]);
     else
-        strncpy(current->comm, list_peek_back(&exe->path->components), sizeof(current->comm) - 1);
+        set_current_comm(list_peek_back(&exe->path->components));
 
     switch_directory(new_pagedir);
 

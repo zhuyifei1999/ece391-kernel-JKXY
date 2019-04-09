@@ -1,4 +1,5 @@
 #include "main.h"
+#include "task/task.h"
 #include "task/sched.h"
 #include "task/kthread.h"
 #include "task/clone.h"
@@ -24,7 +25,7 @@ struct task_struct *init_task;
 
 #if RUN_TESTS
 static int kselftest(void *args) {
-    strcpy(current->comm, "kselftest");
+    set_current_comm("kselftest");
     if (!launch_tests())
         tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
     return 0;
@@ -67,7 +68,7 @@ static int kernel_dummy_init(void *args) {
     // The purpose of this dummy PID 1 is to fork off all the shells on different TTYs,
     // because the ECE391 subsystem is too bad and can't self-govern.
 
-    strcpy(current->comm, "kernel_init");
+    set_current_comm("kernel_init");
 
 #if !RUN_TESTS
     tty_switch_foreground(MKDEV(TTY_MAJOR, 1));

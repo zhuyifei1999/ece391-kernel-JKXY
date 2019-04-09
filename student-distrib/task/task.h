@@ -2,6 +2,7 @@
 #define _TASK_H
 
 #include "../lib/stdint.h"
+#include "../lib/string.h"
 #include "../mm/paging.h"
 #include "../compiler.h"
 #include "../interrupt.h"
@@ -89,5 +90,9 @@ void set_all_regs(struct intr_info *regs) {
 extern struct list tasks;
 
 struct task_struct *get_task_from_pid(uint16_t pid);
+
+static inline void set_current_comm(char *newcomm) {
+    strncpy(current->comm, newcomm, sizeof(current->comm) - 1);
+}
 
 #endif

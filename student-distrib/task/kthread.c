@@ -21,7 +21,7 @@ struct create_entry {
 
 int kthreadd(void *args) {
     kthreadd_task = current;
-    strcpy(kthreadd_task->comm, "kthreadd");
+    set_current_comm("kthreadd");
 
     while (1) {
         current->state = TASK_INTERRUPTIBLE;
