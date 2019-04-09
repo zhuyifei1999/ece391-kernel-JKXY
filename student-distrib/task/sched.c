@@ -56,8 +56,14 @@ void schedule(void) {
     do_free_tasks();
 }
 
+void cond_schedule(void) {
+    if (schedule_rtc_counter < SCHEDULE_TICK)
+        return;
+    schedule();
+}
+
 void rtc_schedule(struct intr_info *info) {
-    if (++schedule_rtc_counter < 8)
+    if (++schedule_rtc_counter < SCHEDULE_TICK)
         return; // Let's schedule every 16 ticks
     if (info->cs == KERNEL_CS)
         return; // In kernel mode. Don't prempt.
