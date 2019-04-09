@@ -70,8 +70,7 @@ static void mouse_handler(struct intr_info *info){
  *   init_mouse
  *   DESCRIPTION: initialize the mouse driver
  */
-__attribute__((unused)) // TODO: Migrate to TTY
 static void init_mouse() {
     set_irq_handler(MOUSE_IRQ, &mouse_handler);
 }
-// DEFINE_INITCALL(init_mouse, drivers);
+DEFINE_INITCALL(init_mouse, drivers);

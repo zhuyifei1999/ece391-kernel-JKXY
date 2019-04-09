@@ -64,6 +64,8 @@ static int kernel_dummy_init(void *args) {
     // The purpose of this dummy PID 1 is to fork off all the shells on different TTYs,
     // because the ECE391 subsystem is too bad and can't self-govern.
 
+    strcpy(current->comm, "kernel_init");
+
 #if !RUN_TESTS
     tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
 #endif

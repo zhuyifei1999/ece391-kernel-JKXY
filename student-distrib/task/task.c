@@ -16,12 +16,13 @@ static struct list free_tasks;
 struct task_struct *get_task_from_pid(uint16_t pid) {
     if (pid > MAXPID)
         return ERR_PTR(-ESRCH);
-    struct list_node *node;
-    list_for_each(&tasks[pid & (PID_BUCKETS - 1)], node) {
-        struct task_struct *task = node->value;
+
+    struct task_struct *task;
+    FOR_EACH_TASK(task, ({
         if (task->pid == pid)
             return task;
-    }
+    }));
+
     return ERR_PTR(-ESRCH);
 }
 
@@ -58,6 +59,9 @@ void do_exit(int exitcode) {
             kfree(current->mm);
         }
     }
+
+    if (!current->ppid)
+        panic("Killing process tree!\n");
 
     struct task_struct *parent = get_task_from_pid(current->ppid);
     // if the parent is kthreadd then just auto reap it.

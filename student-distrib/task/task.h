@@ -89,6 +89,17 @@ void set_all_regs(struct intr_info *regs) {
 
 extern struct list tasks[PID_BUCKETS];
 
+#define FOR_EACH_TASK(task, code) do {                                   \
+    struct list_node *__node;                                            \
+    uint32_t __pid_bucket;                                               \
+    for (__pid_bucket = 0; __pid_bucket < PID_BUCKETS; __pid_bucket++) { \
+        list_for_each(&tasks[__pid_bucket], __node) {                      \
+            task = __node->value;                                          \
+            code;                                                        \
+        }                                                                \
+    }                                                                    \
+} while (0)
+
 struct task_struct *get_task_from_pid(uint16_t pid);
 
 noreturn void do_exit(int exitcode);

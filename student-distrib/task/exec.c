@@ -44,6 +44,21 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     // TODO: determine subsystem
     enum subsystem subsystem = SUBSYSTEM_ECE391;
 
+    // ECE391 subsystem cannot have more than 6 userspace processes
+    // Grading criteria. Nothing can be said...
+    if (subsystem == SUBSYSTEM_ECE391) {
+        uint32_t ece391_cnt = 0;
+        struct task_struct *task;
+        FOR_EACH_TASK(task, ({
+            if (task->mm && task->subsystem == SUBSYSTEM_ECE391 && task != current)
+                ece391_cnt++;
+        }));
+        if (ece391_cnt >= 6) {
+            ret = -EAGAIN;
+            goto err_close;
+        }
+    }
+
     filp_seek(exe, 0, SEEK_SET);
     // TODO: start of point of no return. If anything fails here deliver SIGSEGV
 
