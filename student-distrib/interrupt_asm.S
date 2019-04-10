@@ -344,3 +344,12 @@ MAKE_ISR    0xFB
 MAKE_ISR    0xFC
 MAKE_ISR    0xFD
 MAKE_ISR    0xFE
+
+ENTRY(ISR_TSS_DF):
+    cli
+    cld
+    call    double_fault_entry
+    addl    $4,%esp
+    iret
+    cli
+    jmp     ISR_TSS_DF

@@ -119,8 +119,7 @@ noreturn void kernel_main(void) {
 
 #if RUN_TESTS
     // start the tests in a seperate kthread, and let that start init
-    struct task_struct *kselftest_task = kthread(&kselftest, NULL);
-    wake_up_process(kselftest_task);
+    wake_up_process(kthread(&kselftest, NULL));
 #endif
 
     for (;;) {

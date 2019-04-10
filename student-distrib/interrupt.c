@@ -3,6 +3,7 @@
 #include "x86_desc.h"
 #include "lib/cli.h"
 #include "task/sched.h"
+#include "mm/paging.h"
 #include "eflags.h"
 #include "initcall.h"
 #include "tests.h"
@@ -31,7 +32,7 @@ struct intr_action intr_getaction(uint8_t intr_num) {
 
 #define _init_IDT_entry(intr, _type, _dpl, suffix) do {     \
     /* function prototype don't matter here */              \
-    extern void (*ISR_ ## intr ## _ ## suffix)(void);       \
+    extern void ISR_ ## intr ## _ ## suffix(void);          \
     uint32_t addr = (uint32_t)&ISR_ ## intr ## _ ## suffix; \
     struct idt_desc *entry = &idt[intr];                    \
     *entry = (struct idt_desc){                             \
@@ -106,24 +107,11 @@ static void init_IDT() {
 }
 DEFINE_INITCALL(init_IDT, early);
 
-static noreturn void double_fault_entry() {
-    // The CR3 does not seem to be saved. If we are going to return to userspace
-    // then too bad it will be killed.
-    // Software task switch is used because we don't want to save our state.
-    unsigned long flags;
-    cli_and_save(flags);
-    flags &= ~NT & ~IF;
-    restore_flags(flags);
-
-    // Reset the task busy-ness. busy type = 0xb
-    gdt[KERNEL_TSS_IDX].type = 0x9;
-    gdt[DUBFLT_TSS_IDX].type = 0x9;
-
-    ltr(KERNEL_TSS);
-
+asmlinkage
+void double_fault_entry(uint32_t error_code) {
     struct intr_info info = {
         .intr_num   = INTR_EXC_DOUBLE_FAULT,
-        .error_code = (uint32_t)__builtin_return_address(0),
+        .error_code = error_code,
 
         .eip     = tss.eip,
         .eflags  = tss.eflags,
@@ -143,10 +131,31 @@ static noreturn void double_fault_entry() {
         .gs      = tss.gs,
     };
     do_interrupt(&info);
-    set_all_regs(&info);
+
+    tss.eip    = info.eip;
+    tss.eflags = info.eflags;
+    tss.eax    = info.eax;
+    tss.ebx    = info.ebx;
+    tss.ecx    = info.ecx;
+    tss.edx    = info.edx;
+    tss.esp    = info.esp_cfi;
+    tss.ebp    = info.ebp;
+    tss.esi    = info.esi;
+    tss.edi    = info.edi;
+    tss.es     = info.es;
+    tss.cs     = info.cs;
+    tss.ss     = info.ss_cfi;
+    tss.ds     = info.ds;
+    tss.fs     = info.fs;
+    tss.gs     = info.gs;
+
+    // The CR3 does not seem to be saved. If we are going to return to userspace
+    // then too bad it will be killed.
+    tss.cr3 = (uint32_t)&init_page_directory;
 }
 static void init_isr_double_fault() {
-    dubflt_tss.eip = (uint32_t)double_fault_entry;
+    extern void ISR_TSS_DF(void);
+    dubflt_tss.eip = (uint32_t)&ISR_TSS_DF;
     dubflt_tss.cs = KERNEL_CS;
 }
 DEFINE_INITCALL(init_isr_double_fault, early);

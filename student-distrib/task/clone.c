@@ -158,7 +158,7 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
     struct intr_info *regs = (void *)((uint32_t)task +
         TASK_STACK_PAGES * PAGE_SIZE_SMALL - sizeof(struct intr_info));
     // function prototype don't matter here
-    extern void (*entry_task)(void);
+    extern void entry_task(void);
     *regs = (struct intr_info){
         .eax    = (uint32_t)flags,
         .ebx    = (uint32_t)fn,
