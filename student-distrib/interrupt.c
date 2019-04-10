@@ -199,10 +199,10 @@ static void idt_uninitialized_GP() {
 }
 DEFINE_TEST(idt_uninitialized_GP);
 
-/* No handler #GP test
+/* Double fault test
  *
- * Asserts uninitialized IDT entries cause a #GP and we can register a handler
- * Coverage: #GP handler can be registered, IDT for 0xFF is not initialized
+ * Asserts double fault handler can be called and can be used to recover the
+ * system to a usable state.
  */
 __testfunc
 static void idt_DF() {
