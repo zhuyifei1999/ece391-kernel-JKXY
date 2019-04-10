@@ -106,7 +106,7 @@ static void init_IDT() {
 }
 DEFINE_INITCALL(init_IDT, early);
 
-static noreturn void double_fault_entry(uint32_t error_code) {
+static noreturn void double_fault_entry() {
     // The CR3 does not seem to be saved. If we are going to return to userspace
     // then too bad it will be killed.
     // Software task switch is used because we don't want to save our state.
@@ -123,7 +123,7 @@ static noreturn void double_fault_entry(uint32_t error_code) {
 
     struct intr_info info = {
         .intr_num   = INTR_EXC_DOUBLE_FAULT,
-        .error_code = error_code,
+        .error_code = __builtin_return_address(0),
 
         .eip     = tss.eip,
         .eflags  = tss.eflags,
