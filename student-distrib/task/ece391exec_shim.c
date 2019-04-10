@@ -25,7 +25,8 @@ static int ece391execute_child(void *args) {
     char **argv = kcalloc(3, sizeof(*argv));
     if (space) {
         argv[0] = strndup(cmd_full, space - cmd_full);
-        argv[1] = strdup(space + 1);
+        for (; *space == ' '; space++);
+        argv[1] = strdup(space);
     } else
         argv[0] = strdup(cmd_full);
 
