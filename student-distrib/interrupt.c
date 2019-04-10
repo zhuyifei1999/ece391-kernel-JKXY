@@ -114,22 +114,22 @@ static noreturn void double_fault_entry(uint32_t error_code) {
         .intr_num   = INTR_EXC_DOUBLE_FAULT,
         .error_code = error_code,
 
-        .eip        = tss.eip,
-        .eflags     = tss.eflags,
-        .eax        = tss.eax,
-        .ebx        = tss.ebx,
-        .ecx        = tss.ecx,
-        .edx        = tss.edx,
-        .esp_cfi    = tss.esp,
-        .ebp        = tss.ebp,
-        .esi        = tss.esi,
-        .edi        = tss.edi,
-        .es         = tss.es,
-        .cs         = tss.cs,
-        .ss_cfi     = tss.ss,
-        .ds         = tss.ds,
-        .fs         = tss.fs,
-        .gs         = tss.gs,
+        .eip     = tss.eip,
+        .eflags  = tss.eflags,
+        .eax     = tss.eax,
+        .ebx     = tss.ebx,
+        .ecx     = tss.ecx,
+        .edx     = tss.edx,
+        .esp_cfi = tss.esp,
+        .ebp     = tss.ebp,
+        .esi     = tss.esi,
+        .edi     = tss.edi,
+        .es      = tss.es,
+        .cs      = tss.cs,
+        .ss_cfi  = tss.ss,
+        .ds      = tss.ds,
+        .fs      = tss.fs,
+        .gs      = tss.gs,
     };
     do_interrupt(&info);
     // The CR3 does not seem to be saved. If we are going to return to userspace
@@ -212,7 +212,7 @@ static void idt_DF() {
     TEST_ASSERT_INTR(INTR_EXC_DOUBLE_FAULT, ({
         asm volatile ("mov $0,%esp; mov (%esp),%esp");
     }));
-    // Recover twice. If not recovered, should panic
+    // Recover twice. If not recovered by test wrapper, should panic
     // asm volatile ("mov $0,%esp; mov (%esp),%esp");
 }
 DEFINE_TEST(idt_DF);
