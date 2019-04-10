@@ -1,5 +1,6 @@
 #include "x86_desc.h"
 #include "mm/paging.h"
+#include "eflags.h"
 #include "initcall.h"
 
 // Segmentation will not be used
@@ -31,6 +32,8 @@ struct tss dubflt_tss = {
     .esp0 = 0x7f0000,
     .ss = KERNEL_DS,
     .esp = 0x7f0000,
+    .ds = KERNEL_DS,
+    .eflags = EFLAGS_BASE,
     .cr3 = (uint32_t)&init_page_directory,
 };
 
