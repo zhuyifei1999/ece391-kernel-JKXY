@@ -64,6 +64,8 @@ ISR_common:
     cld
     call    do_interrupt
     addl    $4,%esp
+    sti
+    // TODO: Do BH
 ENTRY(ISR_return):
     cmpw    $KERNEL_CS,76(%esp)
     je      3f
