@@ -123,7 +123,7 @@ static noreturn void double_fault_entry() {
 
     struct intr_info info = {
         .intr_num   = INTR_EXC_DOUBLE_FAULT,
-        .error_code = __builtin_return_address(0),
+        .error_code = (uint32_t)__builtin_return_address(0),
 
         .eip     = tss.eip,
         .eflags  = tss.eflags,
