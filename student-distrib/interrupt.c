@@ -4,6 +4,7 @@
 #include "lib/cli.h"
 #include "task/sched.h"
 #include "mm/paging.h"
+#include "panic.h"
 #include "eflags.h"
 #include "initcall.h"
 #include "tests.h"
@@ -149,9 +150,15 @@ void double_fault_entry(uint32_t error_code) {
     tss.fs     = info.fs;
     tss.gs     = info.gs;
 
-    // The CR3 does not seem to be saved. If we are going to return to userspace
-    // then too bad it will be killed.
-    tss.cr3 = (uint32_t)&init_page_directory;
+    // The CR3 does not seem to be saved.
+    if (tss.cs != KERNEL_CS)
+        BUG(); // How is userspace able to trigger a #DF?!
+
+    struct task_struct *task = task_from_stack((void*)tss.esp);
+    if (task->mm)
+        switch_directory(task->mm->page_directory);
+
+    asm volatile ("mov %%cr3,%0" : "=a"(tss.cr3));
 }
 static void init_isr_double_fault() {
     extern void ISR_TSS_DF(void);
