@@ -107,8 +107,19 @@ static void init_IDT() {
 DEFINE_INITCALL(init_IDT, early);
 
 static noreturn void double_fault_entry(uint32_t error_code) {
+    // The CR3 does not seem to be saved. If we are going to return to userspace
+    // then too bad it will be killed.
+    // Software task switch is used because we don't want to save our state.
     unsigned long flags;
     cli_and_save(flags);
+    flags &= ~NT & ~IF;
+    restore_flags(flags);
+
+    // Reset the task busy-ness. busy type = 0xb
+    gdt[KERNEL_TSS_IDX].type = 0x9;
+    gdt[DUBFLT_TSS_IDX].type = 0x9;
+
+    ltr(KERNEL_TSS);
 
     struct intr_info info = {
         .intr_num   = INTR_EXC_DOUBLE_FAULT,
@@ -132,17 +143,6 @@ static noreturn void double_fault_entry(uint32_t error_code) {
         .gs      = tss.gs,
     };
     do_interrupt(&info);
-    // The CR3 does not seem to be saved. If we are going to return to userspace
-    // then too bad it will be killed.
-    // Software task switch is used because we don't want to save our state.
-
-    // Reset the task busy-ness. busy type = 0xb
-    gdt[KERNEL_TSS_IDX].type = 0x9;
-    gdt[DUBFLT_TSS_IDX].type = 0x9;
-
-    ltr(KERNEL_TSS);
-    flags &= ~NT;
-    restore_flags(flags);
     set_all_regs(&info);
 }
 static void init_isr_double_fault() {
