@@ -147,7 +147,8 @@ void double_fault_entry(uint32_t error_code) {
     tss.fs     = info.fs;
     tss.gs     = info.gs;
 
-    // The CR3 does not seem to be saved.
+    // The CR3 does not seem to be saved. If a userspace trigger a #DF and we
+    // in really serious trouble; like, worse than if this were from kernel.
     if (tss.cs != KERNEL_CS)
         BUG(); // How is userspace able to trigger a #DF?!
 
