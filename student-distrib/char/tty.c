@@ -28,7 +28,7 @@ struct tty early_console = {
     .video_mem = (char *)VIDEO,
 };
 
-struct tty *foreground_tty;
+struct tty *foreground_tty = &early_console;
 
 struct vidmaps_entry {
     struct task_struct *task;
@@ -167,13 +167,10 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
 
 static inline void tty_commit_cursor(struct tty *tty) {
     if (tty == foreground_tty)
-        vga_update_cursor(foreground_tty->cursor_x, foreground_tty->cursor_y);
+        vga_set_cursor(foreground_tty->cursor_x, foreground_tty->cursor_y);
 }
 
 int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) {
-    if (!tty)
-        return 0;
-
     unsigned long flags;
     cli_and_save(flags);
 
@@ -236,7 +233,7 @@ static int32_t tty_write(struct file *file, const char *buf, uint32_t nbytes) {
 }
 
 void tty_foreground_keyboard(char chr) {
-    if (!foreground_tty)
+    if (foreground_tty == &early_console)
         return;
 
     // When you press enter, the line is committed
@@ -262,8 +259,8 @@ void tty_foreground_keyboard(char chr) {
 
 void tty_foreground_puts(const char *s) {
     struct tty *tty = foreground_tty;
-    if (!tty)
-        tty = &early_console;
+    if (tty == &early_console)
+        vga_get_cursor(&tty->cursor_x, &tty->cursor_y);
 
     raw_tty_write(tty, s, strlen(s));
 }
@@ -278,9 +275,6 @@ static struct file_operations tty_dev_op = {
 // FIXME: support ANSI/VT100. this is evil
 // http://www.termsys.demon.co.uk/vtansi.htm
 static void tty_clear(struct tty *tty) {
-    if (!tty)
-        return;
-
     tty->cursor_x = tty->cursor_y = 0;
     tty_commit_cursor(tty);
 
@@ -294,6 +288,9 @@ static void tty_clear(struct tty *tty) {
 }
 
 void tty_foreground_clear() {
+    if (foreground_tty == &early_console)
+        return;
+
     tty_clear(foreground_tty);
 }
 
@@ -311,7 +308,7 @@ void tty_switch_foreground(uint32_t device_num) {
         goto out;
     }
 
-    if (foreground_tty) {
+    if (foreground_tty && foreground_tty != &early_console) {
         void *video_mem_save = alloc_pages(1, 0, 0);
         memcpy(video_mem_save, vga_mem, LEN_4K);
         foreground_tty->video_mem = video_mem_save;

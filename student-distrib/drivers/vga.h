@@ -16,15 +16,26 @@
 
 static char * const vga_mem = (char *)VIDEO;
 
-/* static inline void update_cursor(void);
- * Function: Updates cursor position */
-static inline void vga_update_cursor(uint16_t x, uint16_t y) {
+/* Function: Updates cursor position */
+static inline void vga_set_cursor(uint16_t x, uint16_t y) {
     unsigned int cursor_loc = NUM_COLS * y + x;
 
     outb(0x0F, 0x3D4);
     outb((unsigned char)cursor_loc, 0x3D5);
     outb(0x0E, 0x3D4);
     outb((unsigned char)(cursor_loc>>8), 0x3D5);
+}
+
+/* Function: Get cursor position */
+static inline void vga_get_cursor(uint16_t *x, uint16_t *y) {
+    unsigned int cursor_loc = 0;
+    outb(0x0F, 0x3D4);
+    cursor_loc |= inb(0x3D5);
+    outb(0x0E, 0x3D4);
+    cursor_loc |= ((uint16_t)inb(0x3D5)) << 8;
+
+    *x = cursor_loc % NUM_COLS;
+    *y = cursor_loc / NUM_COLS;
 }
 
 #endif
