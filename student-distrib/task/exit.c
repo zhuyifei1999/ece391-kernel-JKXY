@@ -1,6 +1,8 @@
 #include "exit.h"
 #include "kthread.h"
 #include "sched.h"
+#include "session.h"
+#include "../char/tty.h"
 #include "../syscall.h"
 #include "../panic.h"
 #include "../mm/paging.h"
@@ -20,8 +22,8 @@ void do_exit(int exitcode) {
     filp_close(current->cwd);
     if (current->exe)
         filp_close(current->exe);
-    if (current->tty)
-        tty_put(current->tty);
+    if (current->session)
+        put_session();
 
     if (current->files) {
         if (!atomic_dec(&current->files->refcount)) {

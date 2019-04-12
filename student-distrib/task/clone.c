@@ -1,5 +1,6 @@
 #include "clone.h"
 #include "exit.h"
+#include "session.h"
 #include "../mm/kmalloc.h"
 #include "../lib/string.h"
 #include "../eflags.h"
@@ -98,8 +99,8 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
     atomic_inc(&current->cwd->refcount);
     if (current->exe)
         atomic_inc(&current->exe->refcount);
-    if (current->tty)
-        atomic_inc(&current->tty->refcount);
+    if (current->session)
+        atomic_inc(&current->session->refcount);
 
     // set new pid, and copy the other task state
     *task = (struct task_struct){
@@ -109,7 +110,8 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         .subsystem = current->subsystem,
         .cwd       = current->cwd,
         .exe       = current->exe,
-        .tty       = current->tty,
+        .session   = current->session,
+        .pgid      = current->pgid,
     };
 
     strncpy(task->comm, current->comm, sizeof(task->comm));

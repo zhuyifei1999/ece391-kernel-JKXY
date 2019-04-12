@@ -1,6 +1,7 @@
 #ifndef _TTY_H
 #define _TTY_H
 
+#include "../task/session.h"
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
 #include "../vfs/device.h"
@@ -17,6 +18,7 @@ struct tty {
     atomic_t refcount;
     uint32_t device_num;
     struct task_struct *task; // The task that's reading the tty
+    struct session *session;
     char *video_mem;
     struct list vidmaps;
     uint16_t cursor_x;

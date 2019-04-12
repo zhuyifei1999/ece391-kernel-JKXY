@@ -42,7 +42,7 @@ ISR_common:
 .cfi_offset ecx, -28
 .cfi_offset edx, -32
 .cfi_offset ebx, -36
-.cfi_offset eax, -40
+// .cfi_offset esp, -40
 .cfi_offset esi, -52
 .cfi_offset edi, -56
 // and now figure out the real esp and ss

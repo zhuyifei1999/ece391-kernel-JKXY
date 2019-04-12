@@ -3,6 +3,8 @@
 #include "task/kthread.h"
 #include "task/clone.h"
 #include "task/exec.h"
+#include "task/session.h"
+#include "char/tty.h"
 #include "mm/kmalloc.h"
 #include "initcall.h"
 #include "panic.h"
@@ -42,15 +44,17 @@ static int run_init_process(void *args) {
         NULL
     };
 
-    if (args && !current->tty) {
+    if (args && !current->session) {
+        do_setsid();
+
         // The args specify the TTY number
         int *tty_num = args;
         struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, *tty_num), O_RDWR, S_IFCHR | 0666);
         kfree(args);
 
         if (!IS_ERR(file)) {
-            if (current->tty) {
-                fprintf(file, "TTY%d\n", MINOR(current->tty->device_num));
+            if (current->session && current->session->tty) {
+                fprintf(file, "TTY%d\n", MINOR(current->session->tty->device_num));
             }
             filp_close(file);
         }

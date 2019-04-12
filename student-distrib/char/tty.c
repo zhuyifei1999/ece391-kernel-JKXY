@@ -3,6 +3,7 @@
 #include "../vfs/device.h"
 #include "../task/task.h"
 #include "../task/sched.h"
+#include "../task/session.h"
 #include "../drivers/vga.h"
 #include "../structure/list.h"
 #include "../mm/paging.h"
@@ -44,10 +45,10 @@ struct tty *tty_get(uint32_t device_num) {
     // TODO: This should be read from the task's associated TTY, not the tty
     // that's attached to the keyboard
     if (device_num == TTY_CURRENT) {
-        if (!current->tty)
+        if (!current->session || !current->session->tty)
             return ERR_PTR(-ENXIO);
-        atomic_inc(&current->tty->refcount);
-        return current->tty;
+        atomic_inc(&current->session->tty->refcount);
+        return current->session->tty;
     }
     // The console is TTY0
     if (device_num == TTY_CONSOLE)
@@ -120,9 +121,15 @@ static int32_t tty_open(struct file *file, struct inode *inode) {
 
     file->vendor = tty;
 
-    if (!current->tty && !(file->flags & O_NOCTTY)) {
+    if (
+        current->session && !current->session->tty && !tty->session &&
+        current->session->sid == current->pid && !(file->flags & O_NOCTTY)
+    ) {
         atomic_inc(&tty->refcount);
-        current->tty = tty;
+        current->session->tty = tty;
+        // We dound hold a heference count here because the reference would be
+        // held until the session is destroyed, which requires 0 reference.
+        tty->session = current->session;
     }
 
     return 0;
@@ -343,6 +350,9 @@ DEFINE_SYSCALL1(ECE391, vidmap, void **, screen_start) {
     if (safe_buf(screen_start, sizeof(*screen_start), true) < sizeof(*screen_start))
         return -EFAULT;
 
+    if (!current->session || !current->session->tty)
+        return -EBADF;
+
     struct vidmaps_entry *vidmap = kmalloc(sizeof(*vidmap));
     if (!vidmap)
         return -ENOMEM;
@@ -350,18 +360,18 @@ DEFINE_SYSCALL1(ECE391, vidmap, void **, screen_start) {
         .task = current,
     };
 
-    remap_to_user(current->tty->video_mem, &vidmap->table, screen_start);
+    remap_to_user(current->session->tty->video_mem, &vidmap->table, screen_start);
     if (!*screen_start)
         return -ENOMEM;
 
-    list_insert_back(&current->tty->vidmaps, vidmap);
+    list_insert_back(&current->session->tty->vidmaps, vidmap);
     return 0;
 }
 
 void exit_vidmap_cb() {
-    if (!current->tty)
+    if (!current->session || !current->session->tty)
         return;
-    list_remove_on_cond_extra(&current->tty->vidmaps, struct vidmaps_entry *, vidmap, vidmap->task == current, ({
+    list_remove_on_cond_extra(&current->session->tty->vidmaps, struct vidmaps_entry *, vidmap, vidmap->task == current, ({
         vidmap->table->present = 0;
         kfree(vidmap);
     }));
