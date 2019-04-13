@@ -26,15 +26,6 @@
 struct task_struct *swapper_task;
 struct task_struct *init_task;
 
-#if RUN_TESTS
-static int kselftest(void *args) {
-    set_current_comm("kselftest");
-    if (!launch_tests())
-        tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
-    return 0;
-}
-#endif
-
 static int run_init_process(void *args) {
     set_current_comm("init");
 
@@ -111,9 +102,7 @@ static int kernel_dummy_init(void *args) {
 
     set_current_comm("kernel_init");
 
-#if !RUN_TESTS
     tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
-#endif
 
     int i;
 
@@ -187,12 +176,9 @@ noreturn void kernel_main(void) {
     wake_up_process(kernel_thread(&kthreadd, NULL));
     schedule();
 
-    wake_up_process(init_task);
+    DO_INITCALL(init_kthread);
 
-#if RUN_TESTS
-    // start the tests in a seperate kthread, and let that start init
-    wake_up_process(kthread(&kselftest, NULL));
-#endif
+    wake_up_process(init_task);
 
     for (;;) {
         while (list_isempty(&schedule_queue))

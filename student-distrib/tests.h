@@ -5,7 +5,7 @@
 
 #if RUN_TESTS
 
-// test infrastructure, supported by initcall, interrupts, list, files, and magic
+// test infrastructure, supported by initcall, interrupts, list, files, scheduler, and magic
 #include "initcall.h"
 #include "interrupt.h"
 #include "lib/stdint.h"

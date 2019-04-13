@@ -4,6 +4,7 @@
 #include "lib/cli.h"
 #include "lib/stdio.h"
 #include "task/task.h"
+#include "task/kthread.h"
 #include "char/tty.h"
 #include "interrupt.h"
 
@@ -121,4 +122,11 @@ bool launch_tests() {
 
     return test_failed;
 }
+
+static int kselftest(void *args) {
+    set_current_comm("kselftest");
+    launch_tests();
+    return 0;
+}
+DEFINE_INIT_KTHREAD(kselftest);
 #endif

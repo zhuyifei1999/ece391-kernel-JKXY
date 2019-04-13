@@ -26,7 +26,7 @@
 // function keys map, 0x80 to 0xFF, unassigned have 0xFF
 #define DO_GUI    0xFF
 #define DO_APPS   0xFF
-#define DO_ESC    0xFF
+#define DO_ESC    0x80
 #define DO_F1     0x81
 #define DO_F2     0x82
 #define DO_F3     0x83
@@ -230,6 +230,9 @@ static bool do_function(unsigned char scancode_mapped) {
     if (!has_ctrl && has_alt && scancode_mapped >= DO_F1 && scancode_mapped <= DO_F12) {
         tty_switch_foreground(MKDEV(TTY_MAJOR, scancode_mapped - DO_F1 + 1));
         return true;
+    } else if (!has_ctrl && has_alt && scancode_mapped == DO_ESC) {
+        tty_switch_foreground(TTY_CONSOLE);
+        return true;
     }
     return false;
 }
@@ -307,6 +310,5 @@ static void scancode_fixup_caps_test() {
         TEST_ASSERT(scancode_mapped == test_output_lib[i]);
     }
 }
-
 DEFINE_TEST(scancode_fixup_caps_test);
 #endif
