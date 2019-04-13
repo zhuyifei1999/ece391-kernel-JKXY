@@ -30,16 +30,16 @@ static void soft_reset(struct ata_data* dev){
 	io_delay(dev);
 	char stat = inb(reg_offset + STATUS_OFF);
 	// check if BSY clear and RDY set
-	while(!(stat & STAT_RDY) || (stat & STAT_BSY)){
+	while (!(stat & STAT_RDY) || (stat & STAT_BSY)){
 		stat = inb(reg_offset + STATUS_OFF);
 	}
 }
 
 static int ata_identify(int32_t ata_num){
 	struct ata_data ata;
-	if(ata_num == 1)
+	if (ata_num == 1)
 		ata = primary_driver_info;
-	else if(ata_num == 2)
+	else if (ata_num == 2)
 		ata = secondary_driver_info;
 	
 	outb(0xA0, ata.ata_base_reg+DRIVE_HEAD_OFF);
@@ -49,13 +49,15 @@ static int ata_identify(int32_t ata_num){
 	outb(0, ata.ata_base_reg + LBA_HI_OFF);
 	outb(CMD_ID, ata.ata_base_reg + STATUS_OFF);
 	uint8_t stat = inb(ata.ata_base_reg + STATUS_OFF);
-	if(stat == 0)
+
+	if (stat == 0)
 		return -1;
-	while(stat&STAT_BSY){
+	while (stat&STAT_BSY){
 		stat = inb(ata.ata_base_reg + STATUS_OFF);
 	}
-	while(!(stat& STAT_DRQ)){
-		if(stat&STAT_ERR)
+
+	while (!(stat& STAT_DRQ)){
+		if (stat&STAT_ERR)
 			return -1;
 		stat = inb(ata.ata_base_reg + STATUS_OFF);
 	}
@@ -85,22 +87,22 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes){
 	int32_t reg_offset = ata->ata_base_reg;
     int32_t byte_count = 0;
 
-    if(block_count<0){
+    if (block_count<0){
         soft_reset(ata);
     }
 
-    if(block_count > 0x3FFFFF)
+    if (block_count > 0x3FFFFF)
         return -1;
 
     uint8_t status = inb(reg_offset + STATUS_OFF);
-	if(status | STAT_BSY || status & STAT_DRQ){
+	if (status | STAT_BSY || status & STAT_DRQ){
 		soft_reset(ata);
 	}
 	int i;
     int32_t lba = ata->stLBA + off/512;
 
-    for( i = 0; i < block_count; i++){
-        if(0 != ata_read_28( (lba+i) , buf, ata))
+    for ( i = 0; i < block_count; i++){
+        if (0 != ata_read_28( (lba+i) , buf, ata))
            return -1;
         buf+=512;
         byte_count+=512;
