@@ -1,6 +1,8 @@
 #ifndef ATA_H
 #define ATA_H
 
+
+#include "../irq.h"
 #include "../lib/stdint.h"
 #include "../lib/string.h"
 #include "../vfs/file.h"
@@ -8,7 +10,9 @@
 #include "../multiboot.h"
 #include "../errno.h"
 #include "../initcall.h"
-
+#include "../task/task.h"
+#include "../task/sched.h"
+#include "../task/session.h"
 
 #define ATA_PRIM_IRQ	14	// primary bus irq num
 #define ATA_SEC_IRQ		15	// secondary bus irq num
