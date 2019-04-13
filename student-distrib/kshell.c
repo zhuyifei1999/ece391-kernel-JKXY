@@ -27,7 +27,9 @@ static int kshell(void *args) {
         }
 
         buf[len-1] = '\0';
-        if (!strcmp(buf, "exit"))
+        if (!strcmp(buf, ""))
+            continue;
+        else if (!strcmp(buf, "exit"))
             return 0;
         else if (!strcmp(buf, "ps")) {
             fprintf(tty, "PID     PPID    TTY     STAT    COMM\n");
