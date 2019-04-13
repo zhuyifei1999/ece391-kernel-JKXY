@@ -1,6 +1,7 @@
 #ifndef _TASK_H
 #define _TASK_H
 
+#include "signal.h"
 #include "../lib/stdint.h"
 #include "../lib/string.h"
 #include "../mm/paging.h"
@@ -51,6 +52,8 @@ struct task_struct {
     struct file *exe;
     struct session *session;
     uint32_t pgid;
+    struct sigpending sigpending;
+    struct sigactions *sigactions;
     struct intr_info *entry_regs;  // for kernel execve
     struct intr_info *return_regs; // for scheduler
     enum task_state state;

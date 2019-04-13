@@ -7,7 +7,6 @@
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
 #include "../syscall.h"
-#include "../signal.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -32,7 +31,7 @@ static int ece391execute_child(void *args) {
 
     kfree(cmd_full);
 
-    int32_t res = do_execve(strdup(argv[0]), argv, NULL);
+    int32_t res = do_execve(argv[0], argv, NULL);
 
     kfree(argv[0]);
     if (argv[1])

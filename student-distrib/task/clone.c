@@ -1,12 +1,12 @@
 #include "clone.h"
 #include "exit.h"
 #include "session.h"
+#include "signal.h"
 #include "../mm/kmalloc.h"
 #include "../lib/string.h"
 #include "../eflags.h"
 #include "../panic.h"
 #include "../x86_desc.h"
-#include "../signal.h"
 #include "../initcall.h"
 #include "../err.h"
 #include "../errno.h"
@@ -149,6 +149,16 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
                 }
             }
         }
+    }
+
+    if (flags & CLONE_SIGHAND) {
+        atomic_inc(&current->sigactions->refcount);
+        task->sigactions = current->sigactions;
+    } else {
+        task->sigactions = kmalloc(sizeof(*task->sigactions));
+        memcpy(task->sigactions->sigactions, current->sigactions->sigactions,
+            sizeof(current->sigactions->sigactions));
+        atomic_set(&task->sigactions->refcount, 1);
     }
 
     if (flags & CLONE_PARENT_SETTID)
