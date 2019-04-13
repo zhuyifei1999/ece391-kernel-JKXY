@@ -1,5 +1,6 @@
 #include "task.h"
 #include "sched.h"
+#include "signal.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -22,5 +23,6 @@ struct task_struct *get_task_from_pid(uint16_t pid) {
 
 asmlinkage
 void return_to_userspace(struct intr_info *info) {
+    deliver_signal(info);
     cond_schedule();
 }

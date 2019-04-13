@@ -231,7 +231,7 @@ width:;
                 case 'X':
                     precision_given = true;
                     precision = 8;
-                    prefix = "0x";
+                    // prefix = "0x";
                     break;
                 }
             }

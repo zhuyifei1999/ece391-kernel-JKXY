@@ -60,12 +60,12 @@ void multiboot_info(unsigned long magic, struct multiboot_info *mbi_in) {
     /* Are mmap_* valid? */
     if (CHECK_FLAG(mbi->flags, 6)) {
         struct multiboot_memory_map *mmap;
-        printk("mmap_addr = %#x, mmap_length = 0x%x\n",
+        printk("mmap_addr = 0x%#x, mmap_length = 0x%x\n",
                 mbi->mmap_addr, mbi->mmap_length);
         for (mmap = (struct multiboot_memory_map *)mbi->mmap_addr;
                 (unsigned long)mmap < mbi->mmap_addr + mbi->mmap_length;
                 mmap = (struct multiboot_memory_map *)((unsigned long)mmap + mmap->size + sizeof (mmap->size)))
-            printk("    size = 0x%x, base_addr = %#x%08x\n    type = 0x%x,  length    = %#x%08x\n",
+            printk("    size = 0x%x, base_addr = 0x%#x%#x\n    type = 0x%x,  length    = 0x%#x%#x\n",
                     mmap->size,
                     mmap->base_addr_high,
                     mmap->base_addr_low,
