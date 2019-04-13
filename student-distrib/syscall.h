@@ -1,9 +1,6 @@
 #ifndef _SYSCALL_H
 #define _SYSCALL_H
 
-#include "task/task.h"
-#include "initcall.h"
-
 // ausyscall i386 --dump | awk '{ print "#define NR_LINUX_"$2" "$1 }'
 #define NR_LINUX_restart_syscall 0
 #define NR_LINUX_exit 1
@@ -399,6 +396,11 @@
 
 #define MAX_SYSCALL 400
 
+#ifndef ASM
+
+#include "task/task.h"
+#include "initcall.h"
+
 extern intr_handler_t *syscall_handlers[NUM_SUBSYSTEMS][MAX_SYSCALL];
 
 #define _EXPAND(val) val
@@ -418,6 +420,14 @@ static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info) {
     sys_ ## subsystem ## _ ## name(info);                                        \
 }                                                                                \
 void sys_ ## subsystem ## _ ## name(struct intr_info *info_arg)
+
+#define DEFINE_SYSCALL0(subsystem, name)                                         \
+_DEFINE_SYSCALL(subsystem, name);                                                \
+int32_t sys_ ## subsystem ## _ ## name(void);                                    \
+static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info) { \
+    info->eax = sys_ ## subsystem ## _ ## name();                                \
+}                                                                                \
+int32_t sys_ ## subsystem ## _ ## name(void)
 
 #define DEFINE_SYSCALL1(subsystem, name, type1, arg1)                            \
 _DEFINE_SYSCALL(subsystem, name);                                                \
@@ -456,5 +466,7 @@ static void sys_ ## subsystem ## _ ## name ## _wrapper(struct intr_info *info) {
                                                (type4)info->esi);                            \
 }                                                                                            \
 int32_t sys_ ## subsystem ## _ ## name(type1 arg1, type2 arg2, type3 arg3, type4 arg4)
+
+#endif
 
 #endif

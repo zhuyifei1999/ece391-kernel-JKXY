@@ -41,6 +41,12 @@
 #define SIGSYS		31
 #define	SIGUNUSED	31
 
+#define SIG_ECE391_DIV_ZERO  0
+#define SIG_ECE391_SEGFAULT  1
+#define SIG_ECE391_INTERRUPT 2
+#define SIG_ECE391_ALARM     3
+#define SIG_ECE391_USER1     4
+
 // source: <asm/signal.h>
 #define _NSIG		64
 
@@ -98,7 +104,7 @@ void kernel_unmask_signal(uint16_t signum);
 uint16_t kernel_peek_pending_sig();
 uint16_t kernel_get_pending_sig();
 
-void deliver_signal(struct intr_info *intr_info);
+void deliver_signal(struct intr_info *regs);
 
 #endif
 

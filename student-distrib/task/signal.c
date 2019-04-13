@@ -2,6 +2,8 @@
 #include "sched.h"
 #include "task.h"
 #include "exit.h"
+#include "userstack.h"
+#include "../syscall.h"
 #include "../err.h"
 
 enum default_action {
@@ -112,15 +114,38 @@ uint16_t kernel_get_pending_sig() {
     return ret;
 }
 
-void deliver_signal(struct intr_info *intr_info) {
+struct ece391_user_context {
+    uint32_t ebx;
+    uint32_t ecx;
+    uint32_t edx;
+    uint32_t esi;
+    uint32_t edi;
+    uint32_t ebp;
+    uint32_t eax;
+    uint16_t ds __attribute__((aligned(4)));
+    uint16_t es __attribute__((aligned(4)));
+    uint16_t fs __attribute__((aligned(4)));
+    uint32_t intr_num;
+    uint32_t error_code;
+    uint32_t eip;
+    uint16_t cs __attribute__((aligned(4)));
+    uint32_t eflags;
+    uint32_t esp;
+    uint16_t ss __attribute__((aligned(4)));
+};
+
+void deliver_signal(struct intr_info *regs) {
     if (!signal_pending(current))
         return;
 
-    uint16_t signum = current->sigpending.signum;
+    struct sigpending sigpending = current->sigpending;
+    current->sigpending.is_pending = false;
+
+    uint16_t signum = sigpending.signum;
     struct sigaction *sigaction = &current->sigactions->sigactions[signum];
     if (sigaction->action == SIG_IGN)
         return;
-    if (current->sigpending.forced || sigaction->action == SIG_DFL) {
+    if (sigpending.forced || sigaction->action == SIG_DFL) {
         switch (default_sig_action(signum)) {
         case SIG_IGNORE:
             return;
@@ -134,5 +159,128 @@ void deliver_signal(struct intr_info *intr_info) {
         }
     }
 
-    // TODO:
+    switch (current->subsystem) {
+    case SUBSYSTEM_LINUX:
+        goto force_segv;  // TODO:
+    case SUBSYSTEM_ECE391: {
+        // function prototype don't matter here
+        extern uint8_t ECE391_sigret_start;
+        extern uint8_t ECE391_sigret_stop;
+
+        if (push_userstack(regs, &ECE391_sigret_start, &ECE391_sigret_stop - &ECE391_sigret_start) < 0)
+            goto force_segv;
+        uint32_t returnaddr = regs->esp;
+
+        struct ece391_user_context context = {
+            .ebx = regs->ebx,
+            .ecx = regs->ecx,
+            .edx = regs->edx,
+            .esi = regs->esi,
+            .edi = regs->edi,
+            .ebp = regs->ebp,
+            .eax = regs->eax,
+            .ds = regs->ds,
+            .es = regs->es,
+            .fs = regs->fs,
+            .eip = regs->eip,
+            .cs = regs->cs,  // DO NOT restore this
+            .eflags = regs->eflags,
+            .esp = regs->esp,
+            .ss = regs->ss,
+        };
+
+        if (push_userstack(regs, &context, sizeof(context)) < 0)
+            goto force_segv;
+
+        uint32_t ece391_signum;
+        switch (signum) {
+        case SIGFPE:
+            ece391_signum = SIG_ECE391_DIV_ZERO;
+            break;
+        case SIGSEGV:
+            ece391_signum = SIG_ECE391_SEGFAULT;
+            break;
+        case SIGINT:
+            ece391_signum = SIG_ECE391_INTERRUPT;
+            break;
+        case SIGALRM:
+            ece391_signum = SIG_ECE391_ALARM;
+            break;
+        case SIGUSR1:
+            ece391_signum = SIG_ECE391_USER1;
+            break;
+        default:
+            goto force_segv; // how is this possible?
+        }
+
+        if (push_userstack(regs, &ece391_signum, sizeof(ece391_signum)) < 0)
+            goto force_segv;
+
+        if (push_userstack(regs, &returnaddr, sizeof(returnaddr)) < 0)
+            goto force_segv;
+
+
+        regs->eip = (uint32_t)sigaction->action;
+        return;
+    }
+    }
+
+force_segv:
+    force_sig(current, SIGSEGV);
+    deliver_signal(regs);
+}
+
+DEFINE_SYSCALL2(ECE391, set_handler, int32_t, signum, void *, handler_address) {
+    switch (signum) {
+    case SIG_ECE391_DIV_ZERO:
+        signum = SIGFPE;
+        break;
+    case SIG_ECE391_SEGFAULT:
+        signum = SIGSEGV;
+        break;
+    case SIG_ECE391_INTERRUPT:
+        signum = SIGINT;
+        break;
+    case SIG_ECE391_ALARM:
+        signum = SIGALRM;
+        break;
+    case SIG_ECE391_USER1:
+        signum = SIGUSR1;
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    current->sigactions->sigactions[signum].action = handler_address;
+    return 0;
+}
+
+DEFINE_SYSCALL_COMPLEX(ECE391, sigreturn, regs) {
+    extern uint8_t ECE391_sigret_start;
+    extern uint8_t ECE391_sigret_postint;
+
+    struct ece391_user_context *context = (void *)(regs->eip - (&ECE391_sigret_postint - &ECE391_sigret_start) - sizeof(struct ece391_user_context));
+    if (safe_buf(context, sizeof(*context), false) != sizeof(*context)) {
+        force_sig(current, SIGSEGV);
+        return;
+    }
+
+    regs->ebx = context->ebx;
+    regs->ecx = context->ecx;
+    regs->edx = context->edx;
+    regs->esi = context->esi;
+    regs->edi = context->edi;
+    regs->ebp = context->ebp;
+    regs->eax = context->eax;
+    regs->ds = context->ds;
+    regs->es = context->es;
+    regs->fs = context->fs;
+    regs->eip = context->eip;
+    regs->eflags = context->eflags;
+    regs->esp = context->esp;
+    regs->ss = context->ss;
+
+    // FIXME: Bad regs here can cause a panic
+
+    return;
 }
