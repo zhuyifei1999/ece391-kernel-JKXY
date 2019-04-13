@@ -13,11 +13,16 @@
 #include "../task/task.h"
 #include "../task/sched.h"
 #include "../task/session.h"
+#include "../structure/list.h"
+#include "../lib/io.h"
+#include "../err.h"
+#include "../errno.h"
 
 #define ATA_PRIM_IRQ	14	// primary bus irq num
 #define ATA_SEC_IRQ		15	// secondary bus irq num
 
 #define PRIM_DATA_REG	0x1F0	///< primary IO port: 0x1F0 - 0x1F7
+#define SEC_DATA_REG	0x170	///< primary IO port: 0x1F0 - 0x1F7
 #define ERROR_FEAT_OFF	0x1	///< feature/error register
 #define SEC_COUNT_OFF	0x2	///< sector count
 #define SECTOR_NUM_OFF	0x3	///< sector number
@@ -50,10 +55,23 @@
 
 struct ata_data {
 	int32_t slave_bit;		///< master/slave
+	struct task_struct *task;
 	int32_t ata_base_reg;	///< primary/secondary
 	int32_t stLBA;			///< lba offset
 	int32_t prt_size;		///< partition size
 };
+
+static void ata_init();
+static int32_t ata_close(struct file *file, struct inode *inode);
+static int32_t ata_open(struct file *file, struct inode *inode);
+static void ATA_handler();
+static int32_t ata_should_read(struct ata_data* dev);
+static int ata_read_28(uint32_t lba, char* buf, struct ata_data* dev);
+static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes);
+static int ata_identify(int32_t ata_num);
+static void soft_reset(struct ata_data* dev);
+void io_delay(struct ata_data* dev);
+
 
 
 #endif
