@@ -168,7 +168,7 @@ width:;
             if (precision_pad < 0)
                 precision_pad = 0;
 
-            int32_t space_pad = width - precision - (value < 0 || space || always_sign);
+            int32_t space_pad = width - num_len - precision_pad - (value < 0 || space || always_sign);
             if (space_pad < 0)
                 space_pad = 0;
 
@@ -260,7 +260,7 @@ width:;
             if (precision_pad < 0)
                 precision_pad = 0;
 
-            int32_t space_pad = width - precision - strlen(prefix);
+            int32_t space_pad = width - num_len - precision_pad - strlen(prefix);
             if (space_pad < 0)
                 space_pad = 0;
 
@@ -296,7 +296,24 @@ width:;
             break;
         case 's': {
             char *value = va_arg(ap, char *);
-            if (!precision_given || precision >= strlen(value))
+            uint32_t len = strlen(value);
+
+            uint32_t num_len = len;
+            if (num_len > precision && precision_given)
+                num_len = precision;
+
+            int32_t space_pad = width - num_len;
+            if (space_pad < 0)
+                space_pad = 0;
+
+            int i;
+
+            if (!left_adjust) {
+                for (i = 0; i < space_pad; i++)
+                    printf_emit(target, (char []){' ', 0});
+            }
+
+            if (!precision_given || precision >= len)
                 printf_emit(target, value);
             else {
                 int i;
@@ -304,6 +321,12 @@ width:;
                     printf_emit(target, (char []){value[i], 0});
                 }
             }
+
+            if (left_adjust) {
+                for (i = 0; i < space_pad; i++)
+                    printf_emit(target, (char []){' ', 0});
+            }
+
             break;
         }
         case '%':
