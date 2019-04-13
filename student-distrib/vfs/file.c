@@ -15,9 +15,6 @@
  *   inode_decref
  *   DESCRIPTION: destroy the inode
  *   INPUTS: struct inode *inode
- *   OUTPUTS: none
- *   RETURN VALUE: none
- *   SIDE EFFECTS: none
  */
 void inode_decref(struct inode *inode) {
     int32_t refcount = atomic_dec(&inode->refcount);
@@ -34,9 +31,7 @@ void inode_decref(struct inode *inode) {
  *   filp_openat
  *   DESCRIPTION: open the file
  *   INPUTS: struct int32_t dfd, char *path, uint32_t flags, uint16_t mode
- *   OUTPUTS: none
  *   RETURN VALUE: struct file
- *   SIDE EFFECTS: none
  */
 struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
     struct path *path_rel = path_fromstr(path);
@@ -174,9 +169,7 @@ out_rel:
  *   filp_open
  *   DESCRIPTION: open the file in the current working dirctory
  *   INPUTS: char *path, uint32_t flags, uint16_t mode
- *   OUTPUTS: none
  *   RETURN VALUE: file
- *   SIDE EFFECTS: none
  */
 struct file *filp_open(char *path, uint32_t flags, uint16_t mode) {
     return filp_openat(AT_FDCWD, path, flags, mode);
@@ -186,10 +179,8 @@ struct file *filp_open(char *path, uint32_t flags, uint16_t mode) {
  *   filp_open_anondevice
  *   DESCRIPTION: open the device without a dev file
  *   INPUTS: uint32_t dev, uint32_t flags, uint16_t mode
- *   OUTPUTS: none
  *   RETURN VALUE: file
  *   operation
- *   SIDE EFFECTS: none
  */
 struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     struct file_operations *file_op = get_dev_file_op(mode, dev);
@@ -251,10 +242,8 @@ out_destroy_path:
  *   filp_seek
  *   DESCRIPTION: write the file
  *   INPUTS: struct file *file, const void *buf, uint32_t nbytes
- *   OUTPUTS: none
  *   RETURN VALUE: write buffer and nbyte through the file's write
  *   operation
- *   SIDE EFFECTS: none
  */
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
     return (*file->op->seek)(file, offset, whence);
@@ -264,10 +253,8 @@ int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
  *   filp_read
  *   DESCRIPTION: read the file
  *   INPUTS: struct file *file, const void *buf, uint32_t nbytes
- *   OUTPUTS: none
  *   RETURN VALUE: read by buffer and nbyte in the file's write
  *   operation
- *   SIDE EFFECTS: none
  */
 int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
     char *buf_char = buf;
@@ -276,29 +263,14 @@ int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
         return -EINVAL;
 
     return (*file->op->read)(file, buf_char, nbytes);
-
-    // int32_t bytes_read = 0;
-    // while (nbytes) {
-    //     int32_t res = (*file->op->read)(file, buf_char, nbytes);
-    //     if (res < 0)
-    //         return res;
-    //     else if (!res)
-    //         break;
-    //     nbytes -= res;
-    //     bytes_read += res;
-    //     buf_char += res;
-    // }
-    // return bytes_read;
 }
 
 /*
  *   filp_write
  *   DESCRIPTION: write the file
  *   INPUTS: struct file *file, const void *buf, uint32_t nbytes
- *   OUTPUTS: none
  *   RETURN VALUE: write through buffer and nbyte in the file's write
  *   operation
- *   SIDE EFFECTS: none
  */
 int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes) {
     const char *buf_char = buf;
@@ -310,28 +282,22 @@ int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes) {
 
     // invoke the write operation
     return (*file->op->write)(file, buf_char, nbytes);
+}
 
-    // int32_t bytes_written = 0;
-    // while (nbytes) {
-    //     int32_t res = (*file->op->write)(file, buf_char, nbytes);
-    //     if (res < 0)
-    //         return res;
-    //     else if (!res)
-    //         break;
-    //     nbytes -= res;
-    //     bytes_written += res;
-    //     buf_char += res;
-    // }
-    // return bytes_written;
+/*
+ *   filp_write
+ *   DESCRIPTION: invoke ioctl handler on the file
+ *   INPUTS: struct file *file, uint32_t request, unsigned long arg
+ */
+int32_t filp_ioctl(struct file *file, uint32_t request, unsigned long arg, bool arg_user) {
+    // invoke the write operation
+    return (*file->op->ioctl)(file, request, arg, arg_user);
 }
 
 /*
  *   filp_close
  *   DESCRIPTION: close the file
  *   INPUTS: struct file *file
- *   OUTPUTS: none
- *   RETURN VALUE: none
- *   SIDE EFFECTS: none
  */
 int32_t filp_close(struct file *file) {
     int32_t refcount = atomic_dec(&file->refcount);
@@ -530,6 +496,9 @@ int32_t default_file_read(struct file *file, char *buf, uint32_t nbytes) {
 int32_t default_file_write(struct file *file, const char *buf, uint32_t nbytes) {
     return -EINVAL;
 }
+int32_t default_file_ioctl(struct file *file, uint32_t request, unsigned long arg, bool arg_user) {
+    return -ENOTTY;
+}
 int32_t default_file_open(struct file *file, struct inode *inode) {
     return 0;
 }
@@ -559,9 +528,6 @@ void default_ino_truncate(struct inode *inode) {
  *   fill_default_file_op
  *   DESCRIPTION: fill the file_operation's instructions
  *   INPUTS: struct file_operations *file_op
- *   OUTPUTS: none
- *   RETURN VALUE: none
- *   SIDE EFFECTS: none
  */
 void fill_default_file_op(struct file_operations *file_op) {
     // fill with the funtion pointer
@@ -571,6 +537,8 @@ void fill_default_file_op(struct file_operations *file_op) {
         file_op->read = &default_file_read;
     if (!file_op->write)
         file_op->write = &default_file_write;
+    if (!file_op->ioctl)
+        file_op->ioctl = &default_file_ioctl;
     if (!file_op->open)
         file_op->open = &default_file_open;
     if (!file_op->release)
@@ -581,9 +549,6 @@ void fill_default_file_op(struct file_operations *file_op) {
  *   fill_default_ino_op
  *   DESCRIPTION: fill the inode_operation's instructions
  *   INPUTS: struct inode_operations *ino_op
- *   OUTPUTS: none
- *   RETURN VALUE: none
- *   SIDE EFFECTS: none
  */
 void fill_default_ino_op(struct inode_operations *ino_op) {
     // fill with the funtion pointer

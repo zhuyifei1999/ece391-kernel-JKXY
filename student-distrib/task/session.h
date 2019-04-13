@@ -3,7 +3,6 @@
 
 #include "../lib/stdint.h"
 #include "../char/tty.h"
-#include "../atomic.h"
 
 struct session {
     atomic_t refcount;
@@ -15,5 +14,7 @@ struct session {
 int32_t do_setsid(void);
 
 void put_session();
+
+int32_t do_setpgid(int32_t pid, int32_t pgid);
 
 #endif

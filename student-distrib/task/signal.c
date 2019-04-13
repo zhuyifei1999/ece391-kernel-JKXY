@@ -2,6 +2,7 @@
 #include "sched.h"
 #include "task.h"
 #include "exit.h"
+#include "../err.h"
 
 enum default_action {
     SIG_IGNORE,
@@ -68,6 +69,27 @@ void force_sig(struct task_struct *task, uint16_t signum) {
 
     if (task->state == TASK_INTERRUPTIBLE)
         wake_up_process(task);
+}
+
+int32_t send_sig_pg(uint16_t pgid, uint16_t signum) {
+    struct task_struct *leader = get_task_from_pid(pgid);
+    if (IS_ERR(leader))
+        return PTR_ERR(leader);
+
+    if (leader->pgid != pgid) {
+        // Not a leader
+        send_sig(leader, signum);
+        return 0;
+    }
+
+    struct list_node *node;
+    list_for_each(&tasks, node) {
+        struct task_struct *task = node->value;
+        if (task->pgid == pgid)
+            send_sig(task, signum);
+    }
+
+    return 0;
 }
 
 void kernel_mask_signal(uint16_t signum) {

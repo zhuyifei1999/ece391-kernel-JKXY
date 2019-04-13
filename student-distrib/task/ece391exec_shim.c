@@ -4,9 +4,12 @@
 #include "clone.h"
 #include "exec.h"
 #include "exit.h"
+#include "session.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
+#include "../vfs/file.h"
 #include "../syscall.h"
+#include "../ioctls.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -30,6 +33,14 @@ static int ece391execute_child(void *args) {
         argv[0] = strdup(cmd_full);
 
     kfree(cmd_full);
+
+    do_setpgid(0, 0);
+
+    struct file *tty = filp_open_anondevice(TTY_CURRENT, O_RDWR, S_IFCHR | 0666);
+    if (!IS_ERR(tty)) {
+        filp_ioctl(tty, TIOCSPGRP, &current->pgid, false);
+        filp_close(tty);
+    }
 
     int32_t res = do_execve(argv[0], argv, NULL);
 
@@ -66,7 +77,15 @@ DEFINE_SYSCALL1(ECE391, execute, char *, command) {
     // put child process into queue
     wake_up_process(child);
 
-    return do_wait(child);
+    int exitcode = do_wait(child);
+
+    struct file *tty = filp_open_anondevice(TTY_CURRENT, O_RDWR, S_IFCHR | 0666);
+    if (!IS_ERR(tty)) {
+        filp_ioctl(tty, TIOCSPGRP, &current->pgid, false);
+        filp_close(tty);
+    }
+
+    return exitcode;
 }
 
 DEFINE_SYSCALL2(ECE391, getargs, char *, buf, int32_t, nbytes) {

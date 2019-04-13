@@ -46,3 +46,30 @@ void put_session() {
     }
     kfree(session);
 }
+
+int32_t do_setpgid(int32_t pid, int32_t pgid) {
+    if (!pid)
+        pid = current->pid;
+    if (!pgid)
+        pgid = current->pid;
+
+    struct task_struct *task = get_task_from_pid(pid);
+    if (IS_ERR(task))
+        return PTR_ERR(task);
+
+    struct task_struct *leader = get_task_from_pid(pgid);
+    if (IS_ERR(leader))
+        return PTR_ERR(leader);
+
+    if (!task->session || !leader->session)
+        return -EINVAL;
+
+    if (task->session->sid == task->pid)
+        return -EPERM;
+
+    if (task->session != leader->session)
+        return -EPERM;
+
+    task->pgid = pgid;
+    return 0;
+}

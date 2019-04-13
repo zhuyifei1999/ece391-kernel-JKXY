@@ -141,7 +141,7 @@ static unsigned char scancode_map[256] = {
 unsigned char buffer_end;
 bool has_shift, has_ctrl, has_alt, has_caps;
 
-static void do_function(unsigned char scancode_mapped);
+static bool do_function(unsigned char scancode_mapped);
 static unsigned char scancode_fixup_caps(unsigned char scancode, bool has_shift, bool has_caps);
 
 /*
@@ -196,12 +196,11 @@ static void keyboard_handler(struct intr_info *info) {
             unsigned char scancode_mapped = scancode_map[scancode];
             if (!scancode_mapped)
                 continue; // unknown key
-            if (!has_ctrl && !has_alt && scancode_mapped < MSB) { // ascii characters
-                scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
-
-                tty_foreground_keyboard(scancode_mapped);
-            } else { // function key
-                do_function(scancode_mapped);
+            if (!do_function(scancode_mapped)) {
+                if (scancode_mapped < MSB) { // ascii characters
+                    scancode_mapped = scancode_fixup_caps(scancode, has_shift, has_caps);
+                    tty_foreground_keyboard(scancode_mapped, has_ctrl, has_alt);
+                }
             }
         }
     }
@@ -226,17 +225,13 @@ static unsigned char scancode_fixup_caps(unsigned char scancode, bool has_shift,
  *   do_function
  *   DESCRIPTION: wake the keyboard thread due to the scancode
  *   INPUTS: scancode_mapped
- *   OUTPUTS: none
- *   RETURN VALUE: none
- *   SIDE EFFECTS: none
  */
-static void do_function(unsigned char scancode_mapped) {
-    if (scancode_mapped == 'l' && has_ctrl) {
-        // FIXME: this is ultra evil
-        tty_foreground_clear();
-    } else if (has_alt && scancode_mapped >= DO_F1 && scancode_mapped <= DO_F12) {
+static bool do_function(unsigned char scancode_mapped) {
+    if (!has_ctrl && has_alt && scancode_mapped >= DO_F1 && scancode_mapped <= DO_F12) {
         tty_switch_foreground(MKDEV(TTY_MAJOR, scancode_mapped - DO_F1 + 1));
+        return true;
     }
+    return false;
 }
 
 /*

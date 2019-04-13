@@ -1,7 +1,6 @@
 #ifndef _TTY_H
 #define _TTY_H
 
-#include "../task/session.h"
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
 #include "../vfs/device.h"
@@ -13,6 +12,8 @@
 #define TTY_CONSOLE MKDEV(5, 1)
 
 #define TTY_BUFFER_SIZE 128
+
+struct session;
 
 struct tty {
     atomic_t refcount;
@@ -32,11 +33,9 @@ struct tty {
 struct tty *tty_get(uint32_t device_num);
 void tty_put(struct tty *tty);
 
-int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes);
-
-void tty_foreground_keyboard(char chr);
+void tty_foreground_keyboard(char chr, bool has_ctrl, bool has_alt);
 void tty_foreground_puts(const char *s);
-void tty_foreground_clear();
+void tty_foreground_signal(uint16_t signum);
 
 void tty_switch_foreground(uint32_t device_num);
 

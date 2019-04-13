@@ -90,6 +90,8 @@ bool fatal_signal_pending(struct task_struct *task);
 void send_sig(struct task_struct *task, uint16_t signum);
 void force_sig(struct task_struct *task, uint16_t signum);
 
+int32_t send_sig_pg(uint16_t pgid, uint16_t signum);
+
 void kernel_mask_signal(uint16_t signum);
 void kernel_unmask_signal(uint16_t signum);
 

@@ -61,6 +61,7 @@ void do_exit(int exitcode) {
     if (!current->ppid)
         panic("Killing process tree!\n");
 
+    // Signal parent so it can mourn us
     struct task_struct *parent = get_task_from_pid(current->ppid);
     if (parent->sigactions->sigactions[SIGCHLD].action == SIG_IGN) {
         _do_wait(current);
@@ -68,7 +69,14 @@ void do_exit(int exitcode) {
         send_sig(parent, SIGCHLD);
     }
 
-    // TODO: reparent children
+    // Reparent children to init
+    struct list_node *node;
+    list_for_each(&tasks, node) {
+        struct task_struct *task = node->value;
+        if (task->ppid == current->pid)
+            task->ppid = 1;
+    }
+
     schedule();
 
     BUG();

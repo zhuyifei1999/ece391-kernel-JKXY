@@ -4,6 +4,7 @@
 #include "../task/task.h"
 #include "../task/sched.h"
 #include "../task/session.h"
+#include "../task/signal.h"
 #include "../drivers/vga.h"
 #include "../structure/list.h"
 #include "../mm/paging.h"
@@ -14,6 +15,7 @@
 #include "../printk.h"
 #include "../initcall.h"
 #include "../syscall.h"
+#include "../ioctls.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -150,13 +152,16 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
     tty->task = current;
     sti();
 
-    current->state = TASK_UNINTERRUPTIBLE;
+    current->state = TASK_INTERRUPTIBLE;
     // Until the last character in buffer is '\n'
-    while (!tty_should_read(tty))
+    while (!tty_should_read(tty) && !signal_pending(current))
         schedule();
     current->state = TASK_RUNNING;
 
     tty->task = NULL;
+
+    if (signal_pending(current))
+        return -EINTR;
 
     // Don't read more than you can read
     if (nbytes > tty->buffer_end - tty->buffer_start)
@@ -177,7 +182,7 @@ static inline void tty_commit_cursor(struct tty *tty) {
         vga_set_cursor(foreground_tty->cursor_x, foreground_tty->cursor_y);
 }
 
-int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) {
+static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) {
     unsigned long flags;
     cli_and_save(flags);
 
@@ -239,26 +244,86 @@ static int32_t tty_write(struct file *file, const char *buf, uint32_t nbytes) {
     return raw_tty_write(file->vendor, buf, nbytes);
 }
 
-void tty_foreground_keyboard(char chr) {
+static int32_t tty_ioctl(struct file *file, uint32_t request, unsigned long arg, bool arg_user) {
+    struct tty *tty = file->vendor;
+
+    switch (request) {
+    case TIOCGPGRP:
+        if (!tty->session || tty->session != current->session)
+            return -ENOTTY;
+        if (arg_user && safe_buf((uint16_t *)arg, sizeof(uint16_t), true) != sizeof(uint16_t))
+            return -EFAULT;
+        *(uint16_t *)arg = tty->session->foreground_pgid;
+        return 0;
+    case TIOCSPGRP: {
+        if (!tty->session || tty->session != current->session)
+            return -ENOTTY;
+        if (arg_user && safe_buf((uint16_t *)arg, sizeof(uint16_t), false) != sizeof(uint16_t))
+            return -EFAULT;
+        uint16_t pgid = *(uint16_t *)arg;
+        struct task_struct *leader = get_task_from_pid(pgid);
+        if (IS_ERR(leader))
+            return -EINVAL;
+        if (leader->session != tty->session)
+            return -EPERM;
+        tty->session->foreground_pgid = pgid;
+        return 0;
+    }
+    case TIOCGSID:
+        if (!tty->session || tty->session != current->session)
+            return -ENOTTY;
+        if (arg_user && safe_buf((uint16_t *)arg, sizeof(uint16_t), true) != sizeof(uint16_t))
+            return -EFAULT;
+        *(uint16_t *)arg = tty->session->sid;
+        return 0;
+    }
+
+    return -ENOTTY;
+}
+
+void tty_foreground_signal(uint16_t signum) {
+    if (foreground_tty == &early_console)
+        return;
+    if (!foreground_tty->session || !foreground_tty->session->foreground_pgid)
+        return;
+
+    send_sig_pg(foreground_tty->session->foreground_pgid, signum);
+}
+
+void tty_foreground_keyboard(char chr, bool has_ctrl, bool has_alt) {
     if (foreground_tty == &early_console)
         return;
 
-    // When you press enter, the line is committed
-    if (tty_should_read(foreground_tty))
-        return;
-
-    if (chr == '\b') {
-        if (foreground_tty->buffer_end) {
-            tty_foreground_puts((char []){chr, 0});
-            foreground_tty->buffer_end--;
+    if (has_ctrl && !has_alt) {
+        switch (chr) {
+        case 'l':
+        case 'L':
+            tty_clear(foreground_tty);
+            break;
+        case 'c':
+        case 'C':
+            tty_foreground_puts("^C");
+            tty_foreground_signal(SIGINT);
+            break;
         }
-    } else {
-        if (foreground_tty->buffer_end < TTY_BUFFER_SIZE) {
-            foreground_tty->buffer[foreground_tty->buffer_end++] = chr;
-            tty_foreground_puts((char []){chr, 0});
+    } else if (!has_ctrl && !has_alt) {
+        // When you press enter, the line is committed
+        if (tty_should_read(foreground_tty))
+            return;
 
-            if (chr == WAKEUP_CHAR && foreground_tty->task) {
-                wake_up_process(foreground_tty->task);
+        if (chr == '\b') {
+            if (foreground_tty->buffer_end) {
+                tty_foreground_puts((char []){chr, 0});
+                foreground_tty->buffer_end--;
+            }
+        } else {
+            if (foreground_tty->buffer_end < TTY_BUFFER_SIZE) {
+                foreground_tty->buffer[foreground_tty->buffer_end++] = chr;
+                tty_foreground_puts((char []){chr, 0});
+
+                if (chr == WAKEUP_CHAR && foreground_tty->task) {
+                    wake_up_process(foreground_tty->task);
+                }
             }
         }
     }
@@ -275,6 +340,7 @@ void tty_foreground_puts(const char *s) {
 static struct file_operations tty_dev_op = {
     .read    = &tty_read,
     .write   = &tty_write,
+    .ioctl   = &tty_ioctl,
     .open    = &tty_open,
     .release = &tty_release,
 };
@@ -292,13 +358,6 @@ static void tty_clear(struct tty *tty) {
     }
 
     raw_tty_write(tty, tty->buffer, tty->buffer_end);
-}
-
-void tty_foreground_clear() {
-    if (foreground_tty == &early_console)
-        return;
-
-    tty_clear(foreground_tty);
 }
 
 void tty_switch_foreground(uint32_t device_num) {
