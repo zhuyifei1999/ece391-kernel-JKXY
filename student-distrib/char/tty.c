@@ -108,7 +108,7 @@ void tty_put(struct tty *tty) {
     cli_and_save(flags);
 
     // No more reference count, let's enter a critical section and recheck
-    if (!atomic_read(&tty->refcount)) {
+    if (!atomic_get(&tty->refcount)) {
         list_remove(&ttys, tty);
         kfree(tty);
     }

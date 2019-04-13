@@ -11,7 +11,7 @@ typedef struct {
     int32_t val;
 } atomic_t;
 
-static inline __always_inline int32_t atomic_read(atomic_t *var) {
+static inline __always_inline int32_t atomic_get(atomic_t *var) {
     return *(volatile int32_t *)var;
 }
 

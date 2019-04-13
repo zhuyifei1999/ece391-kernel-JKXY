@@ -49,7 +49,7 @@ DEFINE_EXC_HANDLER(fn_name, intr)
 // initialize stub exception handlers
 STUB_EXC_HANDLER("#DE", divide_by_zero,                INTR_EXC_DIVIDE_BY_ZERO_ERROR,          SIGFPE);
 STUB_EXC_HANDLER("#BR", bound_range_exceeded,          INTR_EXC_BOUND_RANGE_EXCEEDED,          SIGSEGV);
-STUB_EXC_HANDLER("#UD", invalid_opcode,                INTR_EXC_INVALID_OPCODE,                SIGSEGV);
+STUB_EXC_HANDLER("#UD", invalid_opcode,                INTR_EXC_INVALID_OPCODE,                SIGILL);
 STUB_EXC_HANDLER("#NM", device_not_available,          INTR_EXC_DEVICE_NOT_AVAILABLE,          SIGBUS);
 STUB_EXC_HANDLER("#DF", double_fault,                  INTR_EXC_DOUBLE_FAULT,                  0);
 STUB_EXC_HANDLER("#TS", invalid_tss,                   INTR_EXC_INVALID_TSS,                   SIGSEGV);

@@ -30,7 +30,7 @@ static int kshell(void *args) {
         if (!strcmp(buf, ""))
             continue;
         else if (!strcmp(buf, "exit"))
-            return 0;
+            break;
         else if (!strcmp(buf, "ps")) {
             fprintf(tty, "PID     PPID    TTY     STAT    COMM\n");
 
@@ -56,7 +56,11 @@ static int kshell(void *args) {
                     (task->session && task->session->foreground_pgid == task->pgid) ? "+" : ""
                 );
 
-                fprintf(tty, "%-8d%-8d%-8s%-8s%s\n", task->pid, task->ppid, tty_field, stat_field, task->comm);
+                fprintf(tty, "%-8d%-8d%-8s%-8s", task->pid, task->ppid, tty_field, stat_field);
+                if (task->mm)
+                    fprintf(tty, "%s\n", task->comm);
+                else
+                    fprintf(tty, "[%s]\n", task->comm);
             }
         } else {
             fprintf(tty, "Unknown command \"%s\"\n", buf);
@@ -64,5 +68,6 @@ static int kshell(void *args) {
     }
 
     filp_close(tty);
+    return 0;
 }
 DEFINE_INIT_KTHREAD(kshell);
