@@ -55,24 +55,31 @@
 struct ata_data {
     int32_t slave_bit;    ///< master/slave
     int32_t ata_base_reg; ///< primary/secondary
-    int32_t stLBA;        ///< lba offset
     int32_t prt_size;     ///< partition size
 };
 
 #define ATA_IRQ_PRIM 14
 #define ATA_IRQ_SEC 15
 
-static struct ata_data primary_driver_info = {
-    .slave_bit = 0,
+static struct ata_data primary_master = {
+    .slave_bit    = 0,
     .ata_base_reg = PRIM_DATA_REG,
-    .prt_size = 0,
-    .stLBA = 0,
+    .prt_size     = 0,
 };
-static struct ata_data secondary_driver_info = {
-    .slave_bit = 0,
+static struct ata_data primary_slave = {
+    .slave_bit    = 1,
+    .ata_base_reg = PRIM_DATA_REG,
+    .prt_size     = 0,
+};
+static struct ata_data secondary_master = {
+    .slave_bit    = 0,
     .ata_base_reg = SEC_DATA_REG,
-    .prt_size = 0,
-    .stLBA = 0,
+    .prt_size     = 0,
+};
+static struct ata_data secondary_slave = {
+    .slave_bit    = 1,
+    .ata_base_reg = SEC_DATA_REG,
+    .prt_size     = 0,
 };
 
 static struct list ata_queue;
@@ -83,7 +90,6 @@ The suggestion is to read the Status register FIVE TIMES,
 and only pay attention to the value returned by the last one
 */
 static void io_delay(struct ata_data *dev) {
-
     int32_t reg_offset = dev->ata_base_reg;
     // 4 consecutive read to implement 400ns delay
     inb(reg_offset + ALTERNATE_STAT);
@@ -92,20 +98,11 @@ static void io_delay(struct ata_data *dev) {
     inb(reg_offset + ALTERNATE_STAT);
 }
 
-__attribute__((unused))
-static void soft_reset(struct ata_data *dev) {
-    int32_t reg_offset = dev->ata_base_reg;
-    outb(CMD_RESET, reg_offset + COMMAND_OFF);
-    outb(0, reg_offset + COMMAND_OFF);
-    io_delay(dev);
-    char stat = inb(reg_offset + ALTERNATE_STAT);
-    // check if BSY clear and RDY set
-    while (!(stat & STAT_RDY) || (stat & STAT_BSY)) {
-        stat = inb(reg_offset + ALTERNATE_STAT);
-    }
-}
-
+// FIXME: Non-existent drives don't show 0 as expected
 static int ata_identify(struct ata_data *ata) {
+    if (ata->prt_size) // Already identified
+        return ata->prt_size;
+
     outb(0xA0, ata->ata_base_reg + DRIVE_HEAD_OFF);
     outb(0, ata->ata_base_reg + SEC_COUNT_OFF);
     outb(0, ata->ata_base_reg + SECTOR_NUM_OFF);
@@ -175,10 +172,6 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
             return irq_ret;
         else if (irq_ret)
             break;
-
-        // current->state = TASK_UNINTERRUPTIBLE;
-        // schedule();
-        // current->state = TASK_RUNNING;
     }
 
     io_delay(dev);
@@ -223,12 +216,6 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     }
     current->state = TASK_RUNNING;
 
-    // int32_t reg_offset = ata->ata_base_reg;
-    // uint8_t status = inb(reg_offset + ALTERNATE_STAT);
-    // if (status | STAT_BSY || status & STAT_DRQ) {
-    //     soft_reset(ata);
-    // }
-
     int32_t byte_count = 0;
     int32_t ret;
     while (nbytes) {
@@ -270,14 +257,26 @@ out:
 }
 
 static int32_t ata_open(struct file *file, struct inode *inode) {
-    if (MINOR(inode->rdev) == 0)
-        file->vendor = &primary_driver_info;
-    else if (MINOR(inode->rdev) == 1)
-        file->vendor = &secondary_driver_info;
-    else
+    switch (MINOR(inode->rdev)) {
+    case 0:
+        file->vendor = &primary_master;
+        break;
+    case 1:
+        file->vendor = &primary_slave;
+        break;
+    case 2:
+        file->vendor = &secondary_master;
+        break;
+    case 3:
+        file->vendor = &secondary_slave;
+        break;
+    default:
         return -ENXIO;
+    }
+
 	if (!ata_identify(file->vendor))
-		return ENXIO;
+        return -ENXIO;
+
     return 0;
 }
 
@@ -317,15 +316,7 @@ static struct file_operations ata_dev_op = {
     .seek    = &ata_seek,
 };
 
-__attribute__((unused))
-static void ata_handler() {
-    wake_up_process(list_peek_front(&ata_queue));
-}
-
 static void ata_init() {
-    // set_irq_handler(ATA_IRQ_PRIM, &ata_handler);
-    // set_irq_handler(ATA_IRQ_SEC, &ata_handler);
-
     // ATA has major device number 8
     register_dev(S_IFBLK, MKDEV(8, MINORMASK), &ata_dev_op);
 }
