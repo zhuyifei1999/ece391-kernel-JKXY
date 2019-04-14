@@ -193,6 +193,7 @@ static int32_t ece391fs_init(struct super_block *sb, struct file *dev) {
 
 err_free:
     kfree(boot_block);
+    return res;
 
 out:
     return default_sb_init(sb, dev);
