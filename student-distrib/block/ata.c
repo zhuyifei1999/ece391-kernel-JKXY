@@ -10,6 +10,7 @@
 #include "../structure/list.h"
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
+#include "../mutex.h"
 #include "../panic.h"
 #include "../err.h"
 #include "../errno.h"
@@ -82,8 +83,10 @@ static struct ata_data secondary_slave = {
     .prt_size     = 0,
 };
 
-static struct list ata_queue;
-LIST_STATIC_INIT(ata_queue);
+static struct mutex ata_mutex;
+MUTEX_STATIC_INIT(ata_mutex);
+
+static struct task_struct *in_service;
 
 /*
 The suggestion is to read the Status register FIVE TIMES,
@@ -151,7 +154,6 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     int32_t reg_offset = dev->ata_base_reg;
     int32_t slavebit = dev->slave_bit;
 
-    cli();
     outb(0xE0 | (slavebit << 4) | ((lba >> 24) & 0x0F), reg_offset + DRIVE_HEAD_OFF);
     outb(0x00, reg_offset + ERROR_FEAT_OFF);
     // write sector count to port
@@ -162,7 +164,6 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     outb((uint8_t)(lba>>16), reg_offset + LBA_HI_OFF);
     // send read command
     outb(CMD_READ_SEC, reg_offset + COMMAND_OFF);
-    sti();
 
     io_delay(dev);
 
@@ -201,28 +202,6 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     return 0;
 }
 
-// TODO: Make these mutexes
-static void ata_lock() {
-    list_insert_back(&ata_queue, current);
-    current->state = TASK_UNINTERRUPTIBLE;
-    while (list_peek_front(&ata_queue) != current) {
-        schedule();
-    }
-    current->state = TASK_RUNNING;
-}
-
-static void ata_unlock() {
-    cli();
-    if (list_peek_front(&ata_queue) != current)
-        BUG();
-    list_pop_front(&ata_queue);
-
-    // Wake up the next in queue
-    if (!list_isempty(&ata_queue))
-        wake_up_process(list_peek_front(&ata_queue));
-    sti();
-}
-
 static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     struct ata_data *ata = file->vendor;
     uint32_t pos = file->pos;
@@ -236,7 +215,8 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     if (!read_head_buf)
         return -ENOMEM;
 
-    ata_lock();
+    mutex_lock_uninterruptable(&ata_mutex);
+    in_service = current;
 
     int32_t byte_count = 0;
     int32_t ret;
@@ -266,8 +246,9 @@ out:
     kfree(read_head_buf);
 
     file->pos = pos;
+    in_service = NULL;
 
-    ata_unlock();
+    mutex_unlock(&ata_mutex);
 
     return ret;
 }
@@ -303,7 +284,7 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
 
     uint32_t size = ata->prt_size;
 
-    ata_lock();
+    mutex_lock_uninterruptable(&ata_mutex);
 
     int32_t ret;
 
@@ -333,7 +314,7 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     ret = new_pos;
 
 out:
-    ata_unlock();
+    mutex_unlock(&ata_mutex);
 
     return ret;
 }
@@ -346,7 +327,8 @@ static struct file_operations ata_dev_op = {
 };
 
 static void ata_handler() {
-    wake_up_process(list_peek_front(&ata_queue));
+    if (in_service)
+        wake_up_process(in_service);
 }
 
 static void ata_init() {
