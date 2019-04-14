@@ -119,7 +119,6 @@ static int kernel_dummy_init(void *args) {
     }
 
     kernel_unmask_signal(SIGTERM);
-    kernel_unmask_signal(SIGCHLD); // We handle children counting
 
     // TODO: Make a centain signal do the subsystem switch
     while (true) {
@@ -130,9 +129,6 @@ static int kernel_dummy_init(void *args) {
                 send_sig(shepards[i], SIGTERM);
             }
             goto do_switch;
-        case SIGCHLD:
-            do_waitall(NULL);
-            break;
         default:
             current->state = TASK_INTERRUPTIBLE;
             schedule();
