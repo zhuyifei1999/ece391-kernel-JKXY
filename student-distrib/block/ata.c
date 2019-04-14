@@ -46,9 +46,8 @@
 #define CMD_SLAVE_ID      0xB0 ///< slave identify command
 #define CMD_ID            0xEC ///< identify command
 
-#define EIGHT_MB 8388608
 
-#define SECTOR_SIZE SECTOR_SIZE
+#define SECTOR_SIZE      512
 
 struct ata_data {
     int32_t slave_bit;    ///< master/slave
@@ -63,13 +62,13 @@ struct ata_data {
 static struct ata_data primary_driver_info = {
     .slave_bit = 0,
     .ata_base_reg = PRIM_DATA_REG,
-    .prt_size = EIGHT_MB,
+    .prt_size = 0,
     .stLBA = 0,
 };
 static struct ata_data secondary_driver_info = {
     .slave_bit = 0,
     .ata_base_reg = SEC_DATA_REG,
-    .prt_size = EIGHT_MB,
+    .prt_size = 0,
     .stLBA = 0,
 };
 
@@ -135,6 +134,7 @@ static int ata_identify(struct ata_data *ata) {
         : "edx", "ecx", "edi"
     );
     int size = (id_buf[61]<<16) | id_buf[60];
+    ata->prt_size = size * SECTOR_SIZE;
     return size * SECTOR_SIZE;
 }
 
@@ -289,7 +289,10 @@ static int32_t ata_open(struct file *file, struct inode *inode) {
 
 static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     int32_t new_pos;
-    uint32_t size = EIGHT_MB; // FIXME: Why?
+    struct ata_data *ata;
+    ata = file->vendor;
+    
+    uint32_t size = ata->prt_size; 
 
     // cases for whence
     switch (whence) {
