@@ -197,8 +197,7 @@ void tty_foreground_mouse(uint16_t dx, uint16_t dy) {
     foreground_tty->mouse_cursor_x = mouse_x;
     foreground_tty->mouse_cursor_y = mouse_y;
     foreground_tty->video_mem[(NUM_COLS *(foreground_tty->mouse_cursor_y/SLOW_FACTOR_Y)
-    + foreground_tty->mouse_cursor_x/SLOW_FACTOR_X) * 2+1] = BLACK_IN_WHITE;
-    
+        + foreground_tty->mouse_cursor_x/SLOW_FACTOR_X) * 2+1] = BLACK_IN_WHITE;
 }
 
 static inline void tty_commit_cursor(struct tty *tty) {

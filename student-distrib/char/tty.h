@@ -38,9 +38,9 @@ void tty_put(struct tty *tty);
 void tty_foreground_keyboard(char chr, bool has_ctrl, bool has_alt);
 void tty_foreground_puts(const char *s);
 void tty_foreground_signal(uint16_t signum);
+void tty_foreground_mouse(uint16_t dx, uint16_t dy);
 
 void tty_switch_foreground(uint32_t device_num);
-void tty_mouse_cursor(uint16_t dx, uint16_t dy);
 void exit_vidmap_cb();
 
 #endif

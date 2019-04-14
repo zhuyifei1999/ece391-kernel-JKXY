@@ -50,12 +50,11 @@ static void mouse_handler(struct intr_info *info){
     byte_3 = inb(PS2_DATA_PORT);
     dx = byte_1;
     dy = byte_1;
-   
+
     // read the signal bits of package
     dx = (int16_t)byte_2 - ((dx << 4) & 0x100);
     dy = (int16_t)byte_3 - ((dy << 3) & 0x100);
-    tty_mouse_cursor(dx,dy);
-
+    tty_foreground_mouse(dx, dy);
 }
 
 /*
