@@ -140,7 +140,7 @@ static int ata_identify(struct ata_data *ata) {
 }
 
 static int32_t ata_should_read(struct ata_data *dev) {
-    uint8_t status = inb(dev->ata_base_reg + ALTERNATE_STAT);
+    uint8_t status = inb(dev->ata_base_reg + STATUS_OFF);
     if (status & STAT_DF || status & STAT_ERR)
         return -EIO;
     return (!(status & STAT_BSY) && (status & STAT_DRQ));
@@ -172,6 +172,10 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
             return irq_ret;
         else if (irq_ret)
             break;
+
+        current->state = TASK_UNINTERRUPTIBLE;
+        schedule();
+        current->state = TASK_RUNNING;
     }
 
     io_delay(dev);
@@ -197,11 +201,34 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     return 0;
 }
 
+// TODO: Make these mutexes
+static void ata_lock() {
+    list_insert_back(&ata_queue, current);
+    current->state = TASK_UNINTERRUPTIBLE;
+    while (list_peek_front(&ata_queue) != current) {
+        schedule();
+    }
+    current->state = TASK_RUNNING;
+}
+
+static void ata_unlock() {
+    cli();
+    if (list_peek_front(&ata_queue) != current)
+        BUG();
+    list_pop_front(&ata_queue);
+
+    // Wake up the next in queue
+    if (!list_isempty(&ata_queue))
+        wake_up_process(list_peek_front(&ata_queue));
+    sti();
+}
+
 static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     struct ata_data *ata = file->vendor;
+    uint32_t pos = file->pos;
 
-    if (nbytes > ata->prt_size - file->pos)
-        nbytes = ata->prt_size - file->pos;
+    if (nbytes > ata->prt_size - pos)
+        nbytes = ata->prt_size - pos;
     if (!nbytes)
         return 0;
 
@@ -209,18 +236,13 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     if (!read_head_buf)
         return -ENOMEM;
 
-    list_insert_back(&ata_queue, current);
-    current->state = TASK_UNINTERRUPTIBLE;
-    while (list_peek_front(&ata_queue) != current) {
-        schedule();
-    }
-    current->state = TASK_RUNNING;
+    ata_lock();
 
     int32_t byte_count = 0;
     int32_t ret;
     while (nbytes) {
-        uint32_t sector_num = file->pos / SECTOR_SIZE;
-        uint32_t sector_off = file->pos % SECTOR_SIZE;
+        uint32_t sector_num = pos / SECTOR_SIZE;
+        uint32_t sector_off = pos % SECTOR_SIZE;
         ret = ata_read_28(sector_num, read_head_buf, ata);
 
         if (ret)
@@ -235,7 +257,7 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
         nbytes -= inner_nbytes;
         byte_count += inner_nbytes;
         buf += inner_nbytes;
-        file->pos += inner_nbytes;
+        pos += inner_nbytes;
     }
 
     ret = byte_count;
@@ -243,15 +265,9 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
 out:
     kfree(read_head_buf);
 
-    cli();
-    if (list_peek_front(&ata_queue) != current)
-        BUG();
-    list_pop_front(&ata_queue);
+    file->pos = pos;
 
-    // Wake up the next in queue
-    if (!list_isempty(&ata_queue))
-        wake_up_process(list_peek_front(&ata_queue));
-    sti();
+    ata_unlock();
 
     return ret;
 }
@@ -287,6 +303,10 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
 
     uint32_t size = ata->prt_size;
 
+    ata_lock();
+
+    int32_t ret;
+
     // cases for whence
     switch (whence) {
     case SEEK_SET:
@@ -299,14 +319,23 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
         new_pos = size + offset;
         break;
     default:
-        return -EINVAL;
+        ret = -EINVAL;
+        goto out;
     }
 
     // check validity of new_pos
-    if (new_pos >= size || new_pos < 0)
-        return -EINVAL;
+    if (new_pos >= size || new_pos < 0) {
+        ret = -EINVAL;
+        goto out;
+    }
+
     file->pos = new_pos;
-    return new_pos;
+    ret = new_pos;
+
+out:
+    ata_unlock();
+
+    return ret;
 }
 
 static struct file_operations ata_dev_op = {
@@ -316,7 +345,14 @@ static struct file_operations ata_dev_op = {
     .seek    = &ata_seek,
 };
 
+static void ata_handler() {
+    wake_up_process(list_peek_front(&ata_queue));
+}
+
 static void ata_init() {
+    set_irq_handler(ATA_IRQ_PRIM, &ata_handler);
+    set_irq_handler(ATA_IRQ_SEC, &ata_handler);
+
     // ATA has major device number 8
     register_dev(S_IFBLK, MKDEV(8, MINORMASK), &ata_dev_op);
 }
