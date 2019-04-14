@@ -161,11 +161,12 @@ noreturn void kernel_main(void) {
     DO_INITCALL(drivers);
 
     // device (1, 0) is 0th initrd
-    // struct file *initrd_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
-    struct file *initrd_block = filp_open_anondevice(MKDEV(8, 2), 0, S_IFBLK | 0666);
-    if (IS_ERR(initrd_block))
-        panic("Could not open initrd: %d\n", PTR_ERR(initrd_block));
-    int32_t res = do_mount(initrd_block, get_sb_op_by_name("ece391fs"), &root_path);
+    struct file *root_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
+    // device (8, 2) is secondary ATA master
+    // struct file *root_block = filp_open_anondevice(MKDEV(8, 2), 0, S_IFBLK | 0666);
+    if (IS_ERR(root_block))
+        panic("Could not open initrd: %d\n", PTR_ERR(root_block));
+    int32_t res = do_mount(root_block, get_sb_op_by_name("ece391fs"), &root_path);
     if (res < 0)
         panic("Could not mount root: %d\n", res);
     swapper_task->cwd = filp_open("/", 0, 0);
