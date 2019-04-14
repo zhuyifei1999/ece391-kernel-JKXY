@@ -26,6 +26,16 @@
 struct task_struct *swapper_task;
 struct task_struct *init_task;
 
+static void mount_root_device(uint32_t device_num, char *fsname) {
+    struct file *root_block = filp_open_anondevice(device_num, 0, S_IFBLK | 0666);
+    if (IS_ERR(root_block))
+        panic("Could not open root device: %d\n", PTR_ERR(root_block));
+    int32_t res = do_mount(root_block, get_sb_op_by_name(fsname), &root_path);
+    if (res < 0)
+        panic("Could not mount root: %d\n", res);
+    filp_close(root_block);
+}
+
 static int run_init_process(void *args) {
     set_current_comm("init");
 
@@ -139,12 +149,20 @@ static int kernel_dummy_init(void *args) {
 do_switch:; // TODO
     int32_t res = do_umount(&root_path);
     if (res < 0)
-        printk("Could not umount root: %d\n", res);
+        panic("Could not umount root: %d\n", res);
 
-    while (true) {
-        current->state = TASK_INTERRUPTIBLE;
-        schedule();
-    }
+    // device (8, 2) is secondary ATA master
+    mount_root_device(MKDEV(8, 2), "ece391fs");
+
+    // attach to TTY 1
+    do_setsid();
+    struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, 1), O_RDWR, S_IFCHR | 0666);
+    if (!IS_ERR(file))
+        filp_close(file);
+
+    tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
+
+    return run_init_process(NULL);
 }
 
 noreturn void kernel_main(void) {
@@ -164,15 +182,7 @@ noreturn void kernel_main(void) {
     DO_INITCALL(drivers);
 
     // device (1, 0) is 0th initrd
-    struct file *root_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
-    // device (8, 2) is secondary ATA master
-    // struct file *root_block = filp_open_anondevice(MKDEV(8, 2), 0, S_IFBLK | 0666);
-    if (IS_ERR(root_block))
-        panic("Could not open initrd: %d\n", PTR_ERR(root_block));
-    int32_t res = do_mount(root_block, get_sb_op_by_name("ece391fs"), &root_path);
-    if (res < 0)
-        panic("Could not mount root: %d\n", res);
-    filp_close(root_block);
+    mount_root_device(MKDEV(1, 0), "ece391fs");
 
     init_task = kernel_thread(&kernel_dummy_init, NULL);
 
