@@ -167,26 +167,28 @@ void deliver_signal(struct intr_info *regs) {
         extern uint8_t ECE391_sigret_start;
         extern uint8_t ECE391_sigret_stop;
 
+        uint32_t saved_esp = regs->esp;
+
         if (push_userstack(regs, &ECE391_sigret_start, &ECE391_sigret_stop - &ECE391_sigret_start) < 0)
             goto force_segv;
         uint32_t returnaddr = regs->esp;
 
         struct ece391_user_context context = {
-            .ebx = regs->ebx,
-            .ecx = regs->ecx,
-            .edx = regs->edx,
-            .esi = regs->esi,
-            .edi = regs->edi,
-            .ebp = regs->ebp,
-            .eax = regs->eax,
-            .ds = regs->ds,
-            .es = regs->es,
-            .fs = regs->fs,
-            .eip = regs->eip,
-            .cs = regs->cs,  // DO NOT restore this
+            .ebx    = regs->ebx,
+            .ecx    = regs->ecx,
+            .edx    = regs->edx,
+            .esi    = regs->esi,
+            .edi    = regs->edi,
+            .ebp    = regs->ebp,
+            .eax    = regs->eax,
+            .ds     = regs->ds,
+            .es     = regs->es,
+            .fs     = regs->fs,
+            .eip    = regs->eip,
+            .cs     = regs->cs, // DO NOT restore this
             .eflags = regs->eflags,
-            .esp = regs->esp,
-            .ss = regs->ss,
+            .esp    = saved_esp,
+            .ss     = regs->ss,
         };
 
         if (push_userstack(regs, &context, sizeof(context)) < 0)
@@ -265,20 +267,20 @@ DEFINE_SYSCALL_COMPLEX(ECE391, sigreturn, regs) {
         return;
     }
 
-    regs->ebx = context->ebx;
-    regs->ecx = context->ecx;
-    regs->edx = context->edx;
-    regs->esi = context->esi;
-    regs->edi = context->edi;
-    regs->ebp = context->ebp;
-    regs->eax = context->eax;
-    regs->ds = context->ds;
-    regs->es = context->es;
-    regs->fs = context->fs;
-    regs->eip = context->eip;
+    regs->ebx    = context->ebx;
+    regs->ecx    = context->ecx;
+    regs->edx    = context->edx;
+    regs->esi    = context->esi;
+    regs->edi    = context->edi;
+    regs->ebp    = context->ebp;
+    regs->eax    = context->eax;
+    regs->ds     = context->ds;
+    regs->es     = context->es;
+    regs->fs     = context->fs;
+    regs->eip    = context->eip;
     regs->eflags = context->eflags;
-    regs->esp = context->esp;
-    regs->ss = context->ss;
+    regs->esp    = context->esp;
+    regs->ss     = context->ss;
 
     // FIXME: Bad regs here can cause a panic
 

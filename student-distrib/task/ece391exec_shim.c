@@ -38,7 +38,7 @@ static int ece391execute_child(void *args) {
 
     struct file *tty = filp_open_anondevice(TTY_CURRENT, O_RDWR, S_IFCHR | 0666);
     if (!IS_ERR(tty)) {
-        filp_ioctl(tty, TIOCSPGRP, &current->pgid, false);
+        filp_ioctl(tty, TIOCSPGRP, (uint32_t)&current->pgid, false);
         filp_close(tty);
     }
 
@@ -81,7 +81,7 @@ DEFINE_SYSCALL1(ECE391, execute, char *, command) {
 
     struct file *tty = filp_open_anondevice(TTY_CURRENT, O_RDWR, S_IFCHR | 0666);
     if (!IS_ERR(tty)) {
-        filp_ioctl(tty, TIOCSPGRP, &current->pgid, false);
+        filp_ioctl(tty, TIOCSPGRP, (uint32_t)&current->pgid, false);
         filp_close(tty);
     }
 
