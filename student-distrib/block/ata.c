@@ -7,6 +7,7 @@
 #include "../task/task.h"
 #include "../task/sched.h"
 #include "../structure/list.h"
+#include "../mm/kmalloc.h"
 #include "../lib/io.h"
 #include "../panic.h"
 #include "../err.h"
@@ -45,7 +46,9 @@
 #define CMD_SLAVE_ID      0xB0 ///< slave identify command
 #define CMD_ID            0xEC ///< identify command
 
-#define EIGHT_MB            8388608
+#define EIGHT_MB 8388608
+
+#define SECTOR_SIZE SECTOR_SIZE
 
 struct ata_data {
     int32_t slave_bit;    ///< master/slave
@@ -132,7 +135,7 @@ static int ata_identify(struct ata_data *ata) {
         : "edx", "ecx", "edi"
     );
     int size = (id_buf[61]<<16) | id_buf[60];
-    return size * 512;
+    return size * SECTOR_SIZE;
 }
 
 static int32_t ata_should_read(struct ata_data *dev) {
@@ -181,7 +184,7 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
         current->state = TASK_RUNNING;
     }
 
-    // read 512 bytes to buffer
+    // read SECTOR_SIZE bytes to buffer
     asm volatile (
         "               \n\
         movl %1,%%edx   \n\
@@ -211,7 +214,6 @@ out:
     return ret;
 }
 
-static char read_head_buf[512];
 static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     struct ata_data *ata = file->vendor;
     uint32_t off = file->pos;
@@ -223,37 +225,57 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
         soft_reset(ata);
     }
 
-    uint32_t sector_start = off/512;
-    uint32_t sector_end = (nbytes + off)/512;
+    uint32_t sector_start = off / SECTOR_SIZE;
+    uint32_t sector_end = (nbytes + off) / SECTOR_SIZE;
 
-    if(sector_start > sector_end || sector_end > 0xFFFFFF )
-        return -1;
-    if (0 != ata_read_28( sector_start , read_head_buf, ata))
-        return -1;
-    if(sector_start == sector_end){
-        memcpy(buf, read_head_buf + off % 512, nbytes);
-        return nbytes;
+    if (sector_start > sector_end || sector_end > 0xFFFFFF)
+        return 0;
+
+    read_head_buf = kmalloc(SECTOR_SIZE);
+
+    int32_t res;
+    int32_t ret;
+    res = ata_read_28(sector_start, read_head_buf, ata);
+    if (res) {
+        ret = res;
+        goto out;
     }
-    memcpy(buf, read_head_buf + off % 512, 512 - off % 512);
-    buf += 512 - off % 512;
-    byte_count += 512 - off % 512;
-    for(; sector_start < sector_end ; ++sector_start ){
-        if (0 != ata_read_28( sector_start , buf, ata))
-           return -1;
-        buf += 512;
-        byte_count += 512;   
+    if (sector_start == sector_end) {
+        memcpy(buf, read_head_buf + off % SECTOR_SIZE, nbytes);
+        ret = nbytes;
+        goto out;
     }
 
-    if (0 != ata_read_28( sector_end , read_head_buf, ata))
-        return -1;
-    memcpy(buf, read_head_buf, (nbytes + off) % 512 );
-    byte_count += (nbytes + off) % 512;
+    memcpy(buf, read_head_buf + off % SECTOR_SIZE, SECTOR_SIZE - off % SECTOR_SIZE);
+    buf += SECTOR_SIZE - off % SECTOR_SIZE;
+    byte_count += SECTOR_SIZE - off % SECTOR_SIZE;
+    for (; sector_start < sector_end; sector_start++) {
+        res = ata_read_28(sector_start, read_head_buf, ata);
+        if (res) {
+            ret = res;
+            goto out;
+        }
+        buf += SECTOR_SIZE;
+        byte_count += SECTOR_SIZE;
+    }
 
-    return byte_count;
+    res = ata_read_28(sector_start, read_head_buf, ata);
+    if (res) {
+        ret = res;
+        goto out;
+    }
+
+    memcpy(buf, read_head_buf, (nbytes + off) % SECTOR_SIZE);
+    byte_count += (nbytes + off) % SECTOR_SIZE;
+
+    ret = byte_count;
+
+out:
+    kfree(read_head_buf);
+    return ret;
 }
 
 static int32_t ata_open(struct file *file, struct inode *inode) {
-	
     if (MINOR(inode->rdev) == 0)
         file->vendor = &primary_driver_info;
     else if (MINOR(inode->rdev) == 1)
@@ -264,9 +286,10 @@ static int32_t ata_open(struct file *file, struct inode *inode) {
 		return ENXIO;
     return 0;
 }
+
 static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     int32_t new_pos;
-    uint32_t size = EIGHT_MB;
+    uint32_t size = EIGHT_MB; // FIXME: Why?
 
     // cases for whence
     switch (whence) {
@@ -289,6 +312,7 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     file->pos = new_pos;
     return new_pos;
 }
+
 static struct file_operations ata_dev_op = {
     .read    = &ata_read,
     //.write   = &ata_write,
