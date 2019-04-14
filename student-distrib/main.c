@@ -172,6 +172,7 @@ noreturn void kernel_main(void) {
     int32_t res = do_mount(root_block, get_sb_op_by_name("ece391fs"), &root_path);
     if (res < 0)
         panic("Could not mount root: %d\n", res);
+    filp_close(root_block);
 
     init_task = kernel_thread(&kernel_dummy_init, NULL);
 

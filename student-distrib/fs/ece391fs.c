@@ -3,6 +3,7 @@
 #include "../vfs/device.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
+#include "../atomic.h"
 #include "../err.h"
 #include "../errno.h"
 #include "../initcall.h"
