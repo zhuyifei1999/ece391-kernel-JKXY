@@ -24,6 +24,8 @@ struct tty {
     struct list vidmaps;
     uint16_t cursor_x;
     uint16_t cursor_y;
+    int16_t mouse_cursor_x;
+    int16_t mouse_cursor_y;
     // FIXME: This should be handled by the line discipline
     uint8_t buffer_start;
     uint8_t buffer_end;
@@ -38,7 +40,7 @@ void tty_foreground_puts(const char *s);
 void tty_foreground_signal(uint16_t signum);
 
 void tty_switch_foreground(uint32_t device_num);
-
+void tty_mouse_cursor(uint16_t dx, uint16_t dy);
 void exit_vidmap_cb();
 
 #endif

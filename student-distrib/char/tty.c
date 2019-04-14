@@ -20,6 +20,8 @@
 #include "../errno.h"
 
 #define TTY_BUFFER_SIZE 128
+#define SLOW_FACTOR_X 16
+#define SLOW_FACTOR_Y 32
 
 #define WAKEUP_CHAR '\n'
 
@@ -175,6 +177,28 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
         tty->buffer_start = tty->buffer_end = 0;
 
     return nbytes;
+}
+
+void tty_foreground_mouse(uint16_t dx, uint16_t dy) {
+    foreground_tty->video_mem[(NUM_COLS *(foreground_tty->mouse_cursor_y/SLOW_FACTOR_Y)
+    + foreground_tty->mouse_cursor_x/SLOW_FACTOR_X) * 2+1] = WHITE_ON_BLACK;
+    int16_t mouse_x, mouse_y;
+    mouse_x = foreground_tty->mouse_cursor_x + dx;
+    mouse_y = foreground_tty->mouse_cursor_y - dy;
+    // check the position of mouse cursor
+    if (mouse_x < 0)
+        mouse_x = 0;
+    else if (mouse_x >= NUM_COLS * SLOW_FACTOR_X)
+        mouse_x = NUM_COLS * SLOW_FACTOR_X - 1;
+    if (mouse_y < 0)
+        mouse_y = 0;
+    else if (mouse_y >= NUM_ROWS * SLOW_FACTOR_Y)
+        mouse_y = NUM_ROWS * SLOW_FACTOR_Y -1;
+    foreground_tty->mouse_cursor_x = mouse_x;
+    foreground_tty->mouse_cursor_y = mouse_y;
+    foreground_tty->video_mem[(NUM_COLS *(foreground_tty->mouse_cursor_y/SLOW_FACTOR_Y)
+    + foreground_tty->mouse_cursor_x/SLOW_FACTOR_X) * 2+1] = BLACK_IN_WHITE;
+    
 }
 
 static inline void tty_commit_cursor(struct tty *tty) {
@@ -391,6 +415,8 @@ void tty_switch_foreground(uint32_t device_num) {
     foreground_tty = tty;
     memcpy(vga_mem, tty->video_mem, LEN_4K);
     tty->video_mem = vga_mem;
+
+    //foreground_tty->video_mem[(NUM_COLS *foreground_tty->mouse_cursor_y + foreground_tty->mouse_cursor_x) * 2 + 1] = BLACK_IN_WHITE;
 
     tty_commit_cursor(tty);
 
