@@ -211,33 +211,43 @@ out:
     return ret;
 }
 
+static char read_head_buf[512];
 static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     struct ata_data *ata = file->vendor;
-    int32_t block_count = nbytes%512 ? nbytes/512 + 1 : nbytes/512;
     uint32_t off = file->pos;
     int32_t reg_offset = ata->ata_base_reg;
     int32_t byte_count = 0;
-
-    if (block_count < 0) {
-        soft_reset(ata);
-    }
-
-    if (block_count > 0x3FFFFF)
-        return -1;
 
     uint8_t status = inb(reg_offset + STATUS_OFF);
     if (status | STAT_BSY || status & STAT_DRQ) {
         soft_reset(ata);
     }
-    int i;
-    int32_t lba = ata->stLBA + off/512;
 
-    for (i = 0; i < block_count; i++) {
-        if (0 != ata_read_28( (lba+i) , buf, ata))
+    uint32_t sector_start = off/512;
+    uint32_t sector_end = (nbytes + off)/512;
+
+    if(sector_start > sector_end || sector_end > 0xFFFFFF )
+        return -1;
+    if (0 != ata_read_28( sector_start , read_head_buf, ata))
+        return -1;
+    if(sector_start == sector_end){
+        memcpy(buf, read_head_buf + off % 512, nbytes);
+        return nbytes;
+    }
+    memcpy(buf, read_head_buf + off % 512, 512 - off % 512);
+    buf += 512 - off % 512;
+    byte_count += 512 - off % 512;
+    for(; sector_start < sector_end ; ++sector_start ){
+        if (0 != ata_read_28( sector_start , buf, ata))
            return -1;
         buf += 512;
-        byte_count += 512;
+        byte_count += 512;   
     }
+
+    if (0 != ata_read_28( sector_end , read_head_buf, ata))
+        return -1;
+    memcpy(buf, read_head_buf, (nbytes + off) % 512 );
+    byte_count += (nbytes + off) % 512;
 
     return byte_count;
 }
@@ -252,11 +262,36 @@ static int32_t ata_open(struct file *file, struct inode *inode) {
 
     return 0;
 }
+static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
+    int32_t new_pos;
+    uint32_t size = EIGHT_MB;
 
+    // cases for whence
+    switch (whence) {
+    case SEEK_SET:
+        new_pos = offset;
+        break;
+    case SEEK_CUR:
+        new_pos = file->pos + offset;
+        break;
+    case SEEK_END:
+        new_pos = size + offset;
+        break;
+    default:
+        return -EINVAL;
+    }
+
+    // check validity of new_pos
+    if (new_pos >= size || new_pos < 0)
+        return -EINVAL;
+    file->pos = new_pos;
+    return new_pos;
+}
 static struct file_operations ata_dev_op = {
     .read    = &ata_read,
     // .write   = &ata_write,
     .open    = &ata_open,
+    .seek    = &ata_seek,
 };
 
 static void ata_handler() {
