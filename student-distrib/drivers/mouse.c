@@ -1,18 +1,10 @@
 #include "ps2.h"
 #include "../irq.h"
-#include "../lib/stdbool.h"
-#include "../lib/cli.h"
 #include "../lib/io.h"
 #include "../initcall.h"
 #include "../char/tty.h"
 
 #define MOUSE_IRQ 12
-
-#define NUM_COLS    80
-#define NUM_ROWS    25
-
-#define SLOW_FACTOR_X 16
-#define SLOW_FACTOR_Y 32
 
 // Generic PS/2 Mouse Packet Bits
 // BYTE	7	6	5	4	3	2	1	0
