@@ -116,7 +116,7 @@ static int ata_identify(struct ata_data *ata) {
         stat = inb(ata->ata_base_reg + STATUS_OFF);
     }
     while (!(stat & STAT_DRQ)) {
-        if (stat &STAT_ERR)
+        if (stat & STAT_ERR)
             return -EIO;
         stat = inb(ata->ata_base_reg + STATUS_OFF);
     }
@@ -130,12 +130,12 @@ static int ata_identify(struct ata_data *ata) {
         rep insw        \n\
         "
         :
-        : "r"(&id_buf), "r"(0x1f0)
+        : "r"(&id_buf), "r"(ata->ata_base_reg)
         : "edx", "ecx", "edi"
     );
     int size = (id_buf[61]<<16) | id_buf[60];
     ata->prt_size = size * SECTOR_SIZE;
-    return size * SECTOR_SIZE;
+    return ata->prt_size;
 }
 
 static int32_t ata_should_read(struct ata_data *dev) {
@@ -231,7 +231,7 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     if (sector_start > sector_end || sector_end > 0xFFFFFF)
         return 0;
 
-    read_head_buf = kmalloc(SECTOR_SIZE);
+    char *read_head_buf = kmalloc(SECTOR_SIZE);
 
     int32_t res;
     int32_t ret;
@@ -282,7 +282,7 @@ static int32_t ata_open(struct file *file, struct inode *inode) {
         file->vendor = &secondary_driver_info;
     else
         return -ENXIO;
-	if(0==ata_identify(file->vendor))
+	if (!ata_identify(file->vendor))
 		return ENXIO;
     return 0;
 }
@@ -291,8 +291,8 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     int32_t new_pos;
     struct ata_data *ata;
     ata = file->vendor;
-    
-    uint32_t size = ata->prt_size; 
+
+    uint32_t size = ata->prt_size;
 
     // cases for whence
     switch (whence) {
