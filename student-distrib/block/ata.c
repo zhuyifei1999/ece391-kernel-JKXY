@@ -140,7 +140,7 @@ static int ata_identify(struct ata_data *ata) {
 }
 
 static int32_t ata_should_read(struct ata_data *dev) {
-    uint8_t status = inb(dev->ata_base_reg + ALTERNATE_STAT);
+    uint8_t status = inb(dev->ata_base_reg + STATUS_OFF);
     if (status & STAT_DF || status & STAT_ERR)
         return -EIO;
     return (!(status & STAT_BSY) && (status & STAT_DRQ));
@@ -345,7 +345,14 @@ static struct file_operations ata_dev_op = {
     .seek    = &ata_seek,
 };
 
+static void ata_handler() {
+    wake_up_process(list_peek_front(&ata_queue));
+}
+
 static void ata_init() {
+    set_irq_handler(ATA_IRQ_PRIM, &ata_handler);
+    set_irq_handler(ATA_IRQ_SEC, &ata_handler);
+
     // ATA has major device number 8
     register_dev(S_IFBLK, MKDEV(8, MINORMASK), &ata_dev_op);
 }
