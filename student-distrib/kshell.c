@@ -1,7 +1,18 @@
 #include "lib/stdio.h"
+#include "task/clone.h"
+#include "task/exit.h"
 #include "task/kthread.h"
 #include "task/session.h"
 #include "char/tty.h"
+#include "tests.h"
+
+#if RUN_TESTS
+static int kselftest(void *args) {
+    set_current_comm("kselftest");
+    launch_tests();
+    return 0;
+}
+#endif
 
 #define BUFSIZE 1024
 
@@ -62,6 +73,14 @@ static int kshell(void *args) {
                 else
                     fprintf(tty, "[%s]\n", task->comm);
             }
+        } else if (!strcmp(buf, "kselftest")) {
+#if RUN_TESTS
+            struct task_struct *kselftest_task = kernel_thread(&kselftest, NULL);
+            wake_up_process(kselftest_task);
+            do_wait(kselftest_task);
+#else
+            fprintf(tty, "kselftest unavailable\n");
+#endif
         } else {
             fprintf(tty, "Unknown command \"%s\"\n", buf);
         }
