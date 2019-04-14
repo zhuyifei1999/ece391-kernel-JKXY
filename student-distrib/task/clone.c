@@ -96,7 +96,8 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
     // TODO: handle OOMs, if fail I think they should just be SIGSEGV-ed
 
     // increase reference count
-    atomic_inc(&current->cwd->refcount);
+    if (current->cwd)
+        atomic_inc(&current->cwd->refcount);
     if (current->exe)
         atomic_inc(&current->exe->refcount);
     if (current->session)

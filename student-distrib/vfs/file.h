@@ -137,6 +137,8 @@ struct file {
     // struct address_space *mapping;
 };
 
+void put_inode(struct inode *inode);
+
 void fill_default_file_op(struct file_operations *file_op);
 void fill_default_ino_op(struct inode_operations *ino_op);
 

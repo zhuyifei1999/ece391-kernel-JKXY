@@ -219,7 +219,7 @@ static void rtc_char_expect_rate(struct file *dev, uint8_t rate) {
 }
 
 static void rtc_char_test_single(uint8_t rate) {
-    struct file *dev = filp_open("rtc", O_RDWR, 0);
+    struct file *dev = filp_open("/rtc", O_RDWR, 0);
     TEST_ASSERT(!IS_ERR(dev));
 
     uint32_t freq = rtc_rate_to_freq(rate);
@@ -241,7 +241,7 @@ DEFINE_TEST(rtc_char_test);
 
 // test initial rate is 2Hz (rate = 15)
 static void rtc_char_test_initial_rate_bad_input() {
-    struct file *dev = filp_open("rtc", O_RDWR, 0);
+    struct file *dev = filp_open("/rtc", O_RDWR, 0);
     TEST_ASSERT(!IS_ERR(dev));
     rtc_char_expect_rate(dev, 15);
 

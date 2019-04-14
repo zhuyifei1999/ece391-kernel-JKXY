@@ -3,6 +3,7 @@
 #include "task/exit.h"
 #include "task/kthread.h"
 #include "task/session.h"
+#include "task/signal.h"
 #include "char/tty.h"
 #include "tests.h"
 
@@ -81,6 +82,9 @@ static int kshell(void *args) {
 #else
             fprintf(tty, "kselftest unavailable\n");
 #endif
+        } else if (!strcmp(buf, "startlinux")) {
+            extern struct task_struct *init_task;
+            send_sig(init_task, SIGTERM);
         } else {
             fprintf(tty, "Unknown command \"%s\"\n", buf);
         }

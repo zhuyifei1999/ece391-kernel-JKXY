@@ -263,7 +263,8 @@ DEFINE_INITCALL(init_ece391fs, drivers);
 __testfunc
 static void ece391fs_ls_test() {
     char buf[TEST_LS_BUF_SIZE];
-    struct file *root = filp_open(".", 0, 0);
+    struct file *root = filp_open("/", 0, 0);
+    TEST_ASSERT(!IS_ERR(root));
     TEST_ASSERT(filp_read(root, buf, TEST_LS_BUF_SIZE) == sizeof(".") - 1);
     TEST_ASSERT(!strncmp(buf, ".", sizeof(".") - 1));
     TEST_ASSERT(filp_read(root, buf, TEST_LS_BUF_SIZE) == sizeof("sigtest") - 1);
@@ -309,7 +310,8 @@ static const char target[] = "very large text file with a very long name\n123456
 __testfunc
 static void ece391fs_rs_test() {
     char buf[TEST_RS_BUF_SIZE];
-    struct file *file = filp_open("verylargetextwithverylongname.tx", 0, 0);
+    struct file *file = filp_open("/verylargetextwithverylongname.tx", 0, 0);
+    TEST_ASSERT(!IS_ERR(file));
     TEST_ASSERT(filp_read(file, buf, TEST_RS_BUF_SIZE) == sizeof(target) - 1);
     TEST_ASSERT(!strncmp(buf, target, sizeof(target) - 1));
     TEST_ASSERT(filp_read(file, buf, TEST_RS_BUF_SIZE) == 0);
@@ -334,8 +336,9 @@ DEFINE_TEST(ece391fs_rs_test);
 __testfunc
 static void ece391fs_ro_test() {
     char buf[TEST_RO_BUF_SIZE];
-    struct file *file = filp_open("verylargetextwithverylongname.tx", O_RDWR, 0);
+    struct file *file = filp_open("/verylargetextwithverylongname.tx", O_RDWR, 0);
     // TODO: implement mount options and do EROFS
+    TEST_ASSERT(!IS_ERR(file));
     TEST_ASSERT(filp_write(file, buf, TEST_RO_BUF_SIZE) < 0);
     TEST_ASSERT(!filp_close(file));
 }
@@ -344,7 +347,7 @@ DEFINE_TEST(ece391fs_ro_test);
 // test that names longer than maximum fails
 __testfunc
 static void ece391fs_longname_test() {
-    TEST_ASSERT(IS_ERR(filp_open("verylargetextwithverylongname.txt", 0, 0)));
+    TEST_ASSERT(IS_ERR(filp_open("/verylargetextwithverylongname.txt", 0, 0)));
 }
 DEFINE_TEST(ece391fs_longname_test);
 #endif

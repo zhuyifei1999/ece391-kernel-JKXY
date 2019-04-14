@@ -29,7 +29,8 @@ void do_exit(int exitcode) {
     // HACK
     exit_vidmap_cb();
 
-    filp_close(current->cwd);
+    if (current->cwd)
+        filp_close(current->cwd);
     if (current->exe)
         filp_close(current->exe);
     if (current->session)

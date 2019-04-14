@@ -30,7 +30,7 @@ static int run_init_process(void *args) {
     set_current_comm("init");
 
     char *argv[] = {
-        "shell",
+        "/shell",
         NULL
     };
     char *envp[] = {
@@ -136,8 +136,15 @@ static int kernel_dummy_init(void *args) {
         }
     }
 
-do_switch: // TODO
-    panic("TODO");
+do_switch:; // TODO
+    int32_t res = do_umount(&root_path);
+    if (res < 0)
+        printk("Could not umount root: %d\n", res);
+
+    while (true) {
+        current->state = TASK_INTERRUPTIBLE;
+        schedule();
+    }
 }
 
 noreturn void kernel_main(void) {
@@ -165,9 +172,6 @@ noreturn void kernel_main(void) {
     int32_t res = do_mount(root_block, get_sb_op_by_name("ece391fs"), &root_path);
     if (res < 0)
         panic("Could not mount root: %d\n", res);
-    swapper_task->cwd = filp_open("/", 0, 0);
-    if (IS_ERR(swapper_task->cwd))
-        panic("Could not set working directory to root directory: %d\n", PTR_ERR(swapper_task->cwd));
 
     init_task = kernel_thread(&kernel_dummy_init, NULL);
 

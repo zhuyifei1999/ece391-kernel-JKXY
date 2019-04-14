@@ -16,6 +16,8 @@ void path_destroy(struct path *path) {
         kfree(node->value);
     }
     list_destroy(&path->components);
+    if (path->mnt)
+        put_mount(path->mnt);
     kfree(path);
 }
 
@@ -66,6 +68,9 @@ struct path *path_join(struct path *x, struct path *y) {
     if (!path)
         return ERR_PTR(-ENOMEM);
     path->mnt = x->mnt;
+    if (path->mnt)
+        atomic_inc(&path->mnt->refcount);
+
     list_init(&path->components);
 
     // add components from x
@@ -159,7 +164,11 @@ struct path *path_checkmnt(struct path *old) {
             return path;
 
         // ... and truncate the path to the mount
+        if (path->mnt)
+            put_mount(path->mnt);
         path->mnt = bestmatch;
+        atomic_inc(&path->mnt->refcount);
+
         struct list_node *pathnode;
         list_for_each(&bestmatch->path->components, pathnode) {
             kfree(list_pop_front(&path->components));

@@ -12,11 +12,11 @@
 #include "../errno.h"
 
 /*
- *   inode_decref
+ *   put_inode
  *   DESCRIPTION: destroy the inode
  *   INPUTS: struct inode *inode
  */
-void inode_decref(struct inode *inode) {
+void put_inode(struct inode *inode) {
     int32_t refcount = atomic_dec(&inode->refcount);
     if (refcount)
         return;
@@ -74,6 +74,11 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
     if (IS_ERR(path_dest)) {
         ret = ERR_CAST(path_dest);
         goto out_premount;
+    } else if (!path_dest->mnt) {
+        // We don't have a mount table?
+        path_destroy(path_dest);
+        ret = ERR_PTR(-EINVAL);
+        goto out_premount;
     }
 
     // now, from the mount root, get the inode
@@ -101,7 +106,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
             goto out_inode_decref;
         }
         // destroy the inode
-        inode_decref(inode);
+        put_inode(inode);
         inode = next_inode;
     }
 
@@ -151,7 +156,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
 
 // destroy three contents
 out_inode_decref:
-    inode_decref(inode);
+    put_inode(inode);
 
     if (IS_ERR(ret))
         path_destroy(path_dest);
@@ -229,7 +234,7 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     }
 
 out_inode_decref:
-    inode_decref(inode);
+    put_inode(inode);
 
 out_destroy_path:
     if (IS_ERR(ret))
@@ -307,7 +312,7 @@ int32_t filp_close(struct file *file) {
     (*file->op->release)(file);
     // destroy the path
     path_destroy(file->path);
-    inode_decref(file->inode);
+    put_inode(file->inode);
     kfree(file);
     return 0;
 }
