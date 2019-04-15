@@ -69,6 +69,7 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         goto out_rel;
     }
 
+resolve_mount:;
     // now resolve mounts
     struct path *path_dest = path_checkmnt(path_premount);
     if (IS_ERR(path_dest)) {
@@ -114,6 +115,52 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
     if (flags & O_EXCL && !created) {
         ret = ERR_PTR(-EEXIST);
         goto out_inode_decref;
+    }
+
+    if ((inode->mode & S_IFMT) == S_IFLNK) {
+        char *link_target = kmalloc(MAX_PATH + 1);
+        if (!link_target) {
+            ret = ERR_PTR(-ENOMEM);
+            goto out_inode_decref;
+        }
+        link_target[MAX_PATH] = '\0';
+
+        int32_t res = (*inode->op->readlink)(inode, link_target, MAX_PATH);
+        if (res < 0) {
+            kfree(link_target);
+            ret = ERR_PTR(res);
+            goto out_inode_decref;
+        }
+        if (!res) {
+            kfree(link_target);
+            ret = ERR_PTR(-EINVAL);
+            goto out_inode_decref;
+        }
+
+        link_target[res] = '\0';
+
+        list_pop_back(&path_dest->components);
+
+        struct path *path_target_rel = path_fromstr(link_target);
+        kfree(link_target);
+        if (IS_ERR(path_target_rel)) {
+            ret = ERR_CAST(path_target_rel);
+            goto out_inode_decref;
+        }
+
+        struct path *path_target = path_join(path_dest, path_target_rel);
+        path_destroy(path_target_rel);
+        if (IS_ERR(path_target)) {
+            ret = ERR_CAST(path_target);
+            goto out_inode_decref;
+        }
+
+        path_destroy(path_dest);
+        path_destroy(path_premount);
+        put_inode(inode);
+        path_premount = path_target;
+
+        goto resolve_mount;
     }
 
     struct file_operations *file_op;
@@ -555,7 +602,9 @@ int32_t default_ino_lookup(struct inode *inode, const char *name, uint32_t flags
 // int32_t default_ino_rmdir(struct inode *inode, const char *, int32_t);
 // int32_t default_ino_mknod(struct inode *inode, const char *, int32_t, int32_t, int32_t);
 // int32_t default_ino_rename(struct inode *inode, const char *, int32_t, struct inode *, const char *, int32_t);
-// int32_t default_ino_readlink(struct inode *inode, char *, int32_t);
+int32_t default_ino_readlink(struct inode *inode, char *buf, int32_t nbytes) {
+    return -EINVAL;
+}
 void default_ino_truncate(struct inode *inode) {
 }
 
@@ -593,6 +642,8 @@ void fill_default_ino_op(struct inode_operations *ino_op) {
         ino_op->create = &default_ino_create;
     if (!ino_op->lookup)
         ino_op->lookup = &default_ino_lookup;
+    if (!ino_op->readlink)
+        ino_op->readlink = &default_ino_readlink;
     if (!ino_op->truncate)
         ino_op->truncate = &default_ino_truncate;
 }

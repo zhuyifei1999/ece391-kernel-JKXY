@@ -6,6 +6,8 @@
 #include "readdir.h"
 #include "../atomic.h"
 
+#define MAX_PATH 260
+
 // #define O_RDONLY  0x0
 #define O_WRONLY  0x1
 #define O_RDWR    0x2
@@ -80,7 +82,7 @@ struct inode_operations {
     // int32_t (*rmdir)(struct inode *,const char *,int32_t);
     // int32_t (*mknod)(struct inode *,const char *,int32_t,int32_t,int32_t);
     // int32_t (*rename)(struct inode *,const char *,int32_t,struct inode *,const char *,int32_t);
-    // int32_t (*readlink)(struct inode *,char *,int32_t);
+    int32_t (*readlink)(struct inode *,char *,int32_t);
     // int32_t (*follow_link)(struct inode *,struct inode *,int32_t,int32_t,struct inode **);
     // int32_t (*readpage)(struct inode *, struct page *);
     // int32_t (*writepage)(struct inode *, struct page *);
@@ -162,6 +164,7 @@ int32_t default_file_open(struct file *file, struct inode *inode);
 void default_file_release(struct file *file);
 int32_t default_ino_create(struct inode *inode, const char *name, uint32_t flags, uint16_t mode, struct inode **next);
 int32_t default_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next);
+int32_t default_ino_readlink(struct inode *inode, char *buf, int32_t nbytes);
 void default_ino_truncate(struct inode *inode);
 
 #endif

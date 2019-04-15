@@ -40,12 +40,13 @@ static int run_init_process(void *args) {
     set_current_comm("init");
 
     char *argv[] = {
-        "/shell",
+        args,
         NULL
     };
     char *envp[] = {
         "HOME=/",
-        // "TERM=linux"
+        "TERM=linux",
+        "PATH=/:/bin",
         NULL
     };
 
@@ -84,7 +85,7 @@ static int kernel_init_shepherd(void *args) {
     kernel_unmask_signal(SIGTERM);
     kernel_unmask_signal(SIGCHLD);
 
-    struct task_struct *userspace_init = kernel_thread(&run_init_process, NULL);
+    struct task_struct *userspace_init = kernel_thread(&run_init_process, "/shell");
     wake_up_process(userspace_init);
 
     while (true) {
@@ -95,7 +96,7 @@ static int kernel_init_shepherd(void *args) {
             return 0;
         case SIGCHLD:
             do_wait(userspace_init);
-            userspace_init = kernel_thread(&run_init_process, NULL);
+            userspace_init = kernel_thread(&run_init_process, "/shell");
             wake_up_process(userspace_init);
             break;
         default:
@@ -181,7 +182,7 @@ do_switch_loop:;
 
     tty_switch_foreground(MKDEV(TTY_MAJOR, 4));
 
-    return run_init_process(NULL);
+    return run_init_process("/bin/sh");
 }
 
 noreturn void kernel_main(void) {

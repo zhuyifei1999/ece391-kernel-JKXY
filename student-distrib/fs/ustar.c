@@ -151,7 +151,7 @@ static int32_t ustar_readdir(struct file *file, void *data, filldir_t filldir) {
                 type = S_IFREG;
                 break;
             case TYPE_HARD: // TODO
-            case TYPE_SYM: // TODO
+            case TYPE_SYM:
                 type = S_IFLNK;
                 break;
             case TYPE_CHAR:
@@ -268,6 +268,25 @@ err_free_info:
     return res;
 }
 
+static int32_t ustar_ino_readlink(struct inode *inode, char *buf, int32_t nbytes) {
+    if ((inode->mode & S_IFMT) != S_IFLNK)
+        return -EINVAL;
+
+    if (!nbytes)
+        return 0;
+
+    struct ustar_inode_info *info = inode->vendor;
+
+    uint32_t len = strlen(info->metadata.link_target);
+
+    if (nbytes > len)
+        nbytes = len;
+
+    strncpy(buf, info->metadata.link_target, nbytes);
+
+    return nbytes;
+}
+
 struct file_operations ustar_file_op = {
     .read = &ustar_read,
     .readdir = &ustar_readdir,
@@ -276,6 +295,7 @@ struct file_operations ustar_file_op = {
 struct inode_operations ustar_ino_op = {
     .default_file_ops = &ustar_file_op,
     .lookup = &ustar_ino_lookup,
+    .readlink = &ustar_ino_readlink,
 };
 
 static int32_t ustar_read_inode(struct inode *inode) {
