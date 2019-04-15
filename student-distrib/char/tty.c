@@ -29,12 +29,15 @@
 static struct list ttys;
 LIST_STATIC_INIT(ttys);
 
+// set the start of video memory
 struct tty early_console = {
     .video_mem = (char *)VIDEO,
 };
 
+// set early_console to be the tty in the foreground
 struct tty *foreground_tty = &early_console;
 
+// video map entry struct contains pointer to task struct and page table entry
 struct vidmaps_entry {
     struct task_struct *task;
     struct page_table_entry *table;
@@ -51,6 +54,7 @@ struct tty *tty_get(uint32_t device_num) {
     if (device_num == TTY_CURRENT) {
         if (!current->session || !current->session->tty)
             return ERR_PTR(-ENXIO);
+        // increase reference count of tty
         atomic_inc(&current->session->tty->refcount);
         return current->session->tty;
     }
@@ -73,12 +77,15 @@ struct tty *tty_get(uint32_t device_num) {
         }
     }
 
+    // allocate one page for video memory
     void *video_mem = alloc_pages(1, 0, 0);
+    // sanity check
     if (!video_mem) {
         ret = ERR_PTR(-ENOMEM);
         goto out;
     }
 
+    // dynamically allocate memory for return
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
         ret = ERR_PTR(-ENOMEM);
@@ -86,13 +93,16 @@ struct tty *tty_get(uint32_t device_num) {
         goto out;
     }
 
+    // set return value to tty
     *ret = (struct tty){
         .device_num = device_num,
         .video_mem = video_mem,
     };
     atomic_set(&ret->refcount, 1);
+    // create list of vidmaps
     list_init(&ret->vidmaps);
 
+    //insert to back of ttys
     list_insert_back(&ttys, ret);
 
     tty_clear(ret);
@@ -119,10 +129,13 @@ void tty_put(struct tty *tty) {
 }
 
 static int32_t tty_open(struct file *file, struct inode *inode) {
+    // get the tty according to specified inode
     struct tty *tty = tty_get(inode->rdev);
+    // perform sanity check
     if (IS_ERR(tty))
         return PTR_ERR(tty);
 
+    // place tty into vendor
     file->vendor = tty;
 
     if (
@@ -138,6 +151,8 @@ static int32_t tty_open(struct file *file, struct inode *inode) {
 
     return 0;
 }
+
+// release tty calls the put function
 static void tty_release(struct file *file) {
     tty_put(file->vendor);
 }
