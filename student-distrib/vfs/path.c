@@ -145,31 +145,26 @@ int32_t path_subsumes(struct path *parent, struct path *child) {
     if (parent->mnt != child->mnt || parent->absolute != child->absolute)
         return -1;
 
-    struct path *path_cloned = path_clone(child);
-
     int32_t matchsize = 0;
-    struct list_node *pathnode;
-    // ... with the most matching components
-    list_for_each(&parent->components, pathnode) {
-        if (list_isempty(&path_cloned->components)) {
-            // our path depletes before mount. not this one
-            matchsize = -1;
-            break;
-        }
 
-        char *component = list_pop_front(&path_cloned->components);
-        if (!strcmp(component, pathnode->value)) {
+    // We are messing with two lists at once, not using list_for_each for efficiency
+    struct list_node *parentnode = parent->components.first.next;
+    struct list_node *childnode = child->components.first.next;
+
+    while (true) {
+        if (parentnode->value == childnode->value) {
+            if (!parentnode->value)
+                return matchsize;
             matchsize++;
-            kfree(component);
             continue;
         }
-        kfree(component);
-        break;
+
+        // parent depletes before child
+        if (!parentnode->value && childnode->value)
+            return matchsize;
+
+        return -1;
     }
-
-    path_destroy(path_cloned);
-
-    return matchsize;
 }
 
 bool path_is_same(struct path *x, struct path *y) {
@@ -195,6 +190,7 @@ struct path *path_checkmnt(struct path *old) {
 
             int32_t matchsize = path_subsumes(entry->path, path);
 
+            // ... with the most matching components
             if (matchsize >= bestmatchsize) {
                 bestmatch = entry;
                 bestmatchsize = matchsize;
