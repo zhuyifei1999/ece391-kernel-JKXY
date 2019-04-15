@@ -42,9 +42,11 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
 
     struct file *ret;
 
-    char *first_component = list_peek_front(&path_rel->components);
     struct path *path_premount;
-    if (*first_component) {
+    if (path_rel->absolute) {
+        // absolute path
+        path_premount = path_clone(path_rel);
+    } else {
         // relative path
         struct file *rel;
         if (dfd == AT_FDCWD) {
@@ -59,9 +61,6 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         // TODO: ENOTDIR
 
         path_premount = path_join(rel->path, path_rel);
-    } else {
-        // absolute path
-        path_premount = path_clone(path_rel);
     }
 
     // check if the path is vaild

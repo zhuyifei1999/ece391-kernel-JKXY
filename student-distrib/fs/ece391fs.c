@@ -148,7 +148,7 @@ static int32_t ece391fs_readdir(struct file *file, void *data, filldir_t filldir
 }
 
 // find the inode number and prepare the inode struct, given the filename
-int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next) {
+static int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next) {
     struct ece391fs_dentry *dentry;
     int32_t res;
     res = ece391fs_read_dentry_by_name(inode->sb, name, &dentry);
