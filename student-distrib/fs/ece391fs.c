@@ -103,7 +103,6 @@ static int32_t ece391fs_read(struct file *file, char *buf, uint32_t nbytes) {
     return read;
 }
 
-// This reads one filename from the directory
 static int32_t ece391fs_readdir(struct file *file, void *data, filldir_t filldir) {
     struct ece391fs_dentry *dentry;
 
@@ -112,7 +111,6 @@ static int32_t ece391fs_readdir(struct file *file, void *data, filldir_t filldir
         if (!ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry))
             break;
 
-        file->pos++;
 
         char *name = dentry->name;
         uint8_t len = strlen(name);
@@ -139,6 +137,7 @@ static int32_t ece391fs_readdir(struct file *file, void *data, filldir_t filldir
         if (res < 0)
             break;
 
+        file->pos++;
         i++;
         if (res)
             break;

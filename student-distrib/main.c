@@ -134,10 +134,7 @@ static int kernel_dummy_init(void *args) {
     while (true) {
         uint16_t signal = kernel_get_pending_sig();
         switch (signal) {
-        case SIGTERM: // TODO: Do subsystem switch
-            for (i = 0; i < NUM_TERMS; i++) {
-                send_sig(shepards[i], SIGTERM);
-            }
+        case SIGTERM:
             goto do_switch;
         default:
             current->state = TASK_INTERRUPTIBLE;
@@ -146,13 +143,34 @@ static int kernel_dummy_init(void *args) {
         }
     }
 
-do_switch:; // TODO
+do_switch:
+    for (i = 0; i < NUM_TERMS; i++) {
+        send_sig(shepards[i], SIGTERM);
+    }
+
+    // Terminate all userspace
+    struct list_node *node;
+    list_for_each(&tasks, node) {
+        struct task_struct *task = node->value;
+        if (task->mm && task->subsystem == SUBSYSTEM_ECE391 && task != current)
+            send_sig(task, SIGTERM);
+    }
+
+    // Wait for them to exit. Because we are child reaper, SIGCHLD messes up our
+    // terminal reading if we don't wait first.
+    schedule();
+    list_for_each(&tasks, node) {
+        struct task_struct *task = node->value;
+        if (task->mm && task->subsystem == SUBSYSTEM_ECE391 && task != current)
+            goto do_switch;
+    }
+
     int32_t res = do_umount(&root_path);
     if (res < 0)
         panic("Could not umount root: %d\n", res);
 
     // device (8, 2) is secondary ATA master
-    mount_root_device(MKDEV(8, 2), "ece391fs");
+    mount_root_device(MKDEV(8, 2), "ustar");
 
     // attach to TTY 7
     do_setsid();

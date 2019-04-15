@@ -152,10 +152,16 @@ int32_t path_subsumes(struct path *parent, struct path *child) {
     struct list_node *childnode = child->components.first.next;
 
     while (true) {
-        if (parentnode->value == childnode->value) {
+        if (
+            parentnode->value == childnode->value || (
+                parentnode->value && childnode->value &&
+                !strcmp(parentnode->value, childnode->value
+        ))) {
             if (!parentnode->value)
                 return matchsize;
             matchsize++;
+            parentnode = parentnode->next;
+            childnode = childnode->next;
             continue;
         }
 
