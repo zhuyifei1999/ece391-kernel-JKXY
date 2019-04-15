@@ -3,6 +3,7 @@
 
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
+#include "readdir.h"
 #include "../atomic.h"
 
 // #define O_RDONLY  0x0
@@ -56,7 +57,7 @@ struct file_operations {
     int32_t (*seek)(struct file *, int32_t, int32_t);
     int32_t (*read)(struct file *, char *, uint32_t);
     int32_t (*write)(struct file *, const char *, uint32_t);
-    // int32_t (*readdir)(struct file *, void *, filldir_t); // TODO: define filldir_t
+    int32_t (*readdir)(struct file *, void *, filldir_t);
     // int32_t (*select)(struct file *, int32_t, select_table *);
     int32_t (*ioctl)(struct file *, uint32_t, unsigned long, bool);
     // int32_t (*mmap)(struct file *, struct vm_area_struct *);
@@ -97,8 +98,8 @@ struct inode {
     // struct list dentry;
     uint32_t ino;
     uint32_t nlink;
-    // uint32_t uid;
-    // uint32_t gid;
+    uint32_t uid;
+    uint32_t gid;
     uint32_t rdev;
     uint32_t size;
     // struct timespec atime;
@@ -148,6 +149,7 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode);
 
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence);
 int32_t filp_read(struct file *file, void *buf, uint32_t nbytes);
+int32_t filp_readdir(struct file *file, void *data, filldir_t filldir);
 int32_t filp_ioctl(struct file *file, uint32_t request, unsigned long arg, bool arg_user);
 int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes);
 int32_t filp_close(struct file *file);

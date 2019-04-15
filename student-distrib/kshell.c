@@ -10,6 +10,8 @@
 #if RUN_TESTS
 static int kselftest(void *args) {
     set_current_comm("kselftest");
+    current->subsystem = SUBSYSTEM_ECE391;
+
     launch_tests();
     return 0;
 }

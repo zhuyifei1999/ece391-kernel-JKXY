@@ -84,7 +84,7 @@ static int32_t ece391fs_read_data(struct super_block *sb, uint32_t inode, uint32
 }
 
 // this reads a file until the file is fully read or nbytes runs out, whichever comes first
-static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes) {
+static int32_t ece391fs_read(struct file *file, char *buf, uint32_t nbytes) {
     // maximum to read
     if (nbytes > file->inode->size - file->pos)
         nbytes = file->inode->size - file->pos;
@@ -104,39 +104,47 @@ static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes)
 }
 
 // This reads one filename from the directory
-static int32_t ece391fs_dir_read(struct file *file, char *buf, uint32_t nbytes) {
-    // TODO: Should be handled by VFS
-    // TODO: only for ece391 subsystem
+static int32_t ece391fs_readdir(struct file *file, void *data, filldir_t filldir) {
     struct ece391fs_dentry *dentry;
-    int32_t res;
-    res = ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry);
-    if (!res)
-        return 0;
 
-    file->pos++;
+    int i = 0;
+    while (true) {
+        if (!ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry))
+            break;
 
-    char *name = dentry->name;
-    uint8_t len = strlen(name);
+        file->pos++;
 
-    // read at most this size. if the filename is larger than nbytes well too bad then
-    if (len > sizeof(dentry->name))
-        len = sizeof(dentry->name);
-    if (len > nbytes)
-        len = nbytes;
+        char *name = dentry->name;
+        uint8_t len = strlen(name);
 
-    strncpy(buf, name, len);
-    return len;
-}
+        // read at most this size. if the filename is larger than nbytes well too bad then
+        if (len > sizeof(dentry->name))
+            len = sizeof(dentry->name);
 
-static int32_t ece391fs_read(struct file *file, char *buf, uint32_t nbytes) {
-    switch (file->inode->mode & S_IFMT) {
-    case S_IFREG:
-        return ece391fs_file_read(file, buf, nbytes);
-    case S_IFDIR:
-        return ece391fs_dir_read(file, buf, nbytes);
-    default:
-        return -EINVAL; // VFS should handle the rest
+        uint32_t type;
+
+        switch (dentry->type) {
+        case 0: // RTC device
+            type = S_IFCHR;
+            break;
+        case 1: // Root directory
+            type = S_IFDIR;
+            break;
+        case 2:; // Regular file
+            type = S_IFREG;
+            break;
+        }
+
+        int32_t res = (*filldir)(data, name, len, file->pos, dentry->inode_num, type);
+        if (res < 0)
+            break;
+
+        i++;
+        if (res)
+            break;
     }
+
+    return i;
 }
 
 // find the inode number and prepare the inode struct, given the filename
@@ -166,6 +174,7 @@ int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flag
 
 struct file_operations ece391fs_file_op = {
     .read = &ece391fs_read,
+    .readdir = &ece391fs_readdir,
 };
 struct inode_operations ece391fs_ino_op = {
     .default_file_ops = &ece391fs_file_op,

@@ -4,6 +4,7 @@
 #include "mount.h"
 #include "device.h"
 #include "dummyinode.h"
+#include "readdir.h"
 #include "../lib/string.h"
 #include "../task/task.h"
 #include "../mm/kmalloc.h"
@@ -132,6 +133,12 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         break;
     }
 
+    if (current->subsystem == SUBSYSTEM_LINUX)
+        if ((inode->mode & S_IFMT) == S_IFDIR && ((flags & O_WRONLY) || (flags & O_RDWR))) {
+            ret = ERR_PTR(-EISDIR);
+            goto out_inode_decref;
+        }
+
     // allocate the space in the kernel
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
@@ -251,6 +258,9 @@ out_destroy_path:
  *   operation
  */
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
+    if ((file->inode->mode & S_IFMT) == S_IFDIR)
+        return -EISDIR;
+
     return (*file->op->seek)(file, offset, whence);
 }
 
@@ -262,12 +272,30 @@ int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
  *   operation
  */
 int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
-    char *buf_char = buf;
-
     if ((file->flags & O_WRONLY))
         return -EINVAL;
+    if ((file->inode->mode & S_IFMT) == S_IFDIR) {
+        switch (current->subsystem) {
+        case SUBSYSTEM_LINUX:
+            return -EISDIR;
+        case SUBSYSTEM_ECE391:
+            return compat_ece391_dir_read(file, buf, nbytes);
+        }
+    }
 
-    return (*file->op->read)(file, buf_char, nbytes);
+    return (*file->op->read)(file, buf, nbytes);
+}
+
+/*
+ *   filp_readdir
+ *   DESCRIPTION: read the directory
+ *   INPUTS: struct file *file, void *data, filldir_t filldir
+ */
+int32_t filp_readdir(struct file *file, void *data, filldir_t filldir) {
+    if ((file->inode->mode & S_IFMT) != S_IFDIR)
+        return -ENOTDIR;
+
+    return (*file->op->readdir)(file, data, filldir);
 }
 
 /*
@@ -278,15 +306,15 @@ int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
  *   operation
  */
 int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes) {
-    const char *buf_char = buf;
-
     if (!(file->flags & O_WRONLY) && !(file->flags & O_RDWR))
         return -EINVAL;
+    if ((file->inode->mode & S_IFMT) == S_IFDIR)
+        return -EISDIR;
     if (file->flags & O_APPEND)
         filp_seek(file, 0, SEEK_END);
 
     // invoke the write operation
-    return (*file->op->write)(file, buf_char, nbytes);
+    return (*file->op->write)(file, buf, nbytes);
 }
 
 /*
@@ -498,6 +526,9 @@ int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
 int32_t default_file_read(struct file *file, char *buf, uint32_t nbytes) {
     return -EINVAL;
 }
+int32_t default_file_readdir(struct file *file, void *data, filldir_t filldir) {
+    return -ENOTDIR;
+}
 int32_t default_file_write(struct file *file, const char *buf, uint32_t nbytes) {
     return -EINVAL;
 }
@@ -540,6 +571,8 @@ void fill_default_file_op(struct file_operations *file_op) {
         file_op->seek = &default_file_seek;
     if (!file_op->read)
         file_op->read = &default_file_read;
+    if (!file_op->readdir)
+        file_op->readdir = &default_file_readdir;
     if (!file_op->write)
         file_op->write = &default_file_write;
     if (!file_op->ioctl)
