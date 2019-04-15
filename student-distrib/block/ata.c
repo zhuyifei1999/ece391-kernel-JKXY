@@ -174,7 +174,7 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
             break;
 
         // current->state = TASK_UNINTERRUPTIBLE;
-        // schedule();
+        schedule();
         // current->state = TASK_RUNNING;
     }
 
@@ -281,8 +281,6 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
 
     uint32_t size = ata->prt_size;
 
-    mutex_lock_uninterruptable(&ata_mutex);
-
     int32_t ret;
 
     // cases for whence
@@ -311,8 +309,6 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     ret = new_pos;
 
 out:
-    mutex_unlock(&ata_mutex);
-
     return ret;
 }
 
