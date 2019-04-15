@@ -143,6 +143,7 @@ static int ata_identify(struct ata_data *ata) {
 }
 
 static int32_t ata_should_read(struct ata_data *dev) {
+    io_delay(dev);
     uint8_t status = inb(dev->ata_base_reg + STATUS_OFF);
     if (status & STAT_DF || status & STAT_ERR)
         return -EIO;
@@ -165,8 +166,6 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     // send read command
     outb(CMD_READ_SEC, reg_offset + COMMAND_OFF);
 
-    io_delay(dev);
-
     while (true) {
         int32_t irq_ret = ata_should_read(dev);
         if (irq_ret < 0)
@@ -178,8 +177,6 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
         schedule();
         current->state = TASK_RUNNING;
     }
-
-    io_delay(dev);
 
     // read sector to buffer
     asm volatile (
