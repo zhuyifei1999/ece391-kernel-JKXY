@@ -336,8 +336,13 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
             return NULL;
     }
 
-    // TODO: if page + num cross boundaries
-    if (num > NUM_ENTRIES)
+    if ((gfp_flags & GFP_LARGE) && num > NUM_ENTRIES)
+        return NULL;
+    if (
+        !(gfp_flags & GFP_LARGE) &&
+        (PAGE_DIR_IDX((uint32_t)page) != PAGE_DIR_IDX((uint32_t)page + num * PAGE_SIZE_SMALL)
+    ))
+        // TODO: Handle this cross boundary
         return NULL;
 
     cli_and_save(flags);

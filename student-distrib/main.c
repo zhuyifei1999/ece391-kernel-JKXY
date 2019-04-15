@@ -65,6 +65,8 @@ static int run_init_process(void *args) {
     return res;
 }
 
+#if HAS_ECE391
+
 static int kernel_init_shepherd(void *args) {
     set_current_comm("shepherd");
 
@@ -107,6 +109,8 @@ static int kernel_init_shepherd(void *args) {
     }
 }
 
+#endif
+
 static int kernel_dummy_init(void *args) {
     // The purpose of this dummy PID 1 is to fork off all the shells on different TTYs,
     // because the ECE391 subsystem is too bad and can't self-govern.
@@ -114,6 +118,8 @@ static int kernel_dummy_init(void *args) {
     set_current_comm("kernel_init");
 
     tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
+
+#if HAS_ECE391
 
     int i;
 
@@ -166,6 +172,7 @@ do_switch_loop:;
         if (task->mm && task->subsystem == SUBSYSTEM_ECE391 && task != current)
             goto do_switch_loop;
     }
+#endif
 
     int32_t res = do_umount(&root_path);
     if (res < 0)
