@@ -173,9 +173,9 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
         else if (irq_ret)
             break;
 
-        current->state = TASK_UNINTERRUPTIBLE;
-        schedule();
-        current->state = TASK_RUNNING;
+        // current->state = TASK_UNINTERRUPTIBLE;
+        // schedule();
+        // current->state = TASK_RUNNING;
     }
 
     // read sector to buffer
@@ -323,14 +323,14 @@ static struct file_operations ata_dev_op = {
     .seek    = &ata_seek,
 };
 
-static void ata_handler() {
-    if (in_service)
-        wake_up_process(in_service);
-}
+// static void ata_handler() {
+//     if (in_service)
+//         wake_up_process(in_service);
+// }
 
 static void ata_init() {
-    set_irq_handler(ATA_IRQ_PRIM, &ata_handler);
-    set_irq_handler(ATA_IRQ_SEC, &ata_handler);
+    // set_irq_handler(ATA_IRQ_PRIM, &ata_handler);
+    // set_irq_handler(ATA_IRQ_SEC, &ata_handler);
 
     // ATA has major device number 8
     register_dev(S_IFBLK, MKDEV(8, MINORMASK), &ata_dev_op);
