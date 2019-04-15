@@ -148,6 +148,7 @@ do_switch:
         send_sig(shepards[i], SIGTERM);
     }
 
+do_switch_loop:;
     // Terminate all userspace
     struct list_node *node;
     list_for_each(&tasks, node) {
@@ -162,7 +163,7 @@ do_switch:
     list_for_each(&tasks, node) {
         struct task_struct *task = node->value;
         if (task->mm && task->subsystem == SUBSYSTEM_ECE391 && task != current)
-            goto do_switch;
+            goto do_switch_loop;
     }
 
     int32_t res = do_umount(&root_path);
