@@ -7,16 +7,6 @@
 #include "../char/tty.h"
 #include "../vfs/file.h"
 
-// TODO: Migrate to TTY
-// void update_mouse(uint32_t x, uint32_t y) {
-//     static uint32_t mouse_x_prev, mouse_y_prev;
-//     video_mem[(NUM_COLS * mouse_y_prev + mouse_y_prev) * 2 + 1] = ATTRIB;
-//     mouse_y_prev = y;
-//     mouse_x_prev = x;
-//     i = (NUM_COLS * y + x);
-//     video_mem[(NUM_COLS * y + x) * 2 + 1] = 0x70;
-// }
-
 struct printf_target {
     int32_t len_printed;
     // Case 1: print to string

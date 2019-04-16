@@ -18,50 +18,51 @@
 #define ATA_PRIM_IRQ 14 // primary bus irq num
 #define ATA_SEC_IRQ  15 // secondary bus irq num
 
-#define PRIM_DATA_REG  0x1F0 ///< primary IO port: 0x1F0 - 0x1F7
-#define SEC_DATA_REG   0x170 ///< primary IO port: 0x170 - 0x177
+#define PRIM_DATA_REG  0x1F0 // primary IO port: 0x1F0 - 0x1F7
+#define SEC_DATA_REG   0x170 // primary IO port: 0x170 - 0x177
 
-#define ERROR_FEAT_OFF 0x1   ///< feature/error register
-#define SEC_COUNT_OFF  0x2   ///< sector count
-#define SECTOR_NUM_OFF 0x3   ///< sector number
-#define LBA_LO_OFF     0x3   ///< lba_lo
-#define CYLIND_LOW_OFF 0x4   ///< cylinder low
-#define LBA_MID_OFF    0x4   ///< lba_mid
-#define CYLIND_HI_OFF  0x5   ///< cylinder high
-#define LBA_HI_OFF     0x5   ///< lba_hi
-#define DRIVE_HEAD_OFF 0x6   ///< drive/head
+#define ERROR_FEAT_OFF 0x1   // feature/error register
+#define SEC_COUNT_OFF  0x2   // sector count
+#define SECTOR_NUM_OFF 0x3   // sector number
+#define LBA_LO_OFF     0x3   // lba_lo
+#define CYLIND_LOW_OFF 0x4   // cylinder low
+#define LBA_MID_OFF    0x4   // lba_mid
+#define CYLIND_HI_OFF  0x5   // cylinder high
+#define LBA_HI_OFF     0x5   // lba_hi
+#define DRIVE_HEAD_OFF 0x6   // drive/head
 #define STATUS_OFF     0x7
 #define COMMAND_OFF    0x7
 #define ALTERNATE_STAT 0x206
 
-#define STAT_ERR 0x01 ///< status bit err
-#define STAT_DRQ 0x08 ///< status bit drq
-#define STAT_SRV 0x10 ///< status bit srv
-#define STAT_DF  0x20 ///< status bit df
-#define STAT_RDY 0x40 ///< status bit rdy
-#define STAT_BSY 0x80 ///< status bit bsy
+#define STAT_ERR 0x01 // status bit err
+#define STAT_DRQ 0x08 // status bit drq
+#define STAT_SRV 0x10 // status bit srv
+#define STAT_DF  0x20 // status bit df
+#define STAT_RDY 0x40 // status bit rdy
+#define STAT_BSY 0x80 // status bit bsy
 
-#define CMD_RESET         0x4  ///< reset command
-#define CMD_READ_SEC      0x20 ///< sector read command
-#define CMD_READ_SEC_EXT  0x24 ///< sector read ext command
-#define CMD_WRITE_SEC     0x30 ///< sector write command
-#define CMD_WRITE_SEC_EXT 0x34 ///< sector write ext command
-#define CMD_CACHE_FLUSH   0xE7 ///< cache flush command
-#define CMD_MASTER_ID     0xA0 ///< master identify command
-#define CMD_SLAVE_ID      0xB0 ///< slave identify command
-#define CMD_ID            0xEC ///< identify command
+#define CMD_RESET         0x4  // reset command
+#define CMD_READ_SEC      0x20 // sector read command
+#define CMD_READ_SEC_EXT  0x24 // sector read ext command
+#define CMD_WRITE_SEC     0x30 // sector write command
+#define CMD_WRITE_SEC_EXT 0x34 // sector write ext command
+#define CMD_CACHE_FLUSH   0xE7 // cache flush command
+#define CMD_MASTER_ID     0xA0 // master identify command
+#define CMD_SLAVE_ID      0xB0 // slave identify command
+#define CMD_ID            0xEC // identify command
 
 #define SECTOR_SIZE      512
 
 struct ata_data {
-    int32_t slave_bit;    ///< master/slave
-    int32_t ata_base_reg; ///< primary/secondary
-    int32_t prt_size;     ///< partition size
+    int32_t slave_bit;    // master/slave
+    int32_t ata_base_reg; // primary/secondary
+    int32_t prt_size;     // partition size
 };
 
 #define ATA_IRQ_PRIM 14
 #define ATA_IRQ_SEC 15
 
+// initialize the driver info struct
 static struct ata_data primary_master = {
     .slave_bit    = 0,
     .ata_base_reg = PRIM_DATA_REG,
@@ -92,6 +93,11 @@ static struct task_struct *in_service;
 The suggestion is to read the Status register FIVE TIMES,
 and only pay attention to the value returned by the last one
 */
+/*
+ *   io_delay
+ *   DESCRIPTION: read status reg for four times to gain a 400ns's delay
+ *   INPUTS: struct ata_data *dev
+ */
 static void io_delay(struct ata_data *dev) {
     int32_t reg_offset = dev->ata_base_reg;
     // 4 consecutive read to implement 400ns delay
@@ -102,6 +108,12 @@ static void io_delay(struct ata_data *dev) {
 }
 
 // FIXME: Non-existent drives don't show 0 as expected
+/*
+ *   ata_identify
+ *   DESCRIPTION: identitfy the ata hard disk. check if it is exist and get the size of it
+ *   INPUTS: struct ata_data *dev
+ *   OUTPUT: the size of disk
+ */
 static int ata_identify(struct ata_data *ata) {
     if (ata->prt_size) // Already identified
         return ata->prt_size;
@@ -114,6 +126,7 @@ static int ata_identify(struct ata_data *ata) {
     outb(CMD_ID, ata->ata_base_reg + COMMAND_OFF);
     uint8_t stat = inb(ata->ata_base_reg + ALTERNATE_STAT);
 
+    // check if the feedback of ata is valid
     if (!stat)
         return -ENXIO;
     while (stat & STAT_BSY) {
@@ -125,6 +138,7 @@ static int ata_identify(struct ata_data *ata) {
         stat = inb(ata->ata_base_reg + ALTERNATE_STAT);
     }
 
+    // copy the content from io port for 256 times
     uint16_t id_buf[256];
     asm volatile (
         "               \n\
@@ -137,11 +151,19 @@ static int ata_identify(struct ata_data *ata) {
         : "r"(&id_buf), "r"(ata->ata_base_reg)
         : "edx", "ecx", "edi"
     );
+
+    // the 60,61 byte contain the data of disk size
     int size = (id_buf[61]<<16) | id_buf[60];
     ata->prt_size = size * SECTOR_SIZE;
     return ata->prt_size;
 }
 
+/*
+ *   ata_should_read
+ *   DESCRIPTION: check if the status reg of ata to see if it is ready to read/write
+ *   INPUTS: struct ata_data *dev
+ *   OUTPUT: check code
+ */
 static int32_t ata_should_read(struct ata_data *dev) {
     io_delay(dev);
     uint8_t status = inb(dev->ata_base_reg + STATUS_OFF);
@@ -150,6 +172,12 @@ static int32_t ata_should_read(struct ata_data *dev) {
     return (!(status & STAT_BSY) && (status & STAT_DRQ));
 }
 
+/*
+ *   ata_read_28
+ *   DESCRIPTION: read data from ata in 28bit mode
+ *   INPUTS: uint32_t lba, char *buf, struct ata_data *dev
+ *   OUTPUT: check code
+ */
 static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     uint8_t ret_state;
     int32_t reg_offset = dev->ata_base_reg;
@@ -166,6 +194,7 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     // send read command
     outb(CMD_READ_SEC, reg_offset + COMMAND_OFF);
 
+    // wait ata interrupt and then handle the packet
     while (true) {
         int32_t irq_ret = ata_should_read(dev);
         if (irq_ret < 0)
@@ -199,6 +228,12 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     return 0;
 }
 
+/*
+ *   ata_read_28
+ *   DESCRIPTION: read data from ata
+ *   INPUTS: uint32_t lba, char *buf, struct ata_data *dev
+ *   OUTPUT: the size of data it read
+ */
 static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     struct ata_data *ata = file->vendor;
     uint32_t pos = file->pos;
@@ -208,10 +243,12 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     if (!nbytes)
         return 0;
 
+    // malloc the data buf
     char *read_head_buf = kmalloc(SECTOR_SIZE);
     if (!read_head_buf)
         return -ENOMEM;
 
+    // use mutex to resist other processes
     mutex_lock_uninterruptable(&ata_mutex);
     in_service = current;
 
@@ -220,8 +257,10 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     while (nbytes) {
         uint32_t sector_num = pos / SECTOR_SIZE;
         uint32_t sector_off = pos % SECTOR_SIZE;
+        // call ata_read_28 to read data
         ret = ata_read_28(sector_num, read_head_buf, ata);
 
+        // if it read all
         if (ret)
             goto out;
 
@@ -231,6 +270,7 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
 
         memcpy(buf, read_head_buf + sector_off, inner_nbytes);
 
+        // record the reading info
         nbytes -= inner_nbytes;
         byte_count += inner_nbytes;
         buf += inner_nbytes;
@@ -240,18 +280,27 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     ret = byte_count;
 
 out:
+    // free the malloced buf
     kfree(read_head_buf);
 
     file->pos = pos;
     in_service = NULL;
 
+    // unlock mutex
     mutex_unlock(&ata_mutex);
 
     return ret;
 }
 
+/*
+ *   ata_open
+ *   DESCRIPTION: open the system, record the driver struct into vendor
+ *   INPUTS: struct file *file, struct inode *inode
+ *   OUTPUT: check code
+ */
 static int32_t ata_open(struct file *file, struct inode *inode) {
     switch (MINOR(inode->rdev)) {
+    // open according to the inode's dev num
     case 0:
         file->vendor = &primary_master;
         break;
@@ -268,12 +317,19 @@ static int32_t ata_open(struct file *file, struct inode *inode) {
         return -ENXIO;
     }
 
-	if (!ata_identify(file->vendor))
+    // if the hardware is error
+    if (!ata_identify(file->vendor))
         return -ENXIO;
 
     return 0;
 }
 
+/*
+ *   ata_seek
+ *   DESCRIPTION: locate the offset
+ *   INPUTS: struct file *file, int32_t offset, int32_t whence
+ *   OUTPUT: check code
+ */
 static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     int32_t new_pos;
     struct ata_data *ata;
@@ -319,11 +375,19 @@ static struct file_operations ata_dev_op = {
     .seek    = &ata_seek,
 };
 
+/*
+ *   ata_handler
+ *   DESCRIPTION: wake up the read_28
+ */
 // static void ata_handler() {
 //     if (in_service)
 //         wake_up_process(in_service);
 // }
 
+/*
+ *   ata_init
+ *   DESCRIPTION: initialize the ata
+ */
 static void ata_init() {
     // set_irq_handler(ATA_IRQ_PRIM, &ata_handler);
     // set_irq_handler(ATA_IRQ_SEC, &ata_handler);

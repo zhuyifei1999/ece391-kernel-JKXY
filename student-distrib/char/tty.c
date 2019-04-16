@@ -29,12 +29,15 @@
 static struct list ttys;
 LIST_STATIC_INIT(ttys);
 
+// set the start of video memory
 struct tty early_console = {
     .video_mem = (char *)VIDEO,
 };
 
+// set early_console to be the tty in the foreground
 struct tty *foreground_tty = &early_console;
 
+// video map entry struct contains pointer to task struct and page table entry
 struct vidmaps_entry {
     struct task_struct *task;
     struct page_table_entry *table;
@@ -45,12 +48,19 @@ struct vidmaps_entry {
 
 static void tty_clear(struct tty *tty);
 
+/*
+ *   tty_get
+ *   DESCRIPTION: get tty for the device
+ *   INPUTS: uint32_t device_num
+ *   OUTPUTS： the tty struct
+ */
 struct tty *tty_get(uint32_t device_num) {
     // TODO: This should be read from the task's associated TTY, not the tty
     // that's attached to the keyboard
     if (device_num == TTY_CURRENT) {
         if (!current->session || !current->session->tty)
             return ERR_PTR(-ENXIO);
+        // increase reference count of tty
         atomic_inc(&current->session->tty->refcount);
         return current->session->tty;
     }
@@ -73,12 +83,15 @@ struct tty *tty_get(uint32_t device_num) {
         }
     }
 
+    // allocate one page for video memory
     void *video_mem = alloc_pages(1, 0, 0);
+    // sanity check
     if (!video_mem) {
         ret = ERR_PTR(-ENOMEM);
         goto out;
     }
 
+    // dynamically allocate memory for return
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
         ret = ERR_PTR(-ENOMEM);
@@ -86,13 +99,16 @@ struct tty *tty_get(uint32_t device_num) {
         goto out;
     }
 
+    // set return value to tty
     *ret = (struct tty){
         .device_num = device_num,
         .video_mem = video_mem,
     };
     atomic_set(&ret->refcount, 1);
+    // create list of vidmaps
     list_init(&ret->vidmaps);
 
+    //insert to back of ttys
     list_insert_back(&ttys, ret);
 
     tty_clear(ret);
@@ -102,6 +118,12 @@ out:
     return ret;
 }
 
+/*
+ *   tty_put
+ *   DESCRIPTION: free the tty
+ *   INPUTS: struct tty *tty
+ *   OUTPUTS： the tty struct
+ */
 void tty_put(struct tty *tty) {
     if (atomic_dec(&tty->refcount))
         return;
@@ -118,11 +140,20 @@ void tty_put(struct tty *tty) {
     restore_flags(flags);
 }
 
+/*
+ *   tty_open
+ *   DESCRIPTION: open the tty through file system
+ *   INPUTS: struct file *file, struct inode *inode
+ *   OUTPUTS： check code
+ */
 static int32_t tty_open(struct file *file, struct inode *inode) {
+    // get the tty according to specified inode
     struct tty *tty = tty_get(inode->rdev);
+    // perform sanity check
     if (IS_ERR(tty))
         return PTR_ERR(tty);
 
+    // place tty into vendor
     file->vendor = tty;
 
     if (
@@ -138,10 +169,23 @@ static int32_t tty_open(struct file *file, struct inode *inode) {
 
     return 0;
 }
+
+/*
+ *   tty_release
+ *   DESCRIPTION: free the vendor
+ *   INPUTS: struct file *file
+ */
+// release tty calls the put function
 static void tty_release(struct file *file) {
     tty_put(file->vendor);
 }
 
+/*
+ *   tty_put
+ *   DESCRIPTION: read content to buffer
+ *   INPUTS: struct file *file, char *buf, uint32_t nbytes
+ *   OUTPUTS：the size of reading bytes
+ */
 static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
     struct tty *tty = file->vendor;
 
@@ -179,6 +223,11 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
     return nbytes;
 }
 
+/*
+ *   tty_foreground_mouse
+ *   DESCRIPTION: control the mouse in foreground tty
+ *   INPUTS: uint16_t dx, uint16_t dy
+ */
 void tty_foreground_mouse(uint16_t dx, uint16_t dy) {
     foreground_tty->video_mem[(NUM_COLS *(foreground_tty->mouse_cursor_y/SLOW_FACTOR_Y)
     + foreground_tty->mouse_cursor_x/SLOW_FACTOR_X) * 2+1] = WHITE_ON_BLACK;
@@ -194,17 +243,30 @@ void tty_foreground_mouse(uint16_t dx, uint16_t dy) {
         mouse_y = 0;
     else if (mouse_y >= NUM_ROWS * SLOW_FACTOR_Y)
         mouse_y = NUM_ROWS * SLOW_FACTOR_Y -1;
+    
+    // update the mouse cursor
     foreground_tty->mouse_cursor_x = mouse_x;
     foreground_tty->mouse_cursor_y = mouse_y;
     foreground_tty->video_mem[(NUM_COLS *(foreground_tty->mouse_cursor_y/SLOW_FACTOR_Y)
         + foreground_tty->mouse_cursor_x/SLOW_FACTOR_X) * 2+1] = BLACK_IN_WHITE;
 }
 
+/*
+ *   tty_commit_cursor
+ *   DESCRIPTION: set text cursor
+ *   INPUTS: struct tty *tty
+ */
 static inline void tty_commit_cursor(struct tty *tty) {
     if (tty == foreground_tty)
         vga_set_cursor(foreground_tty->cursor_x, foreground_tty->cursor_y);
 }
 
+/*
+ *   raw_tty_write
+ *   DESCRIPTION: wirte content to teminal from buffer
+ *   INPUTS: const char *buf, uint32_t nbytes
+ *   OUTPUTS： the number of current writing index
+ */
 static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) {
     unsigned long flags;
     cli_and_save(flags);
@@ -257,16 +319,29 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
         }
     }
 
+    // set the text cursor
     tty_commit_cursor(tty);
 
     restore_flags(flags);
     return i;
 }
 
+/*
+ *   tty_write
+ *   DESCRIPTION: wirte content to file's vendor content
+ *   INPUTS: struct file *file, const char *buf, uint32_t nbytes
+ *   OUTPUTS： check code
+ */
 static int32_t tty_write(struct file *file, const char *buf, uint32_t nbytes) {
     return raw_tty_write(file->vendor, buf, nbytes);
 }
 
+/*
+ *   tty_ioctl
+ *   DESCRIPTION: set the IO parameters
+ *   INPUTS: struct file *file, uint32_t request, unsigned long arg, bool arg_user
+ *   OUTPUTS： check code
+ */
 static int32_t tty_ioctl(struct file *file, uint32_t request, unsigned long arg, bool arg_user) {
     struct tty *tty = file->vendor;
 
@@ -304,6 +379,11 @@ static int32_t tty_ioctl(struct file *file, uint32_t request, unsigned long arg,
     return -ENOTTY;
 }
 
+/*
+ *   tty_foreground_signal
+ *   DESCRIPTION: send signal to the foreground teminal
+ *   INPUTS: uint16_t signum
+ */
 void tty_foreground_signal(uint16_t signum) {
     if (foreground_tty == &early_console)
         return;
@@ -313,6 +393,11 @@ void tty_foreground_signal(uint16_t signum) {
     send_sig_pg(foreground_tty->session->foreground_pgid, signum);
 }
 
+/*
+ *   tty_foreground_keyboard
+ *   DESCRIPTION: react to the keyboard for foreground teminal
+ *   INPUTS: char chr, bool has_ctrl, bool has_alt
+ */
 void tty_foreground_keyboard(char chr, bool has_ctrl, bool has_alt) {
     if (foreground_tty == &early_console)
         return;
@@ -352,6 +437,11 @@ void tty_foreground_keyboard(char chr, bool has_ctrl, bool has_alt) {
     }
 }
 
+/*
+ *   tty_foreground_put
+ *   DESCRIPTION: wirte s
+ *   INPUTS: const char *s
+ */
 void tty_foreground_puts(const char *s) {
     struct tty *tty = foreground_tty;
     if (tty == &early_console)
@@ -383,6 +473,11 @@ static void tty_clear(struct tty *tty) {
     raw_tty_write(tty, tty->buffer, tty->buffer_end);
 }
 
+/*
+ *   tty_switch_foreground
+ *   DESCRIPTION: switch foreground teminal
+ *   INPUTS: uint32_t device_num
+ */
 void tty_switch_foreground(uint32_t device_num) {
     unsigned long flags;
 
@@ -397,6 +492,7 @@ void tty_switch_foreground(uint32_t device_num) {
         goto out;
     }
 
+    // insert the current tty's info to queue and free
     if (foreground_tty && foreground_tty != &early_console) {
         void *video_mem_save = alloc_pages(1, 0, 0);
         memcpy(video_mem_save, vga_mem, LEN_4K);
@@ -412,11 +508,11 @@ void tty_switch_foreground(uint32_t device_num) {
     }
 
     foreground_tty = tty;
+    // copy the video memory
     memcpy(vga_mem, tty->video_mem, LEN_4K);
     tty->video_mem = vga_mem;
 
-    //foreground_tty->video_mem[(NUM_COLS *foreground_tty->mouse_cursor_y + foreground_tty->mouse_cursor_x) * 2 + 1] = BLACK_IN_WHITE;
-
+    // set new tty's info to the screen
     tty_commit_cursor(tty);
 
     struct list_node *node;
@@ -452,6 +548,10 @@ DEFINE_SYSCALL1(ECE391, vidmap, void **, screen_start) {
     return 0;
 }
 
+/*
+ *   exit_vidmap_cb
+ *   DESCRIPTION: remove the vidmap
+ */
 void exit_vidmap_cb() {
     if (!current->session || !current->session->tty)
         return;
@@ -461,6 +561,10 @@ void exit_vidmap_cb() {
     }));
 }
 
+/*
+ *   init_tty_char
+ *   DESCRIPTION: initialize the tty
+ */
 static void init_tty_char() {
     register_dev(S_IFCHR, MKDEV(TTY_MAJOR, MINORMASK), &tty_dev_op);
     register_dev(S_IFCHR, TTY_CURRENT, &tty_dev_op);

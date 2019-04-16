@@ -76,10 +76,13 @@ static inline bool addition_is_safe(uint32_t a, uint32_t b) {
     );
     return ret;
 }
+
 /*  init_page
- * initialize initial page directory and zero page table
- *
- * this must be called by entry() with paging disabled
+ *  DESCRIPTION:initialize initial page directory and zero page table
+ *              this must be called by entry() with paging disabled
+ *  INPUTS: struct multiboot_info __physaddr *mbi
+ *  OUTPUTS: none
+ *  RETURN VALUE: none
  */
 void init_page(struct multiboot_info __physaddr *mbi) {
     unsigned long flags;
@@ -140,9 +143,10 @@ void init_page(struct multiboot_info __physaddr *mbi) {
     } else {
         panic("No memory availability information\n");
     }
-    for (i = 0; i < NUM_PREALLOCATE_LARGE; i++)
+    for (i = 0; i < NUM_PREALLOCATE_LARGE; i++) //set kernel memory mapping
         phys_dir[i] = PHYS_DIR_KERNEL;
-
+        
+    // initializ page table
     page_table_t __physaddr *heap_tables = (void __physaddr *)KDIR_PHYS_ADDR;
     for (i = 0; i < NUM_PAGE_TABLES; i++) {
         uint32_t addr_virt = KHEAP_ADDR + i * PAGE_SIZE_LARGE;
@@ -178,18 +182,31 @@ void init_page(struct multiboot_info __physaddr *mbi) {
     restore_flags(flags); // restore interrupts
 }
 
+/*  get_phys_dir_entry
+ *  DESCRIPTION: find the physical memory aligned address for given address
+ *  INPUTS: const void __physaddr *addr, uint32_t gfp_flags
+ *  OUTPUTS: none
+ *  RETURN VALUE: physical memory aligned address
+ */
 static int16_t *get_phys_dir_entry(const void __physaddr *addr, uint32_t gfp_flags) {
     uint32_t idx = (uint32_t)addr / page_size(gfp_flags);
     return &phys_dir[idx];
 }
 
+/*  alloc_phys_mem
+ *  DESCRIPTION: allocate given size of memory. 
+ *  INPUTS: uint32_t gfp_flags
+ *  OUTPUTS: none
+ *  RETURN VALUE: if success, return the memory address;otherwise return NULL pointer.
+ */
 static void __physaddr *alloc_phys_mem(uint32_t gfp_flags) {
     unsigned long flags;
     uint32_t start_idx = (gfp_flags & GFP_LARGE) ? 0 : PHYS_DIR_LARGE_NUM;
     uint32_t end_idx = (gfp_flags & GFP_LARGE) ? PHYS_DIR_LARGE_NUM : PHYS_DIR_SMALL_NUM;
 
-    cli_and_save(flags);
+    cli_and_save(flags);    // disable inturrept
 
+    // find free memory
     for (; start_idx < end_idx; start_idx++) {
         if (phys_dir[start_idx])
             continue;
@@ -211,9 +228,15 @@ static void __physaddr *alloc_phys_mem(uint32_t gfp_flags) {
     cont:;
     }
     restore_flags(flags);
-    return NULL;
+    return NULL;    // no enpugh memory
 }
 
+/*  free_phys_mem
+ *  DESCRIPTION: free physical memory start from the given address
+ *  INPUTS: void __physaddr *addr, uint32_t gfp_flags
+ *  OUTPUTS: none
+ *  RETURN VALUE: none
+ */
 static void free_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
     unsigned long flags;
     int16_t *dir_entry = get_phys_dir_entry(addr, gfp_flags);
@@ -237,6 +260,12 @@ static void free_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
     restore_flags(flags);
 }
 
+/*  use_phys_mem
+ *  DESCRIPTION: use the reference of allocated memory
+ *  INPUTS: void __physaddr *addr, uint32_t gfp_flags
+ *  OUTPUTS: none
+ *  RETURN VALUE: none
+ */
 static void use_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
     unsigned long flags;
     int16_t *dir_entry = get_phys_dir_entry(addr, gfp_flags);
@@ -246,28 +275,42 @@ static void use_phys_mem(void __physaddr *addr, uint32_t gfp_flags) {
         panic("Can't add uses to physical memory entry at addr %p, value = %hd\n", addr, *dir_entry);
     if (!(gfp_flags & GFP_USER))
         panic("Can't add uses to physical memory for kernel at addr %p\n", addr);
-    (*dir_entry)++;
+    (*dir_entry)++; // increase the reference count by 1
     restore_flags(flags);
 }
 
-// FIXME: How do I find the virtual address given the physical? It must be
-// in our heap somewhere.
+/*  find_userspace_page_table
+ *  DESCRIPTION: find the user space page table
+ *  INPUTS: struct page_directory_entry *dir_entry
+ *  OUTPUTS: none
+ *  RETURN VALUE: user space page table
+ */
 static page_table_t *find_userspace_page_table(struct page_directory_entry *dir_entry) {
+    // FIXME: How do I find the virtual address given the physical? It must be
+    // in our heap somewhere.
     page_table_t *table = NULL;
     uint32_t i;
+
+    // loop over exist page directories
     for (i = KHEAP_ADDR_IDX; i < KHEAP_ADDR_IDX + NUM_KHEAP_PAGES; i++) {
         if (heap_tables[i].present && heap_tables[i].addr == dir_entry->addr) {
             table = (void *)PAGE_IDX_ADDR(i);
             break;
         }
     }
-    if (!table)
+    if (!table) // NULL point check
         panic("Unable to find virtual address for page table "
               "at physical address %p\n",
               (void *)PAGE_IDX_ADDR(dir_entry->addr));
     return table;
 }
 
+/*  mk_user_table
+ *  DESCRIPTION: map the kernel memory in given user space page table
+ *  INPUTS: struct page_directory_entry *dir_entry
+ *  OUTPUTS: none
+ *  RETURN VALUE: user space page table
+ */
 static page_table_t *mk_user_table(struct page_directory_entry *dir_entry) {
     // We are allocating a user page, but we need to allocate a
     // kernel page for a page table.
@@ -292,6 +335,12 @@ static inline __always_inline void invlpg(const void *addr) {
     asm volatile ("invlpg %0" : : "m"(*(char *)addr));
 }
 
+/*  current_page_directory
+ *  DESCRIPTION: map the kernel memory in given user space page table
+ *  INPUTS: none
+ *  OUTPUTS: none
+ *  RETURN VALUE: page directory
+ */
 // struct page_directory_entry (*current_page_directory())[NUM_ENTRIES] {
 page_directory_t *current_page_directory() {
     uint32_t physaddr;
@@ -312,6 +361,12 @@ page_directory_t *current_page_directory() {
     return dir;
 }
 
+/*  switch_directory
+ *  DESCRIPTION: switch to the given pag directory
+ *  INPUTS: page_directory_t *dir
+ *  OUTPUTS: none
+ *  RETURN VALUE: none
+ */
 void switch_directory(page_directory_t *dir) {
     if (dir != &init_page_directory) {
         dir = (page_directory_t *)PAGE_IDX_ADDR(heap_tables[PAGE_IDX((uint32_t)dir)].addr);
@@ -320,6 +375,12 @@ void switch_directory(page_directory_t *dir) {
     asm volatile ("movl %0, %%cr3" : : "a"(dir) : "memory");
 }
 
+/*  request_pages
+ *  DESCRIPTION: map more pages to get enough memmory
+ *  INPUTS: void *page, uint32_t num, uint32_t gfp_flags
+ *  OUTPUTS: none
+ *  RETURN VALUE: memory address
+ */
 __attribute__((malloc))
 void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
     unsigned long flags;
@@ -461,6 +522,12 @@ out:
     return ret;
 }
 
+/*  alloc_pages
+ *  DESCRIPTION: allocate pages
+ *  INPUTS: uint32_t num, uint16_t align, uint32_t gfp_flags
+ *  OUTPUTS: none
+ *  RETURN VALUE: memory address
+ */
 __attribute__((malloc))
 void *alloc_pages(uint32_t num, uint16_t align, uint32_t gfp_flags) {
     uint32_t align_num = 1 << align;
@@ -512,6 +579,12 @@ void *alloc_pages(uint32_t num, uint16_t align, uint32_t gfp_flags) {
     }
 }
 
+/*  free_one_page
+ *  DESCRIPTION: free one page
+ *  INPUTS: void *page, uint32_t gfp_flags
+ *  OUTPUTS: none
+ *  RETURN VALUE: none
+ */
 static void free_one_page(void *page, uint32_t gfp_flags) {
     uint32_t addr = (uint32_t)page;
     uint32_t phys = 0;
@@ -552,12 +625,24 @@ static void free_one_page(void *page, uint32_t gfp_flags) {
         free_phys_mem((void __physaddr *)phys, gfp_flags);
 }
 
+/*  free_pages
+ *  DESCRIPTION: free given number of pages
+ *  INPUTS: void *page, uint32_t num, uint32_t gfp_flags
+ *  OUTPUTS: none
+ *  RETURN VALUE: none
+ */
 void free_pages(void *page, uint32_t num, uint32_t gfp_flags) {
     uint32_t i;
     for (i = 0; i < num; i++)
         free_one_page((void *)((uint32_t)page + page_size(gfp_flags) * i), gfp_flags);
 }
 
+/*  remap_to_user
+ *  DESCRIPTION: map some used memory address to another page table 
+ *  INPUTS: void *src, struct page_table_entry **dest, void **newmap_addr
+ *  OUTPUTS: none
+ *  RETURN VALUE: none
+ */
 // DO NOT USE aside from vidmap(). THIS IS A UNSAFE HACK
 // The ECE391 task that holds this must not execute()
 void remap_to_user(void *src, struct page_table_entry **dest, void **newmap_addr) {
@@ -606,11 +691,21 @@ void remap_to_user(void *src, struct page_table_entry **dest, void **newmap_addr
     restore_flags(flags);
 }
 
+/*  
+ *  clone_directory
+ *  DESCRIPTION: clone directory 
+ *  INPUTS: page_directory_t *src
+ *  OUTPUTS: none
+ *  RETURN VALUE: page_directory_t *
+ */
 page_directory_t *clone_directory(page_directory_t *src) {
     // TODO: Handle OOM.
     page_directory_t *dst = alloc_pages(1, 0, 0);
 
     uint16_t i, j;
+
+
+    // copy all entries
     for (i = 0; i < NUM_ENTRIES; i++) {
         struct page_directory_entry *src_dir_entry = &(*src)[i];
         struct page_directory_entry *dst_dir_entry = &(*dst)[i];
@@ -659,10 +754,24 @@ page_directory_t *clone_directory(page_directory_t *src) {
     return dst;
 }
 
+/*  
+ *  new_directory
+ *  DESCRIPTION: clone a directory 
+ *  INPUTS: none
+ *  OUTPUTS: none
+ *  RETURN VALUE: page_directory_t *
+ */
 page_directory_t *new_directory() {
     return clone_directory(&init_page_directory);
 }
 
+/*  
+ *  _clone_cow
+ *  DESCRIPTION: check whether can clone or not
+ *  INPUTS: page_directory_t *directory, const void *addr
+ *  OUTPUTS: none
+ *  RETURN VALUE: bool
+ */
 static bool _clone_cow(page_directory_t *directory, const void *addr) {
     struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)addr)];
     if (!dir_entry->present || !dir_entry->user)
@@ -727,10 +836,25 @@ static bool _clone_cow(page_directory_t *directory, const void *addr) {
 
     return true;
 }
+
+/*  
+ *  clone_cow
+ *  DESCRIPTION: check whether can clone or not
+ *  INPUTS: const void *addr
+ *  OUTPUTS: none
+ *  RETURN VALUE: bool
+ */
 bool clone_cow(const void *addr) {
     return _clone_cow(current_page_directory(), addr);
 }
 
+/*  
+ *  free_directory
+ *  DESCRIPTION: free the given page directory
+ *  INPUTS: page_directory_t *dir
+ *  OUTPUTS: none
+ *  RETURN VALUE: none
+ */
 void free_directory(page_directory_t *dir) {
     unsigned long flags;
     cli_and_save(flags);
@@ -769,6 +893,13 @@ void free_directory(page_directory_t *dir) {
     restore_flags(flags);
 }
 
+/*  
+ *  addr_is_safe
+ *  DESCRIPTION: check whether the given address is safe to write on
+ *  INPUTS: page_directory_t *directory, const void *addr, bool write
+ *  OUTPUTS: none
+ *  RETURN VALUE: bool
+ */
 static bool addr_is_safe(page_directory_t *directory, const void *addr, bool write) {
     struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)addr)];
     if (!dir_entry->present || !dir_entry->user)
@@ -789,6 +920,13 @@ static bool addr_is_safe(page_directory_t *directory, const void *addr, bool wri
     return true;
 }
 
+/*  
+ *  safe_buf
+ *  DESCRIPTION: create a temporary buf to write on
+ *  INPUTS: const void *buf, uint32_t nbytes, bool write
+ *  OUTPUTS: none
+ *  RETURN VALUE: number of writed bytes
+ */
 uint32_t safe_buf(const void *buf, uint32_t nbytes, bool write) {
     const char *buf_char = buf;
     uint32_t ret = 0;
@@ -811,6 +949,13 @@ uint32_t safe_buf(const void *buf, uint32_t nbytes, bool write) {
     return ret;
 }
 
+/*  
+ *  safe_arr_null_term
+ *  DESCRIPTION: safe_arr_null_term
+ *  INPUTS: const void *buf, uint32_t entry_size, bool write
+ *  OUTPUTS: none
+ *  RETURN VALUE: uint32_t
+ */
 uint32_t safe_arr_null_term(const void *buf, uint32_t entry_size, bool write) {
     if (entry_size == 1)
         return safe_buf(buf, UINT_MAX, write);

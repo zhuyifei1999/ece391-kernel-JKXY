@@ -64,6 +64,12 @@ _start:                                 \n\
 /* end of fake container function */
 }
 
+/*
+ *   ece391_execute
+ *   DESCRIPTION: do the system call
+ *   INPUTS: const uint8_t* command
+ *   OUTPUTS： check code
+ */
 int32_t 
 ece391_execute (const uint8_t* command)
 {
@@ -73,6 +79,7 @@ ece391_execute (const uint8_t* command)
     uint8_t* scan;
     uint32_t n_arg;
 
+    // check if the command is valid 
     if (1023 < ece391_strlen (command))
 	return -1;
     buf[0] = '.';
@@ -95,9 +102,10 @@ ece391_execute (const uint8_t* command)
 	    while ('\0' != *scan && ' ' != *scan && '\n' != *scan) scan++;
 	    if ('\0' != *scan)
 	        *scan++ = '\0';
-	}
+	    }
     }
     args[n_arg] = NULL;
+    // Clone the calling process, creating an exact copy.
     if (0 == fork ()) {
 	execv ((char*)buf, args);
         kill (getpid (), 9);
@@ -110,6 +118,12 @@ ece391_execute (const uint8_t* command)
     return 256;
 }
 
+/*
+ *   ece391_open
+ *   DESCRIPTION: open teh 
+ *   INPUTS: const uint8_t* command
+ *   OUTPUTS： check code
+ */
 int32_t 
 ece391_open (const uint8_t* filename)
 {
@@ -128,6 +142,12 @@ ece391_open (const uint8_t* filename)
     return rval;
 }
 
+/*
+ *   ece391_getargs
+ *   DESCRIPTION: copy the arg from esp to buffer
+ *   INPUTS: uint8_t* buf, int32_t nbytes
+ *   OUTPUTS： check code
+ */
 int32_t 
 ece391_getargs (uint8_t* buf, int32_t nbytes)
 {
@@ -141,10 +161,12 @@ ece391_getargs (uint8_t* buf, int32_t nbytes)
 	if (len > nbytes)
 	    return -1;
         ece391_strcpy (buf, argv[idx]);
+    // loop according to the nbyte
 	buf += len;
 	nbytes -= len;
 	if (++idx >= argc)
 	    break;
+    // if nbyte is too small
 	if (nbytes < 1)
 	    return -1;
         *buf++ = ' ';
@@ -156,6 +178,12 @@ ece391_getargs (uint8_t* buf, int32_t nbytes)
     return 0;
 }
 
+/*
+ *   ece391_vidmap
+ *   DESCRIPTION: mapping video memory
+ *   INPUTS: const uint8_t** screen_start
+ *   OUTPUTS： check code
+ */
 int32_t 
 ece391_vidmap (uint8_t** screen_start)
 {
@@ -166,6 +194,7 @@ ece391_vidmap (uint8_t** screen_start)
         mem_fd = open ("/dev/mem", O_RDWR);
     }
 
+    // mapping the virtual address
     if ((mem_image = mmap((void*)0, 1024*1024, PROT_READ | PROT_WRITE,
                     MAP_SHARED, mem_fd, 0)) == MAP_FAILED) {
         perror ("mmap low memory");
@@ -176,6 +205,12 @@ ece391_vidmap (uint8_t** screen_start)
     return 0;
 }
 
+/*
+ *   ece391_read
+ *   DESCRIPTION: read content to buffer
+ *   INPUTS: int32_t fd, void* buf, int32_t nbytes
+ *   OUTPUTS： check code
+ */
 int32_t 
 ece391_read (int32_t fd, void* buf, int32_t nbytes)
 {
@@ -183,7 +218,8 @@ ece391_read (int32_t fd, void* buf, int32_t nbytes)
     int32_t copied;
     uint8_t* from;
     uint8_t* to;
-
+    
+    // check the input value
     if (NULL == dir || dir_fd != fd)
         return __ece391_read (fd, buf, nbytes);
     if (NULL == (de = readdir (dir)))
@@ -205,6 +241,12 @@ ece391_read (int32_t fd, void* buf, int32_t nbytes)
     return copied;
 }
 
+/*
+ *   ece391_write
+ *   DESCRIPTION: wirte content through buffer
+ *   INPUTS: int32_t fd, const void* buf, int32_t nbytes
+ *   OUTPUTS： check code
+ */
 int32_t 
 ece391_write (int32_t fd, const void* buf, int32_t nbytes)
 {
@@ -213,6 +255,12 @@ ece391_write (int32_t fd, const void* buf, int32_t nbytes)
     return -1;
 }
 
+/*
+ *   ece391_close
+ *   DESCRIPTION: halt it 
+ *   INPUTS: int32_t fd
+ *   OUTPUTS： check code
+ */
 int32_t 
 ece391_close (int32_t fd)
 {

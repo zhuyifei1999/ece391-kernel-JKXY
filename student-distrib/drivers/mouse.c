@@ -46,6 +46,7 @@ static void mouse_handler(struct intr_info *info){
     // read the signal bits of package
     dx = (int16_t)byte_2 - ((dx << 4) & 0x100);
     dy = (int16_t)byte_3 - ((dy << 3) & 0x100);
+    //send the moving data to tty.c
     tty_foreground_mouse(dx, dy);
 }
 
