@@ -20,6 +20,7 @@ struct session;
 
 struct mm_struct {
     atomic_t refcount;
+    uint32_t brk;
     page_directory_t *page_directory;
 };
 

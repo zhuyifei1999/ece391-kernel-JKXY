@@ -216,8 +216,8 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         array_for_each(&current->files->files, i) {
             struct file *file = array_get(&current->files->files, i);
             if (file && (file->flags & O_CLOEXEC)) {
+                // close the file if necessary
                 filp_close(file);
-                //replace current's execution by function's arg
                 array_set(&current->files->files, i, NULL);
             }
         }
@@ -253,13 +253,10 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     // malloc the mm for current
     current->mm = kmalloc(sizeof(*current->mm));
     current->mm->page_directory = new_pagedir;
+    current->mm->brk = 0;
     atomic_set(&current->mm->refcount, 1);
     current->subsystem = subsystem;
 
-    // check if the content and pointer of argv are valid
-    // if (argv && argv[0] && *argv[0])
-    //     set_current_comm(argv[0]);
-    // else
     set_current_comm(list_peek_back(&exe->path->components));
 
     switch_directory(new_pagedir);
@@ -288,8 +285,8 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
                 if (!segment.mem_size)
                     continue;
 
-                uint32_t mapaddr = segment.virt_addr / PAGE_SIZE_SMALL * PAGE_SIZE_SMALL;
-                uint32_t numpages = (segment.mem_size + segment.virt_addr - mapaddr - 1) / PAGE_SIZE_SMALL + 1;
+                uint32_t mapaddr = PAGE_IDX_ADDR(PAGE_IDX(segment.virt_addr));
+                uint32_t numpages = PAGE_IDX(segment.mem_size + segment.virt_addr - mapaddr - 1) + 1;
                 if (!request_pages((void *)mapaddr, numpages, GFP_USER | ((segment.flags & 2) ? 0 : GFP_RO)))
                     goto force_sigsegv;
 
@@ -300,6 +297,10 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
                 res = filp_read(exe, (void *)segment.virt_addr, segment.file_size);
                 if (res != segment.file_size)
                     goto force_sigsegv;
+
+                if (segment.flags & 2)
+                    if (!current->mm->brk || segment.file_size != segment.mem_size)
+                        current->mm->brk = segment.virt_addr + segment.mem_size;
 
                 break;
             }

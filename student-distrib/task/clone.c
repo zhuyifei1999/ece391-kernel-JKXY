@@ -125,6 +125,7 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         } else {
             task->mm = kmalloc(sizeof(*task->mm));
             atomic_set(&task->mm->refcount, 1);
+            task->mm->brk = current->mm->brk;
             task->mm->page_directory = clone_directory(current->mm->page_directory);
         }
     }
