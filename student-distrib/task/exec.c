@@ -3,6 +3,7 @@
 #include "userstack.h"
 #include "signal.h"
 #include "../char/tty.h"
+#include "../char/random.h"
 #include "../lib/string.h"
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
@@ -79,11 +80,7 @@ struct elf_segment {
 
 struct auxv {
     int type;
-    union {
-        long val;
-        void *ptr;
-        void (*fnc)();
-    };
+    long val;
 };
 
 static int32_t decode_elf(struct file *exe, struct elf_header *header) {
@@ -273,6 +270,8 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         uint32_t i;
         uint32_t pos = header.segment_pos;
         int32_t res;
+        uint32_t file_hdraddr = 0;
+
         for (i = 0; i < header.segment_entry_num; i++) {
             struct elf_segment segment;
 
@@ -308,6 +307,9 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
                 if (segment.flags & 2)
                     if (!current->mm->brk || segment.file_size != segment.mem_size)
                         current->mm->brk = segment.virt_addr + segment.mem_size;
+
+                if (!segment.file_offset)
+                    file_hdraddr = segment.virt_addr;
 
                 break;
             }
@@ -351,8 +353,36 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
             argv_user[i] = (void *)current->entry_regs->esp;
         }
 
-        struct auxv auxv = { .type = AT_NULL, };
-        push_userstack(current->entry_regs, &auxv, sizeof(auxv));
+        for (i = 0; i < 16; i++) {
+            int32_t rand = rdrand();
+            push_userstack(current->entry_regs, &rand, sizeof(rand));
+        }
+        uint32_t rand_ptr = current->entry_regs->esp;
+
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_NULL }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_UID, .val = 0 }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_EUID, .val = 0 }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_GID, .val = 0 }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_EGID, .val = 0 }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_RANDOM, .val = rand_ptr }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_PHDR, .val = file_hdraddr + header.segment_pos }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_PHENT, .val = sizeof(struct elf_segment) }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_PHNUM, .val = header.segment_entry_num }, sizeof(struct auxv));;
+        push_userstack(current->entry_regs, // TODO: is this correct?
+            &(struct auxv){ .type = AT_BASE, .val = file_hdraddr }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_ENTRY, .val = header.entry_pos }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_PAGESZ, .val = PAGE_SIZE_SMALL }, sizeof(struct auxv));
 
         push_userstack(current->entry_regs, envp_user, (envp_len + 1) * sizeof(*envp_user));
         push_userstack(current->entry_regs, argv_user, (argv_len + 1) * sizeof(*argv_user));
