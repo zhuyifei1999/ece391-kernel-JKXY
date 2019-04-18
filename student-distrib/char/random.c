@@ -58,6 +58,6 @@ static struct file_operations random_dev_op = {
 
 static void init_random_char() {
     register_dev(S_IFCHR, MKDEV(1, 8), &random_dev_op); // /dev/random
-    register_dev(S_IFCHR, MKDEV(1, 9), &random_dev_op); // /dev/uandom
+    register_dev(S_IFCHR, MKDEV(1, 9), &random_dev_op); // /dev/urandom
 }
 DEFINE_INITCALL(init_random_char, drivers);

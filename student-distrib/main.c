@@ -191,7 +191,7 @@ do_switch_loop:;
 
     tty_switch_foreground(MKDEV(TTY_MAJOR, 4));
 
-    return run_init_process("/bin/sh");
+    return run_init_process("/bin/busybox");
 }
 
 noreturn void kernel_main(void) {

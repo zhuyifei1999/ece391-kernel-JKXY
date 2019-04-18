@@ -131,7 +131,7 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
             };
         }
 
-        // althigh irrelevant, only those with mm can have TLS, right?
+        // although irrelevant, only those with mm can have TLS, right?
         memcpy(task->ldt, current->ldt, sizeof(current->ldt));
         memcpy(task->gdt_tls, current->gdt_tls, sizeof(current->gdt_tls));
     }

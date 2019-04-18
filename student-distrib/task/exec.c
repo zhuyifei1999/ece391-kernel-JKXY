@@ -259,6 +259,9 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         .refcount = ATOMIC_INITIALIZER(1),
     };
 
+    memset(current->ldt, 0, sizeof(current->ldt));
+    memset(current->gdt_tls, 0, sizeof(current->gdt_tls));
+
     current->subsystem = subsystem;
 
     set_current_comm(list_peek_back(&exe->path->components));
@@ -319,7 +322,7 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         current->entry_regs->eip = header.entry_pos;
 
         // TODO: Any better way to make a better stack address?
-        uint32_t stack_page = 0xbfc00000;
+        uint32_t stack_page = (2U << 30) - PAGE_SIZE_LARGE;
         if (!request_pages((void *)stack_page, 1, GFP_USER | GFP_LARGE))
             goto force_sigsegv;
         current->entry_regs->esp = stack_page + PAGE_SIZE_LARGE;
