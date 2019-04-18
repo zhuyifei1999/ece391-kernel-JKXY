@@ -120,7 +120,7 @@ int32_t do_sys_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
 
 
     uint32_t i;
-    // loop until no elements to get and no elements to set
+    // loop until fd is free
     for (i = 0;; i++) {
         if (!array_get(&current->files->files, i)) {
             if (!array_set(&current->files->files, i, file)) {
@@ -182,4 +182,19 @@ DEFINE_SYSCALL1(ECE391, close, int32_t, fd) {
 }
 DEFINE_SYSCALL1(LINUX, close, int32_t, fd) {
     return do_sys_close(fd);
+}
+
+
+DEFINE_SYSCALL2(LINUX, dup2, int32_t, oldfd, int32_t, newfd) {
+    struct file *oldfile = array_get(&current->files->files, oldfd);
+    if (!oldfile)
+        return -EBADF;
+
+    struct file *newfile = array_get(&current->files->files, newfd);
+    if (newfile)
+        filp_close(newfile);
+
+    array_set(&current->files->files, newfd, oldfile);
+    atomic_inc(&oldfile->refcount);
+    return newfd;
 }

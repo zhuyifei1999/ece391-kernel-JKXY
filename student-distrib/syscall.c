@@ -24,8 +24,8 @@ static void syscall_handler(struct intr_info *info) {
     } else {
         // call handler when defined
         (*handler)(info);
+        // printk("Sysret: %x\n", info->eax);
     }
-    printk("Sysret: %x\n", info->eax);
 
     // Evil ece391 subsystem shim
     if ((int32_t)info->eax < 0)

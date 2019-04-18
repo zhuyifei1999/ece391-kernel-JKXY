@@ -16,7 +16,7 @@ struct utsname {
 static const struct utsname utsname = {
     .sysname = "Linux",
     .nodename = "localhost",
-    .release = "2.6.22-ece391",
+    .release = "5.0-ece391",
     .version = "#0 EC BUILD",
     .machine = "QEMU",
     .domainname = "localdomain",

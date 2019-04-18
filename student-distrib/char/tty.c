@@ -336,6 +336,13 @@ static int32_t tty_write(struct file *file, const char *buf, uint32_t nbytes) {
     return raw_tty_write(file->vendor, buf, nbytes);
 }
 
+struct winsize {
+    unsigned short ws_row;
+    unsigned short ws_col;
+    unsigned short ws_xpixel;
+    unsigned short ws_ypixel;
+};
+
 /*
  *   tty_ioctl
  *   DESCRIPTION: set the IO parameters
@@ -374,6 +381,13 @@ static int32_t tty_ioctl(struct file *file, uint32_t request, unsigned long arg,
             return -EFAULT;
         *(uint16_t *)arg = tty->session->sid;
         return 0;
+    case TIOCGWINSZ:
+        if (arg_user && safe_buf((struct winsize *)arg, sizeof(struct winsize), true) != sizeof(struct winsize))
+            return -EFAULT;
+        *(struct winsize *)arg = (struct winsize){
+            .ws_row = NUM_ROWS,
+            .ws_col = NUM_COLS,
+        };
     }
 
     return -ENOTTY;

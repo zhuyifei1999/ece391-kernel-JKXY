@@ -336,11 +336,11 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         // Now setup the stack
 
         // Map VDSO
-        uint32_t vdso_addr = 2U << 30;
-        extern unsigned char vdso_start, vdso_end, vsyscall;
-        if (!request_pages((void *)vdso_addr, 1, GFP_USER | GFP_RO))
-            goto force_sigsegv;
-        memcpy((void *)vdso_addr, &vdso_start, &vdso_end - &vdso_start);
+        // uint32_t vdso_addr = 2U << 30;
+        // extern unsigned char vdso_start, vdso_end, vsyscall;
+        // if (!request_pages((void *)vdso_addr, 1, GFP_USER | GFP_RO))
+        //     goto force_sigsegv;
+        // memcpy((void *)vdso_addr, &vdso_start, &vdso_end - &vdso_start);
 
         uint32_t envp_len = 0;
         if (envp)
@@ -368,6 +368,9 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         }
         uint32_t rand_ptr = current->entry_regs->esp;
 
+        // Now align the stack
+        current->entry_regs->esp &= ~0xf;
+
         push_userstack(current->entry_regs,
             &(struct auxv){ .type = AT_NULL }, sizeof(struct auxv));
         push_userstack(current->entry_regs,
@@ -392,10 +395,10 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
             &(struct auxv){ .type = AT_ENTRY, .val = header.entry_pos }, sizeof(struct auxv));
         push_userstack(current->entry_regs,
             &(struct auxv){ .type = AT_PAGESZ, .val = PAGE_SIZE_SMALL }, sizeof(struct auxv));
-        push_userstack(current->entry_regs,
-            &(struct auxv){ .type = AT_SYSINFO, .val = vdso_addr + (&vsyscall - &vdso_start) }, sizeof(struct auxv));
-        push_userstack(current->entry_regs,
-            &(struct auxv){ .type = AT_SYSINFO_EHDR, .val = vdso_addr }, sizeof(struct auxv));
+        // push_userstack(current->entry_regs,
+        //     &(struct auxv){ .type = AT_SYSINFO, .val = vdso_addr + (&vsyscall - &vdso_start) }, sizeof(struct auxv));
+        // push_userstack(current->entry_regs,
+        //     &(struct auxv){ .type = AT_SYSINFO_EHDR, .val = vdso_addr }, sizeof(struct auxv));
 
         push_userstack(current->entry_regs, envp_user, (envp_len + 1) * sizeof(*envp_user));
         push_userstack(current->entry_regs, argv_user, (argv_len + 1) * sizeof(*argv_user));
