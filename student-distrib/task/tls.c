@@ -24,7 +24,14 @@ DEFINE_SYSCALL1(LINUX, set_thread_area, struct user_desc *, u_info) {
     int16_t entry = u_info->entry_number;
     if (entry == -1) {
         for (entry = 0; entry < TLS_SEG_NUM; entry++)
-            if (!memcmp(&current->gdt_tls[entry], &(struct seg_desc){0}, sizeof(struct seg_desc)))
+            if (
+                !memcmp(&current->gdt_tls[entry], &(struct seg_desc){
+                    .dpl = USER_DPL,
+                    .sys = 0x1,
+                    .accessed = 0x1,
+                }, sizeof(struct seg_desc)) ||
+                !memcmp(&current->gdt_tls[entry], &(struct seg_desc){0}, sizeof(struct seg_desc))
+            )
                 break;
     } else {
         entry -= TLS_SEG_IDX;
