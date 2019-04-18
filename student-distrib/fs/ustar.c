@@ -247,8 +247,8 @@ static int32_t ustar_ino_lookup(struct inode *inode, const char *name, uint32_t 
     **next = (struct inode){
         .sb = inode->sb,
         .vendor = info,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&(*next)->refcount, 1);
 
     res = (*inode->sb->op->read_inode)(*next);
     if (res < 0)

@@ -201,8 +201,11 @@ noreturn void kernel_main(void) {
         .comm      = "swapper",
     };
 
-    swapper_task->sigactions = kcalloc(1, sizeof(*swapper_task->sigactions));
-    atomic_set(&swapper_task->sigactions->refcount, 1);
+    swapper_task->sigactions = kmalloc(sizeof(*swapper_task->sigactions));
+    *swapper_task->sigactions = (struct sigactions){
+        .refcount = ATOMIC_INITIALIZER(1),
+    };
+
     int i;
     for (i = 0; i < _NSIG; i++)
         kernel_mask_signal(i);

@@ -31,9 +31,9 @@ struct inode *mk_dummyinode() {
 
     *inode = (struct inode){
         .sb = &dummy_sb,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
     (*inode->sb->op->read_inode)(inode);
-    atomic_set(&inode->refcount, 1);
     return inode;
 }
 

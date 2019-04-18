@@ -160,8 +160,8 @@ static int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32
     **next = (struct inode){
         .sb = inode->sb,
         .vendor = dentry,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&(*next)->refcount, 1);
 
     res = (*inode->sb->op->read_inode)(*next);
     if (res < 0) {

@@ -103,8 +103,8 @@ struct tty *tty_get(uint32_t device_num) {
     *ret = (struct tty){
         .device_num = device_num,
         .video_mem = video_mem,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&ret->refcount, 1);
     // create list of vidmaps
     list_init(&ret->vidmaps);
 
@@ -243,7 +243,7 @@ void tty_foreground_mouse(uint16_t dx, uint16_t dy) {
         mouse_y = 0;
     else if (mouse_y >= NUM_ROWS * SLOW_FACTOR_Y)
         mouse_y = NUM_ROWS * SLOW_FACTOR_Y -1;
-    
+
     // update the mouse cursor
     foreground_tty->mouse_cursor_x = mouse_x;
     foreground_tty->mouse_cursor_y = mouse_y;

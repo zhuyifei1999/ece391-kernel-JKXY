@@ -19,8 +19,8 @@ int32_t do_setsid(void) {
     *session = (struct session){
         .sid = current->pid,
         .foreground_pgid = current->pid,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&session->refcount, 1);
 
     current->session = session;
     current->pgid = current->pid;

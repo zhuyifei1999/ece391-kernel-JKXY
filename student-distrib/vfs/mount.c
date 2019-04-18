@@ -28,8 +28,8 @@ int32_t do_mount(struct file *dev, struct super_block_operations *sb_op, struct 
     }
     *root = (struct inode) {
         .sb = super_block,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&root->refcount, 1);
 
     res = (*sb_op->read_inode)(root);
     if (res < 0)
@@ -49,8 +49,8 @@ int32_t do_mount(struct file *dev, struct super_block_operations *sb_op, struct 
     *entry = (struct mount){
         .root = root,
         .path = path,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&entry->refcount, 1);
 
     res = list_insert_back(&mounttable, entry);
     if (res < 0)

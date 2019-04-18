@@ -124,9 +124,11 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
             task->mm = current->mm;
         } else {
             task->mm = kmalloc(sizeof(*task->mm));
-            atomic_set(&task->mm->refcount, 1);
-            task->mm->brk = current->mm->brk;
-            task->mm->page_directory = clone_directory(current->mm->page_directory);
+            *task->mm = (struct mm_struct){
+                .brk = current->mm->brk,
+                .page_directory = clone_directory(current->mm->page_directory),
+                .refcount = ATOMIC_INITIALIZER(1),
+            };
         }
     }
 
@@ -137,10 +139,9 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
             task->files = current->files;
         } else {
             task->files = kmalloc(sizeof(*task->files));
-            // initialize an empty array of file
-            task->files->files = (struct array){0};
-            // the reference count of opened files
-            atomic_set(&task->files->refcount, 1);
+            *task->files = (struct files_struct){
+                .refcount = ATOMIC_INITIALIZER(1),
+            };
             uint32_t i;
             // loop over all files
             array_for_each(&current->files->files, i) {

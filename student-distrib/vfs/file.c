@@ -195,8 +195,8 @@ resolve_mount:;
         .inode = inode,
         .path = path_dest,
         .flags = flags,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&ret->refcount, 1);
     atomic_inc(&inode->refcount);
 
     int32_t res = (*ret->op->open)(ret, inode);
@@ -273,8 +273,8 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
         .path = path_dest,
         // TODO: change flags according to mode
         .flags = flags,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&ret->refcount, 1);
     atomic_inc(&inode->refcount);
 
     // check the res's value

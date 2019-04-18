@@ -11,6 +11,8 @@ typedef struct {
     int32_t val;
 } atomic_t;
 
+#define ATOMIC_INITIALIZER(_val) ((atomic_t){ .val = _val })
+
 static inline __always_inline int32_t atomic_get(atomic_t *var) {
     return *(volatile int32_t *)var;
 }

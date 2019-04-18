@@ -224,8 +224,9 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     } else {
         // if not, give it a default set of file descriptors
         current->files = kmalloc(sizeof(*current->files));
-        atomic_set(&current->files->refcount, 1);
-        current->files->files = (struct array){0};
+        *current->files = (struct files_struct){
+            .refcount = ATOMIC_INITIALIZER(1),
+        };
         switch (subsystem) {
         case SUBSYSTEM_LINUX:;
             struct file *tty = filp_open_anondevice(TTY_CURRENT, O_RDWR, S_IFCHR | 0666);
@@ -252,9 +253,12 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     }
     // malloc the mm for current
     current->mm = kmalloc(sizeof(*current->mm));
-    current->mm->page_directory = new_pagedir;
-    current->mm->brk = 0;
-    atomic_set(&current->mm->refcount, 1);
+    *current->mm = (struct mm_struct){
+        .brk = 0,
+        .page_directory = new_pagedir,
+        .refcount = ATOMIC_INITIALIZER(1),
+    };
+
     current->subsystem = subsystem;
 
     set_current_comm(list_peek_back(&exe->path->components));
