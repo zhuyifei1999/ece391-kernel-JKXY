@@ -52,7 +52,6 @@ void do_exit(int exitcode) {
     if (current->mm) {
         if (!atomic_dec(&current->mm->refcount)) {
             free_directory(current->mm->page_directory);
-            kfree(current->mm->ldt);
             kfree(current->mm);
         }
     }

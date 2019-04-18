@@ -45,6 +45,13 @@ ISR_common:
 // .cfi_offset esp, -40
 .cfi_offset esi, -52
 .cfi_offset edi, -56
+// now we have everything saved, let's make the selectors sane
+    movw    $KERNEL_DS, %cx
+    movw    %cx, %ss
+    movw    %cx, %ds
+    movw    %cx, %es
+    movw    %cx, %fs
+    movw    %cx, %gs
 // and now figure out the real esp and ss
     cmpw    $KERNEL_CS,20(%ebp)
     je      1f

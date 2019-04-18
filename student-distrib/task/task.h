@@ -22,7 +22,6 @@ struct session;
 struct mm_struct {
     atomic_t refcount;
     uint32_t brk;
-    ldt_t *ldt;
     page_directory_t *page_directory;
 };
 
@@ -57,6 +56,8 @@ struct task_struct {
     uint32_t pgid;
     struct sigpending sigpending;
     struct sigactions *sigactions;
+    tls_seg_t ldt;
+    tls_seg_t gdt_tls;
     struct intr_info *entry_regs;  // for kernel execve
     struct intr_info *return_regs; // for scheduler
     enum task_state state;

@@ -1,6 +1,7 @@
 #include "task.h"
 #include "sched.h"
 #include "signal.h"
+#include "tls.h"
 #include "../err.h"
 #include "../errno.h"
 
@@ -25,4 +26,5 @@ asmlinkage
 void return_to_userspace(struct intr_info *info) {
     deliver_signal(info);
     cond_schedule();
+    load_tls();
 }

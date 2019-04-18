@@ -130,6 +130,10 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
                 .refcount = ATOMIC_INITIALIZER(1),
             };
         }
+
+        // althigh irrelevant, only those with mm can have TLS, right?
+        memcpy(task->ldt, current->ldt, sizeof(current->ldt));
+        memcpy(task->gdt_tls, current->gdt_tls, sizeof(current->gdt_tls));
     }
 
     // if share the files, increase the reference count of these files. otherwise copy the file table

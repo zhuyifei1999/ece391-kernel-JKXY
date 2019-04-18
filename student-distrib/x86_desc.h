@@ -20,9 +20,14 @@
 #define KERNEL_LDT_IDX  7
 #define DUBFLT_TSS_IDX  8
 
+#define TLS_SEG_IDX     9
+#define TLS_SEG_NUM     4
 
-#define GDT_SELECTOR(IDX, RPL) ((IDX << 3) + RPL)
-#define LDT_SELECTOR(IDX, RPL) ((IDX << 3) + 4 + RPL)
+
+#define GDT_SELECTOR(IDX, RPL) (((IDX) << 3) + (RPL))
+#define LDT_SELECTOR(IDX, RPL) (((IDX) << 3) + 4 + (RPL))
+
+#define SELECTER_IDX(sel) ((sel) >> 3)
 
 /* Segment selector values */
 #define KERNEL_CS   GDT_SELECTOR(KERNEL_CS_IDX, KERNEL_DPL)
@@ -51,7 +56,10 @@ struct seg_desc {
     uint16_t seg_lim_15_00;
     uint16_t base_15_00;
     uint8_t  base_23_16;
-    uint32_t type          : 4;
+    uint32_t accessed      : 1;
+    uint32_t rw            : 1;
+    uint32_t dir           : 1;
+    uint32_t exec          : 1;
     uint32_t sys           : 1;
     uint32_t dpl           : 2;
     uint32_t present       : 1;
@@ -125,9 +133,9 @@ extern struct x86_desc gdt_desc;
 
 extern struct seg_desc gdt[];
 
-#define NUM_LDT 4
-typedef struct seg_desc ldt_t[NUM_LDT];
-extern ldt_t ldt;
+typedef struct seg_desc tls_seg_t[TLS_SEG_NUM];
+extern tls_seg_t *gdt_tls;
+extern tls_seg_t ldt;
 
 extern struct tss tss;
 extern struct tss dubflt_tss;

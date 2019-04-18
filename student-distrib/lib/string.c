@@ -1,4 +1,5 @@
 #include "string.h"
+#include "limits.h"
 #include "../mm/kmalloc.h"
 
 /* int8_t *strrev(int8_t *s);
@@ -215,7 +216,19 @@ int32_t strncmp(const int8_t *s1, const int8_t *s2, uint32_t n) {
 
 // strcmp without limit
 int32_t strcmp(const int8_t *s1, const int8_t *s2) {
-    return strncmp(s1,s2, (uint32_t)-1);
+    return strncmp(s1,s2, UINT_MAX);
+}
+
+int32_t memcmp(const void *_s1, const void *_s2, uint32_t n) {
+    const char *s1 = _s1;
+    const char *s2 = _s2;
+    int32_t i;
+    for (i = 0; i < n; i++) {
+        if ((s1[i] != s2[i])) {
+            return s1[i] - s2[i];
+        }
+    }
+    return 0;
 }
 
 /* int8_t *strcpy(int8_t *dest, const int8_t *src)

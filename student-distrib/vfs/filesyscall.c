@@ -87,7 +87,8 @@ DEFINE_SYSCALL3(LINUX, write, int32_t, fd, const void *, buf, int32_t, nbytes) {
     return do_sys_write(fd, buf, nbytes);
 }
 DEFINE_SYSCALL3(LINUX, writev, int32_t, fd, const struct iovec *, iov, int, iovcnt) {
-    return do_iov(&do_sys_write, fd, iov, iovcnt);
+    // The cast here is to mute the incompatible pointer warning due to the 'const'
+    return do_iov((void *)&do_sys_write, fd, iov, iovcnt);
 }
 
 
