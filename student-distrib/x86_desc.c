@@ -37,7 +37,7 @@ struct tss dubflt_tss = {
     .cr3 = (uint32_t)&init_page_directory,
 };
 
-struct seg_desc ldt[4];
+ldt_t ldt;
 struct idt_desc idt[NUM_VEC];
 struct seg_desc gdt[] = {
     [0] = {0}, // First GDT entry cannot be used

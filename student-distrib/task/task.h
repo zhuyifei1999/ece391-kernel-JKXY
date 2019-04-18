@@ -10,6 +10,7 @@
 #include "../structure/list.h"
 #include "../structure/array.h"
 #include "../vfs/file.h"
+#include "../x86_desc.h"
 #include "../panic.h"
 #include "../atomic.h"
 
@@ -21,6 +22,7 @@ struct session;
 struct mm_struct {
     atomic_t refcount;
     uint32_t brk;
+    ldt_t *ldt;
     page_directory_t *page_directory;
 };
 

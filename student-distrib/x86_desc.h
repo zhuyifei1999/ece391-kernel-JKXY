@@ -21,16 +21,17 @@
 #define DUBFLT_TSS_IDX  8
 
 
-#define SELECTOR(IDX, RPL) ((IDX << 3) + RPL)
+#define GDT_SELECTOR(IDX, RPL) ((IDX << 3) + RPL)
+#define LDT_SELECTOR(IDX, RPL) ((IDX << 3) + 4 + RPL)
 
 /* Segment selector values */
-#define KERNEL_CS   SELECTOR(KERNEL_CS_IDX, KERNEL_DPL)
-#define KERNEL_DS   SELECTOR(KERNEL_DS_IDX, KERNEL_DPL)
-#define USER_CS     SELECTOR(USER_CS_IDX, USER_DPL)
-#define USER_DS     SELECTOR(USER_DS_IDX, USER_DPL)
-#define KERNEL_TSS  SELECTOR(KERNEL_TSS_IDX, KERNEL_DPL)
-#define KERNEL_LDT  SELECTOR(KERNEL_LDT_IDX, KERNEL_DPL)
-#define DUBFLT_TSS  SELECTOR(DUBFLT_TSS_IDX, KERNEL_DPL)
+#define KERNEL_CS   GDT_SELECTOR(KERNEL_CS_IDX, KERNEL_DPL)
+#define KERNEL_DS   GDT_SELECTOR(KERNEL_DS_IDX, KERNEL_DPL)
+#define USER_CS     GDT_SELECTOR(USER_CS_IDX, USER_DPL)
+#define USER_DS     GDT_SELECTOR(USER_DS_IDX, USER_DPL)
+#define KERNEL_TSS  GDT_SELECTOR(KERNEL_TSS_IDX, KERNEL_DPL)
+#define KERNEL_LDT  GDT_SELECTOR(KERNEL_LDT_IDX, KERNEL_DPL)
+#define DUBFLT_TSS  GDT_SELECTOR(DUBFLT_TSS_IDX, KERNEL_DPL)
 
 
 /* Number of vectors in the interrupt descriptor table (IDT) */
@@ -124,7 +125,9 @@ extern struct x86_desc gdt_desc;
 
 extern struct seg_desc gdt[];
 
-extern struct seg_desc ldt[];
+#define NUM_LDT 4
+typedef struct seg_desc ldt_t[NUM_LDT];
+extern ldt_t ldt;
 
 extern struct tss tss;
 extern struct tss dubflt_tss;
