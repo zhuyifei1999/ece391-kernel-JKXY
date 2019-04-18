@@ -10,6 +10,7 @@
 #include "../vfs/file.h"
 #include "../vfs/device.h"
 #include "../vfs/path.h"
+#include "../cpuid.h"
 #include "../panic.h"
 #include "../eflags.h"
 #include "../err.h"
@@ -124,6 +125,12 @@ static int32_t decode_elf(struct file *exe, struct elf_header *header) {
         return -ENOEXEC;
 
     return 0;
+}
+
+static inline __always_inline uint32_t hwcap() {
+    uint32_t a, d;
+    cpuid(1, &a, &d);
+    return d;
 }
 
 /*
@@ -395,6 +402,8 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
             &(struct auxv){ .type = AT_ENTRY, .val = header.entry_pos }, sizeof(struct auxv));
         push_userstack(current->entry_regs,
             &(struct auxv){ .type = AT_PAGESZ, .val = PAGE_SIZE_SMALL }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_HWCAP, .val = hwcap() }, sizeof(struct auxv));
         // push_userstack(current->entry_regs,
         //     &(struct auxv){ .type = AT_SYSINFO, .val = vdso_addr + (&vsyscall - &vdso_start) }, sizeof(struct auxv));
         // push_userstack(current->entry_regs,
