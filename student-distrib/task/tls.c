@@ -61,9 +61,9 @@ DEFINE_SYSCALL1(LINUX, set_thread_area, struct user_desc *, u_info) {
         .rw          = !u_info->read_exec_only,
         .accessed    = 0x1,
 
-        .base_31_24 = ((uint32_t)(&u_info->base_addr) & 0xFF000000) >> 24,
-        .base_23_16 = ((uint32_t)(&u_info->base_addr) & 0x00FF0000) >> 16,
-        .base_15_00 = (uint32_t)(&u_info->base_addr) & 0x0000FFFF,
+        .base_31_24 = (u_info->base_addr & 0xFF000000) >> 24,
+        .base_23_16 = (u_info->base_addr & 0x00FF0000) >> 16,
+        .base_15_00 = u_info->base_addr & 0x0000FFFF,
         .seg_lim_19_16 = (u_info->limit & 0x000F0000) >> 16,
         .seg_lim_15_00 = u_info->limit & 0x0000FFFF,
     };
