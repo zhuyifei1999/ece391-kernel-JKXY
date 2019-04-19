@@ -165,7 +165,6 @@ void free_pages(void *pages, uint32_t num, uint32_t gfp_flags);
 void remap_to_user(void *src, struct page_table_entry **dest, void **newmap_addr);
 
 page_directory_t *clone_directory(page_directory_t *src);
-
 page_directory_t *new_directory();
 
 bool clone_cow(const void *addr);
@@ -173,7 +172,6 @@ bool clone_cow(const void *addr);
 void free_directory(page_directory_t *dir);
 
 uint32_t safe_buf(const void *buf, uint32_t nbytes, bool write);
-
 uint32_t safe_arr_null_term(const void *buf, uint32_t entry_size, bool write);
 
 #endif
