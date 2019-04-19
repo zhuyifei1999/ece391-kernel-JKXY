@@ -27,7 +27,7 @@ void put_inode(struct inode *inode) {
     (*inode->sb->op->put_inode)(inode);
 }
 
-struct inode *inode_open(int32_t dfd, char *path, uint32_t flags, uint16_t mode, struct path **path_out) {
+struct inode *inode_open(int32_t dfd, const char *path, uint32_t flags, uint16_t mode, struct path **path_out) {
     struct path *path_rel = path_fromstr(path);
     // check if the file's path is valid
     if (IS_ERR(path_rel))
@@ -184,7 +184,7 @@ out_rel:
  *   INPUTS: struct int32_t dfd, char *path, uint32_t flags, uint16_t mode
  *   RETURN VALUE: struct file
  */
-struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
+struct file *filp_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mode) {
     struct path *path_stru;
 
     struct inode *inode = inode_open(dfd, path, flags, mode, &path_stru);
@@ -249,7 +249,7 @@ out:
  *   INPUTS: char *path, uint32_t flags, uint16_t mode
  *   RETURN VALUE: file
  */
-struct file *filp_open(char *path, uint32_t flags, uint16_t mode) {
+struct file *filp_open(const char *path, uint32_t flags, uint16_t mode) {
     return filp_openat(AT_FDCWD, path, flags, mode);
 }
 

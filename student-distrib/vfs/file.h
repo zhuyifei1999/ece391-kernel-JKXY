@@ -142,13 +142,13 @@ struct file {
 };
 
 void put_inode(struct inode *inode);
-struct inode *inode_open(int32_t dfd, char *path, uint32_t flags, uint16_t mode, struct path **path_out);
+struct inode *inode_open(int32_t dfd, const char *path, uint32_t flags, uint16_t mode, struct path **path_out);
 
 void fill_default_file_op(struct file_operations *file_op);
 void fill_default_ino_op(struct inode_operations *ino_op);
 
-struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode);
-struct file *filp_open(char *path, uint32_t flags, uint16_t mode);
+struct file *filp_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mode);
+struct file *filp_open(const char *path, uint32_t flags, uint16_t mode);
 struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode);
 
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence);

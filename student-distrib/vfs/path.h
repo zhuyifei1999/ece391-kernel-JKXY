@@ -16,7 +16,7 @@ struct path {
 
 void path_destroy(struct path *path);
 
-struct path *path_fromstr(char *pathstr);
+struct path *path_fromstr(const char *pathstr);
 
 struct path *path_join(struct path *x, struct path *y);
 
@@ -30,6 +30,8 @@ bool path_is_direct_decendent(struct path *parent, struct path *child);
 int32_t path_subsumes(struct path *parent, struct path *child);
 
 struct path *path_checkmnt(struct path *old);
+struct path *path_resolvemnt(struct path *old);
+int32_t path_tostring(struct path *path, char *buf, uint32_t nbytes);
 
 extern struct path root_path;
 

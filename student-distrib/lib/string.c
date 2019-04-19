@@ -266,10 +266,10 @@ int8_t *strncpy(int8_t *dest, const int8_t *src, uint32_t n) {
 }
 
 // Find char in string. if not found, return NULL
-char *strchr(char *s, char c) {
+char *strchr(const char *s, char c) {
     while (*s) {
         if (*s == c)
-            return s;
+            return (char *)s; // const correctness? meh
         s++;
     }
     return NULL;

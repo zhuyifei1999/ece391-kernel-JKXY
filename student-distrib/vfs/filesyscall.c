@@ -1,4 +1,5 @@
 #include "file.h"
+#include "path.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
 #include "../task/task.h"
@@ -204,4 +205,23 @@ DEFINE_SYSCALL2(LINUX, dup2, int32_t, oldfd, int32_t, newfd) {
     array_set(&current->files->files, newfd, oldfile);
     atomic_inc(&oldfile->refcount);
     return newfd;
+}
+
+DEFINE_SYSCALL3(LINUX, readlink, const char *, path, char *, buf, uint32_t, nbytes) {
+    uint32_t safe_nbytes = safe_buf(buf, nbytes, true);
+    if (!safe_nbytes && nbytes)
+        return -EFAULT;
+
+    struct inode *inode = inode_open(AT_FDCWD, path, O_NOFOLLOW, 0, NULL);
+    if (IS_ERR(inode))
+        return PTR_ERR(inode);
+
+    int32_t res = (*inode->op->readlink)(inode, buf, safe_nbytes);
+
+    put_inode(inode);
+    return res;
+}
+
+DEFINE_SYSCALL2(LINUX, getcwd, char *, buf, uint32_t, nbytes) {
+    return path_tostring(current->cwd->path, buf, nbytes);
 }

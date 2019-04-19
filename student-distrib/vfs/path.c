@@ -22,7 +22,7 @@ void path_destroy(struct path *path) {
     kfree(path);
 }
 
-static int32_t path_add_component(struct list *components, char *component, uint32_t size) {
+static int32_t path_add_component(struct list *components, const char *component, uint32_t size) {
     if (!size || !strncmp(component, ".", size))
         return 0;
 
@@ -34,7 +34,7 @@ static int32_t path_add_component(struct list *components, char *component, uint
     return 0;
 }
 
-struct path *path_fromstr(char *pathstr) {
+struct path *path_fromstr(const char *pathstr) {
     if (!*pathstr)
         return ERR_PTR(-ENOENT);
 
@@ -186,7 +186,7 @@ struct path *path_checkmnt(struct path *old) {
     if (IS_ERR(path))
         return path;
 
-    while (1) {
+    while (true) {
         // Try to find the best matching mount entry
         struct mount *bestmatch = NULL;
         int32_t bestmatchsize = 0;
@@ -223,6 +223,72 @@ struct path *path_checkmnt(struct path *old) {
     return path;
 }
 
+struct path *path_resolvemnt(struct path *old) {
+    struct path *path = path_clone(old);
+    if (IS_ERR(path))
+        return path;
+
+    while (path->mnt) {
+        struct mount *mnt = path->mnt;
+        path->mnt = NULL;
+
+        struct path *newpath = path_join(mnt->path, path);
+        path_destroy(path);
+        path = newpath;
+
+        if (IS_ERR(path))
+            return path;
+    }
+
+    return path;
+}
+
+int32_t path_tostring(struct path *path, char *buf, uint32_t nbytes) {
+    path = path_resolvemnt(path);
+    if (IS_ERR(path))
+        return PTR_ERR(path);
+
+    if (!nbytes)
+        return 0;
+
+    uint32_t ret = 0;
+    if (list_isempty(&path->components)) {
+        nbytes--;
+        *(buf++) = '/';
+        ret++;
+        if (nbytes--) {
+            *(buf++) = '\0';
+            ret++;
+        }
+    } else {
+        struct list_node *pathnode;
+        list_for_each(&path->components, pathnode) {
+            if (nbytes) {
+                *(buf++) = '/';
+                ret++;
+                nbytes--;
+            } else {
+                break;
+            }
+            char *component = pathnode->value;
+            uint32_t len = strlen(component);
+
+            if (len > nbytes)
+                len = nbytes;
+
+            strncpy(buf, component, len);
+            nbytes -= len;
+            buf += len;
+            ret += len;
+        }
+        if (nbytes--) {
+            *(buf++) = '\0';
+            ret++;
+        }
+    }
+    path_destroy(path);
+    return ret;
+}
 
 static void init_path() {
     root_path.absolute = true;
