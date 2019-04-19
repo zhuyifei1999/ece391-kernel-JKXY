@@ -2,6 +2,7 @@
 #define _TASK_H
 
 #include "signal.h"
+#include "fp.h"
 #include "../lib/stdint.h"
 #include "../lib/string.h"
 #include "../mm/paging.h"
@@ -58,6 +59,7 @@ struct task_struct {
     struct sigactions *sigactions;
     tls_seg_t ldt;
     tls_seg_t gdt_tls;
+    fxsave_data_t *fxsave_data;
     struct intr_info *entry_regs;  // for kernel execve
     struct intr_info *return_regs; // for scheduler
     enum task_state state;

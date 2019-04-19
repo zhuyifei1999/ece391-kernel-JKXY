@@ -2,6 +2,7 @@
 #include "sched.h"
 #include "signal.h"
 #include "tls.h"
+#include "fp.h"
 #include "../syscall.h"
 #include "../err.h"
 #include "../errno.h"
@@ -28,6 +29,7 @@ void return_to_userspace(struct intr_info *info) {
     deliver_signal(info);
     cond_schedule();
     load_tls();
+    retuser_fxrstor();
 }
 
 DEFINE_SYSCALL0(LINUX, getpid) {

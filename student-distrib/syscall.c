@@ -13,7 +13,7 @@ intr_handler_t *syscall_handlers[NUM_SUBSYSTEMS][MAX_SYSCALL];
  */
 static void syscall_handler(struct intr_info *info) {
     intr_handler_t *handler = NULL;
-    printk("Syscall: %u %x %x %x\n", info->eax, info->ebx, info->ecx, info->edx);
+    // printk("Syscall: %u %x %x %x\n", info->eax, info->ebx, info->ecx, info->edx);
     // perform sanity check on the value of eax
     if (info->eax < MAX_SYSCALL) // load proper handler into handler
         handler = syscall_handlers[current->subsystem][info->eax];

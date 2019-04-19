@@ -59,6 +59,9 @@ void do_exit(int exitcode) {
     if (!atomic_dec(&current->sigactions->refcount))
         kfree(current->sigactions);
 
+    if (current->fxsave_data)
+        kfree(current->fxsave_data);
+
     if (!current->ppid)
         panic("Killing process tree!\n");
 

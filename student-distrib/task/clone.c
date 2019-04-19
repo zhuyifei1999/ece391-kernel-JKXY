@@ -132,8 +132,8 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         }
 
         // although irrelevant, only those with mm can have TLS, right?
-        memcpy(task->ldt, current->ldt, sizeof(current->ldt));
-        memcpy(task->gdt_tls, current->gdt_tls, sizeof(current->gdt_tls));
+        memcpy(task->ldt, current->ldt, sizeof(task->ldt));
+        memcpy(task->gdt_tls, current->gdt_tls, sizeof(task->gdt_tls));
     }
 
     // if share the files, increase the reference count of these files. otherwise copy the file table
@@ -166,6 +166,15 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         memcpy(task->sigactions->sigactions, current->sigactions->sigactions,
             sizeof(current->sigactions->sigactions));
         atomic_set(&task->sigactions->refcount, 1);
+    }
+
+    // The child needs to shared the same FP registers (also irrelevant with mm, but...)
+    if (current->mm) {
+        task->fxsave_data = kmalloc(sizeof(*task->fxsave_data));
+        if (current->fxsave_data)
+            memcpy(task->fxsave_data, current->fxsave_data, sizeof(*task->fxsave_data));
+        else
+            fxsave(task->fxsave_data);
     }
 
     if (flags & CLONE_PARENT_SETTID)

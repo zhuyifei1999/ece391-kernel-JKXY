@@ -2,6 +2,7 @@
 #include "ece391exec_shim.h"
 #include "userstack.h"
 #include "signal.h"
+#include "fp.h"
 #include "../char/tty.h"
 #include "../char/random.h"
 #include "../lib/string.h"
@@ -269,6 +270,10 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
 
     memset(current->ldt, 0, sizeof(current->ldt));
     memset(current->gdt_tls, 0, sizeof(current->gdt_tls));
+
+    if (current->fxsave_data)
+        kfree(current->fxsave_data);
+    finit();
 
     current->subsystem = subsystem;
 

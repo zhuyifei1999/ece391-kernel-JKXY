@@ -1,5 +1,6 @@
 #include "sched.h"
 #include "exit.h"
+#include "fp.h"
 #include "../x86_desc.h"
 #include "../mm/paging.h"
 #include "../interrupt.h"
@@ -15,6 +16,7 @@ static uint32_t schedule_rtc_counter;
 static void _switch_to(struct task_struct *task, struct intr_info *info) {
     schedule_rtc_counter = 0;
     current->return_regs = info;
+    sched_fxsave();
 
     if (task->mm) // this task has userspace, update page directory
         switch_directory(task->mm->page_directory);

@@ -291,7 +291,7 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
             tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] = WHITE_ON_BLACK;
         } else if (c == '\t') {
             // TODO
-            return raw_tty_write(tty, " ", 1);
+            raw_tty_write(tty, " ", 1);
         } else {
             tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2] = c;
             tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] = WHITE_ON_BLACK;
