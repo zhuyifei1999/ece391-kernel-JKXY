@@ -46,7 +46,7 @@ void send_sig(struct task_struct *task, uint16_t signum) {
     if (signal_pending(task))
         return;
     struct sigaction *sigaction = &task->sigactions->sigactions[signum];
-    if (sigaction->action == SIG_IGN)
+    if (sigaction->sigaction == SIG_IGN)
         return;
 
     task->sigpending = (struct sigpending){
@@ -95,11 +95,11 @@ int32_t send_sig_pg(uint16_t pgid, uint16_t signum) {
 }
 
 void kernel_mask_signal(uint16_t signum) {
-    current->sigactions->sigactions[signum].action = SIG_IGN;
+    current->sigactions->sigactions[signum].sigaction = SIG_IGN;
 }
 
 void kernel_unmask_signal(uint16_t signum) {
-    current->sigactions->sigactions[signum].action = SIG_DFL;
+    current->sigactions->sigactions[signum].sigaction = SIG_DFL;
 }
 
 uint16_t kernel_peek_pending_sig() {
@@ -143,9 +143,9 @@ void deliver_signal(struct intr_info *regs) {
 
     uint16_t signum = sigpending.signum;
     struct sigaction *sigaction = &current->sigactions->sigactions[signum];
-    if (sigaction->action == SIG_IGN)
+    if (sigaction->sigaction == SIG_IGN)
         return;
-    if (sigpending.forced || sigaction->action == SIG_DFL) {
+    if (sigpending.forced || sigaction->sigaction == SIG_DFL) {
         switch (default_sig_action(signum)) {
         case SIG_IGNORE:
             return;
@@ -222,7 +222,7 @@ void deliver_signal(struct intr_info *regs) {
             goto force_segv;
 
 
-        regs->eip = (uint32_t)sigaction->action;
+        regs->eip = (uint32_t)sigaction->sigaction;
         return;
     }
     }
@@ -231,6 +231,13 @@ force_segv:
     force_sig(current, SIGSEGV);
     deliver_signal(regs);
 }
+
+struct linux_sigaction {
+    void     (*sa_sigaction)(int, struct siginfo *, void *);
+    unsigned long   sa_mask;
+    int        sa_flags;
+    void     (*sa_restorer)(void);
+};
 
 DEFINE_SYSCALL2(ECE391, set_handler, int32_t, signum, void *, handler_address) {
     switch (signum) {
@@ -253,7 +260,29 @@ DEFINE_SYSCALL2(ECE391, set_handler, int32_t, signum, void *, handler_address) {
         return -EINVAL;
     }
 
-    current->sigactions->sigactions[signum].action = handler_address;
+    current->sigactions->sigactions[signum].sigaction = handler_address;
+    return 0;
+}
+
+DEFINE_SYSCALL3(LINUX, rt_sigaction, int, signum, const struct linux_sigaction *, act, struct linux_sigaction *, oldact) {
+    if (signum <= 0 || signum >= _NSIG)
+        return -EINVAL;
+    if (signum == SIGKILL || signum == SIGSTOP)
+        return -EINVAL;
+
+    if (safe_buf(act, sizeof(*act), false) != sizeof(*act))
+        return -EFAULT;
+
+    if (safe_buf(oldact, sizeof(*oldact), false) == sizeof(*oldact)) {
+        *oldact = (struct linux_sigaction){
+            .sa_sigaction = current->sigactions->sigactions[signum].sigaction,
+            .sa_flags = current->sigactions->sigactions[signum].flags,
+        };
+    }
+
+    current->sigactions->sigactions[signum].sigaction = act->sa_sigaction;
+    current->sigactions->sigactions[signum].flags = act->sa_flags;
+
     return 0;
 }
 

@@ -26,7 +26,7 @@
 struct task_struct *swapper_task;
 struct task_struct *init_task;
 
-// #define HAS_ECE391 1
+#define HAS_ECE391 1
 
 static void mount_root_device(uint32_t device_num, char *fsname) {
     struct file *root_block = filp_open_anondevice(device_num, 0, S_IFBLK | 0666);
@@ -191,7 +191,7 @@ do_switch_loop:;
 
     tty_switch_foreground(MKDEV(TTY_MAJOR, 4));
 
-    return run_init_process("/bin/busybox");
+    return run_init_process("/bin/sh");
 }
 
 noreturn void kernel_main(void) {

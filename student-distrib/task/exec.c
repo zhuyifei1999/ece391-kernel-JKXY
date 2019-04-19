@@ -271,8 +271,10 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     memset(current->ldt, 0, sizeof(current->ldt));
     memset(current->gdt_tls, 0, sizeof(current->gdt_tls));
 
-    if (current->fxsave_data)
+    if (current->fxsave_data) {
         kfree(current->fxsave_data);
+        current->fxsave_data = NULL;
+    }
     finit();
 
     current->subsystem = subsystem;
@@ -429,6 +431,7 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         // ECE391 subsystem always map the file to 0x08048000,
         // with stack bottom at the end of the page
         request_pages((void *)ECE391_PAGEADDR, 1, GFP_USER | GFP_LARGE);
+        filp_seek(exe, 0, SEEK_SET);
         filp_read(exe, (void *)(ECE391_PAGEADDR + ECE391_MAPADDR), LEN_4M - ECE391_MAPADDR);
         current->entry_regs->eip = *(uint32_t *)(ECE391_PAGEADDR + ECE391_MAPADDR + 24);
         current->entry_regs->esp = ECE391_PAGEADDR + LEN_4M;

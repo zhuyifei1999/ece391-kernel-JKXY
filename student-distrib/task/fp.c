@@ -1,5 +1,6 @@
 #include "fp.h"
 #include "task.h"
+#include "../mm/kmalloc.h"
 #include "../initcall.h"
 
 // adapted from OSDev

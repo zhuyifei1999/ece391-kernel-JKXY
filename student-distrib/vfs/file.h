@@ -9,14 +9,15 @@
 #define MAX_PATH 260
 
 // #define O_RDONLY  0x0
-#define O_WRONLY  0x1
-#define O_RDWR    0x2
-#define O_CREAT   0x40
-#define O_EXCL    0x80
-#define O_NOCTTY  0x100
-#define O_TRUNC   0x200
-#define O_APPEND  0x400
-#define O_CLOEXEC 0x80000
+#define O_WRONLY   0x1
+#define O_RDWR     0x2
+#define O_CREAT    0x40
+#define O_EXCL     0x80
+#define O_NOCTTY   0x100
+#define O_TRUNC    0x200
+#define O_APPEND   0x400
+#define O_NOFOLLOW 0x20000
+#define O_CLOEXEC  0x80000
 
 #define AT_FDCWD -100 // Means openat should use CWD
 
@@ -141,6 +142,7 @@ struct file {
 };
 
 void put_inode(struct inode *inode);
+struct inode *inode_open(int32_t dfd, char *path, uint32_t flags, uint16_t mode, struct path **path_out);
 
 void fill_default_file_op(struct file_operations *file_op);
 void fill_default_ino_op(struct inode_operations *ino_op);

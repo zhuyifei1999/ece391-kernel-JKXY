@@ -67,7 +67,7 @@ void do_exit(int exitcode) {
 
     // Signal parent so it can mourn us
     struct task_struct *parent = get_task_from_pid(current->ppid);
-    if (parent->sigactions->sigactions[SIGCHLD].action == SIG_IGN) {
+    if (parent->sigactions->sigactions[SIGCHLD].sigaction == SIG_IGN) {
         _do_wait(current);
     } else {
         send_sig(parent, SIGCHLD);
@@ -108,7 +108,7 @@ int32_t do_wait(struct task_struct *task) {
     struct sigaction oldaction = current->sigactions->sigactions[SIGCHLD];
 
     current->sigactions->sigactions[SIGCHLD] = (struct sigaction){
-        .action = SIG_DFL,
+        .sigaction = SIG_DFL,
     };
 
     while (true) {
@@ -156,7 +156,7 @@ int32_t do_waitall(uint16_t *pid) {
         struct sigaction oldaction = current->sigactions->sigactions[SIGCHLD];
 
         current->sigactions->sigactions[SIGCHLD] = (struct sigaction){
-            .action = SIG_DFL,
+            .sigaction = SIG_DFL,
         };
 
         while (true) {

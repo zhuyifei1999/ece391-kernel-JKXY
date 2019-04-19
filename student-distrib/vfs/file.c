@@ -27,19 +27,13 @@ void put_inode(struct inode *inode) {
     (*inode->sb->op->put_inode)(inode);
 }
 
-/*
- *   filp_openat
- *   DESCRIPTION: open the file
- *   INPUTS: struct int32_t dfd, char *path, uint32_t flags, uint16_t mode
- *   RETURN VALUE: struct file
- */
-struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
+struct inode *inode_open(int32_t dfd, char *path, uint32_t flags, uint16_t mode, struct path **path_out) {
     struct path *path_rel = path_fromstr(path);
     // check if the file's path is valid
     if (IS_ERR(path_rel))
         return ERR_CAST(path_rel);
 
-    struct file *ret;
+    struct inode *ret = NULL;
 
     struct path *path_premount;
     if (path_rel->absolute) {
@@ -71,14 +65,16 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
 resolve_mount:;
     // now resolve mounts
     struct path *path_dest = path_checkmnt(path_premount);
+    path_destroy(path_premount);
+
     if (IS_ERR(path_dest)) {
         ret = ERR_CAST(path_dest);
-        goto out_premount;
+        goto out_rel;
     } else if (!path_dest->mnt) {
         // We don't have a mount table?
         path_destroy(path_dest);
         ret = ERR_PTR(-EINVAL);
-        goto out_premount;
+        goto out_rel;
     }
 
     // now, from the mount root, get the inode
@@ -103,7 +99,7 @@ resolve_mount:;
         }
         if (res < 0) {
             ret = ERR_PTR(res);
-            goto out_inode_decref;
+            goto out_put_inode;
         }
         // destroy the inode
         put_inode(inode);
@@ -113,14 +109,18 @@ resolve_mount:;
     // user asked that file must be newly created
     if (flags & O_EXCL && !created) {
         ret = ERR_PTR(-EEXIST);
-        goto out_inode_decref;
+        goto out_put_inode;
     }
 
     if ((inode->mode & S_IFMT) == S_IFLNK) {
+        if (flags & O_NOFOLLOW) {
+            ret = ERR_PTR(-ELOOP);
+            goto out_put_inode;
+        }
         char *link_target = kmalloc(MAX_PATH + 1);
         if (!link_target) {
             ret = ERR_PTR(-ENOMEM);
-            goto out_inode_decref;
+            goto out_put_inode;
         }
         link_target[MAX_PATH] = '\0';
 
@@ -128,12 +128,12 @@ resolve_mount:;
         if (res < 0) {
             kfree(link_target);
             ret = ERR_PTR(res);
-            goto out_inode_decref;
+            goto out_put_inode;
         }
         if (!res) {
             kfree(link_target);
             ret = ERR_PTR(-EINVAL);
-            goto out_inode_decref;
+            goto out_put_inode;
         }
 
         link_target[res] = '\0';
@@ -144,23 +144,54 @@ resolve_mount:;
         kfree(link_target);
         if (IS_ERR(path_target_rel)) {
             ret = ERR_CAST(path_target_rel);
-            goto out_inode_decref;
+            goto out_put_inode;
         }
 
         struct path *path_target = path_join(path_dest, path_target_rel);
         path_destroy(path_target_rel);
         if (IS_ERR(path_target)) {
             ret = ERR_CAST(path_target);
-            goto out_inode_decref;
+            goto out_put_inode;
         }
 
         path_destroy(path_dest);
-        path_destroy(path_premount);
         put_inode(inode);
         path_premount = path_target;
 
         goto resolve_mount;
     }
+
+    ret = inode;
+
+out_put_inode:
+    if (IS_ERR(ret))
+        put_inode(inode);
+
+    if (IS_ERR(ret) || !path_out)
+        path_destroy(path_dest);
+    else
+        *path_out = path_dest;
+
+out_rel:
+    path_destroy(path_rel);
+
+    return ret;
+}
+
+/*
+ *   filp_openat
+ *   DESCRIPTION: open the file
+ *   INPUTS: struct int32_t dfd, char *path, uint32_t flags, uint16_t mode
+ *   RETURN VALUE: struct file
+ */
+struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
+    struct path *path_stru;
+
+    struct inode *inode = inode_open(dfd, path, flags, mode, &path_stru);
+    if (IS_ERR(inode))
+        return ERR_CAST(inode);
+
+    struct file *ret;
 
     struct file_operations *file_op;
     switch (inode->mode & S_IFMT) {
@@ -169,10 +200,10 @@ resolve_mount:;
         file_op = get_dev_file_op(inode->mode, inode->rdev);
         if (!file_op) {
             ret = ERR_PTR(-ENXIO);
-            goto out_inode_decref;
+            goto out;
         }
         break;
-    // TODO: Pipes, sockets, directories, etc.
+    // TODO: Pipes, sockets, etc.
     default:
         file_op = inode->op->default_file_ops;
         break;
@@ -181,43 +212,33 @@ resolve_mount:;
     if (current->subsystem == SUBSYSTEM_LINUX)
         if ((inode->mode & S_IFMT) == S_IFDIR && ((flags & O_WRONLY) || (flags & O_RDWR))) {
             ret = ERR_PTR(-EISDIR);
-            goto out_inode_decref;
+            goto out;
         }
 
     // allocate the space in the kernel
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
         ret = ERR_PTR(-ENOMEM);
-        goto out_inode_decref;
+        goto out;
     }
     *ret = (struct file){
         .op = file_op,
         .inode = inode,
-        .path = path_dest,
+        .path = path_stru,
         .flags = flags,
         .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_inc(&inode->refcount);
 
     int32_t res = (*ret->op->open)(ret, inode);
     if (res < 0) {
         kfree(ret);
         ret = ERR_PTR(res);
-        goto out_inode_decref;
+        goto out;
     }
 
-// destroy three contents
-out_inode_decref:
-    put_inode(inode);
-
+out:
     if (IS_ERR(ret))
-        path_destroy(path_dest);
-
-out_premount:
-    path_destroy(path_premount);
-
-out_rel:
-    path_destroy(path_rel);
+        put_inode(inode);
 
     return ret;
 }
@@ -263,7 +284,7 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
         ret = ERR_PTR(-ENOMEM);
-        goto out_inode_decref;
+        goto out_put_inode;
     }
 
     // assign the value to the ret
@@ -282,10 +303,10 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     if (res < 0) {
         kfree(ret);
         ret = ERR_PTR(res);
-        goto out_inode_decref;
+        goto out_put_inode;
     }
 
-out_inode_decref:
+out_put_inode:
     put_inode(inode);
 
 out_destroy_path:
