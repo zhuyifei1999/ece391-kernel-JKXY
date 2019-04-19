@@ -184,6 +184,13 @@ DEFINE_SYSCALL1(LINUX, close, int32_t, fd) {
     return do_sys_close(fd);
 }
 
+DEFINE_SYSCALL3(LINUX, ioctl, int32_t, fd, uint32_t, request, unsigned long, arg) {
+    struct file *file = array_get(&current->files->files, fd);
+    if (!file)
+        return -EBADF;
+
+    return filp_ioctl(file, request, arg, true);
+}
 
 DEFINE_SYSCALL2(LINUX, dup2, int32_t, oldfd, int32_t, newfd) {
     struct file *oldfile = array_get(&current->files->files, oldfd);

@@ -388,9 +388,10 @@ static int32_t tty_ioctl(struct file *file, uint32_t request, unsigned long arg,
             .ws_row = NUM_ROWS,
             .ws_col = NUM_COLS,
         };
+        return 0;
+    default:
+        return -ENOTTY;
     }
-
-    return -ENOTTY;
 }
 
 /*

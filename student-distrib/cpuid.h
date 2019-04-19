@@ -1,3 +1,6 @@
+#ifndef _CPUID_H
+#define _CPUID_H
+
 #include "lib/stdint.h"
 #include "compiler.h"
 
@@ -106,3 +109,5 @@ enum cpuid_requests {
 static inline __always_inline void cpuid(int code, uint32_t *a, uint32_t *d) {
     asm volatile ("cpuid" : "=a"(*a), "=d"(*d) : "a"(code) : "ecx", "ebx");
 }
+
+#endif
