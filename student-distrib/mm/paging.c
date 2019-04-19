@@ -145,7 +145,7 @@ void init_page(struct multiboot_info __physaddr *mbi) {
     }
     for (i = 0; i < NUM_PREALLOCATE_LARGE; i++) //set kernel memory mapping
         phys_dir[i] = PHYS_DIR_KERNEL;
-        
+
     // initializ page table
     page_table_t __physaddr *heap_tables = (void __physaddr *)KDIR_PHYS_ADDR;
     for (i = 0; i < NUM_PAGE_TABLES; i++) {
@@ -194,7 +194,7 @@ static int16_t *get_phys_dir_entry(const void __physaddr *addr, uint32_t gfp_fla
 }
 
 /*  alloc_phys_mem
- *  DESCRIPTION: allocate given size of memory. 
+ *  DESCRIPTION: allocate given size of memory.
  *  INPUTS: uint32_t gfp_flags
  *  OUTPUTS: none
  *  RETURN VALUE: if success, return the memory address;otherwise return NULL pointer.
@@ -638,7 +638,7 @@ void free_pages(void *page, uint32_t num, uint32_t gfp_flags) {
 }
 
 /*  remap_to_user
- *  DESCRIPTION: map some used memory address to another page table 
+ *  DESCRIPTION: map some used memory address to another page table
  *  INPUTS: void *src, struct page_table_entry **dest, void **newmap_addr
  *  OUTPUTS: none
  *  RETURN VALUE: none
@@ -691,9 +691,9 @@ void remap_to_user(void *src, struct page_table_entry **dest, void **newmap_addr
     restore_flags(flags);
 }
 
-/*  
+/*
  *  clone_directory
- *  DESCRIPTION: clone directory 
+ *  DESCRIPTION: clone directory
  *  INPUTS: page_directory_t *src
  *  OUTPUTS: none
  *  RETURN VALUE: page_directory_t *
@@ -754,9 +754,9 @@ page_directory_t *clone_directory(page_directory_t *src) {
     return dst;
 }
 
-/*  
+/*
  *  new_directory
- *  DESCRIPTION: clone a directory 
+ *  DESCRIPTION: clone a directory
  *  INPUTS: none
  *  OUTPUTS: none
  *  RETURN VALUE: page_directory_t *
@@ -765,7 +765,7 @@ page_directory_t *new_directory() {
     return clone_directory(&init_page_directory);
 }
 
-/*  
+/*
  *  _clone_cow
  *  DESCRIPTION: check whether can clone or not
  *  INPUTS: page_directory_t *directory, const void *addr
@@ -782,9 +782,9 @@ static bool _clone_cow(page_directory_t *directory, const void *addr) {
         dir_entry->rw = 1;
         dir_entry->flags &= ~PAGE_COW_RO;
 
-        int16_t *phys_dir_entry = get_phys_dir_entry(addr, GFP_USER | GFP_LARGE);
+        void __physaddr *old_physaddr = (void __physaddr *)PAGE_IDX_ADDR(dir_entry->addr);
+        int16_t *phys_dir_entry = get_phys_dir_entry(old_physaddr, GFP_USER | GFP_LARGE);
         if (*phys_dir_entry > 1) {
-            void __physaddr *old_physaddr = (void __physaddr *)PAGE_IDX_ADDR(dir_entry->addr);
             void __physaddr *physaddr = alloc_phys_mem(GFP_USER | GFP_LARGE);
             if (!physaddr)
                 return false;
@@ -812,9 +812,9 @@ static bool _clone_cow(page_directory_t *directory, const void *addr) {
         table_entry->rw = 1;
         table_entry->flags &= ~PAGE_COW_RO;
 
-        int16_t *phys_dir_entry = get_phys_dir_entry(addr, GFP_USER);
+        void __physaddr *old_physaddr = (void __physaddr *)PAGE_IDX_ADDR(table_entry->addr);
+        int16_t *phys_dir_entry = get_phys_dir_entry(old_physaddr, GFP_USER);
         if (*phys_dir_entry > 1) {
-            void __physaddr *old_physaddr = (void __physaddr *)PAGE_IDX_ADDR(table_entry->addr);
             void __physaddr *physaddr = alloc_phys_mem(GFP_USER);
             if (!physaddr)
                 return false;
@@ -837,7 +837,7 @@ static bool _clone_cow(page_directory_t *directory, const void *addr) {
     return true;
 }
 
-/*  
+/*
  *  clone_cow
  *  DESCRIPTION: check whether can clone or not
  *  INPUTS: const void *addr
@@ -848,7 +848,7 @@ bool clone_cow(const void *addr) {
     return _clone_cow(current_page_directory(), addr);
 }
 
-/*  
+/*
  *  free_directory
  *  DESCRIPTION: free the given page directory
  *  INPUTS: page_directory_t *dir
@@ -893,7 +893,7 @@ void free_directory(page_directory_t *dir) {
     restore_flags(flags);
 }
 
-/*  
+/*
  *  addr_is_safe
  *  DESCRIPTION: check whether the given address is safe to write on
  *  INPUTS: page_directory_t *directory, const void *addr, bool write
@@ -920,7 +920,7 @@ static bool addr_is_safe(page_directory_t *directory, const void *addr, bool wri
     return true;
 }
 
-/*  
+/*
  *  safe_buf
  *  DESCRIPTION: create a temporary buf to write on
  *  INPUTS: const void *buf, uint32_t nbytes, bool write
@@ -949,7 +949,7 @@ uint32_t safe_buf(const void *buf, uint32_t nbytes, bool write) {
     return ret;
 }
 
-/*  
+/*
  *  safe_arr_null_term
  *  DESCRIPTION: safe_arr_null_term
  *  INPUTS: const void *buf, uint32_t entry_size, bool write
