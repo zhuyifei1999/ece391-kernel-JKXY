@@ -13,6 +13,7 @@
 #include "../vfs/path.h"
 #include "../cpuid.h"
 #include "../panic.h"
+#include "../syscall.h"
 #include "../eflags.h"
 #include "../err.h"
 #include "../errno.h"
@@ -453,4 +454,50 @@ err_close:
 force_sigsegv:
     force_sig(current, SIGSEGV);
     return 0;
+}
+
+DEFINE_SYSCALL_COMPLEX(LINUX, execve, regs) {
+    char *filename = (void *)regs->ebx;
+    char **argv = (void *)regs->ecx;
+    char **envp = (void *)regs->edx;
+
+    uint32_t filename_len, argv_len, envp_len;
+
+    regs->eax = -EFAULT;
+    if (!filename || !(filename_len = safe_arr_null_term(filename, sizeof(*filename), false)))
+        return;
+    if (!argv || !(argv_len = safe_arr_null_term(argv, sizeof(*argv), false)))
+        return;
+    if (!envp || !(envp_len = safe_arr_null_term(envp, sizeof(*envp), false)))
+        return;
+
+    char *filename_k = strndup(filename, filename_len);
+
+    char **argv_k = NULL;
+    char **envp_k = NULL;
+
+    uint32_t i;
+    argv_k = kcalloc(argv_len + 1, sizeof(*argv));
+    for (i = 0; i < argv_len; i++)
+        argv_k[i] = strndup(argv[i], safe_arr_null_term(argv[i], 1, false));
+
+    envp_k = kcalloc(envp_len + 1, sizeof(*envp));
+    for (i = 0; i < envp_len; i++)
+        envp_k[i] = strndup(envp[i], safe_arr_null_term(envp[i], 1, false));
+
+    current->entry_regs = regs;
+
+    int32_t res = do_execve(filename_k, argv_k, envp_k);
+    if (res < 0)
+        regs->eax = res;
+
+    kfree(filename_k);
+
+    for (i = 0; i < argv_len; i++)
+        kfree(argv_k[i]);
+    kfree(argv_k);
+
+    for (i = 0; i < envp_len; i++)
+        kfree(envp_k[i]);
+    kfree(envp_k);
 }

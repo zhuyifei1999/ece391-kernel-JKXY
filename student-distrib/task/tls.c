@@ -4,23 +4,7 @@
 #include "../syscall.h"
 #include "../errno.h"
 
-struct user_desc {
-    unsigned int  entry_number;
-    unsigned long base_addr;
-    unsigned int  limit;
-    unsigned int  seg_32bit:1;
-    unsigned int  contents:2;
-    unsigned int  read_exec_only:1;
-    unsigned int  limit_in_pages:1;
-    unsigned int  seg_not_present:1;
-    unsigned int  useable:1;
-};
-
-DEFINE_SYSCALL1(LINUX, set_thread_area, struct user_desc *, u_info) {
-    uint32_t nbytes = safe_buf(u_info, sizeof(*u_info), true);
-    if (nbytes != sizeof(*u_info))
-        return -EFAULT;
-
+int32_t do_set_thread_area(struct user_desc * u_info) {
     int16_t entry = u_info->entry_number;
     if (entry == -1) {
         for (entry = 0; entry < TLS_SEG_NUM; entry++)
@@ -69,6 +53,14 @@ DEFINE_SYSCALL1(LINUX, set_thread_area, struct user_desc *, u_info) {
     };
 
     return 0;
+}
+
+DEFINE_SYSCALL1(LINUX, set_thread_area, struct user_desc *, u_info) {
+    uint32_t nbytes = safe_buf(u_info, sizeof(*u_info), true);
+    if (nbytes != sizeof(*u_info))
+        return -EFAULT;
+
+    return do_set_thread_area(u_info);
 }
 
 void load_tls(void) {

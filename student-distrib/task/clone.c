@@ -1,12 +1,15 @@
 #include "clone.h"
 #include "exit.h"
 #include "session.h"
+#include "sched.h"
 #include "signal.h"
+#include "tls.h"
 #include "../mm/kmalloc.h"
 #include "../lib/string.h"
 #include "../eflags.h"
 #include "../panic.h"
 #include "../x86_desc.h"
+#include "../syscall.h"
 #include "../initcall.h"
 #include "../err.h"
 #include "../errno.h"
@@ -55,9 +58,13 @@ static void clone_entry_handler(struct intr_info *info) {
     int (*fn)(void *args) = (void *)info->ebx;
     void *args = (void *)info->ecx;
     int *tidptr = (void *)info->edx;
+    struct user_desc *newtls = (void *)info->esi;
 
-    if (flags & CLONE_PARENT_SETTID)
+    if (flags & CLONE_PARENT_SETTID && tidptr)
         *tidptr = current->pid;
+
+    if (flags & CLONE_SETTLS && newtls)
+        do_set_thread_area(newtls);
 
     current->entry_regs = info;
 
@@ -85,11 +92,11 @@ DEFINE_INITCALL(init_clone_entry, early);
 /*
  *   do_clone
  *   DESCRIPTION: clone a child task from the parent
- *   INPUTS: uint32_t flags, int (*fn)(void *args), void *args, int *parent_tidptr, int *child_tidptr
+ *   INPUTS: uint32_t flags, int (*fn)(void *args), void *args, int *ptid, int *ctid
  *   RETURN VALUE: next available pid number
  *   SIDE EFFECTS: none
  */
-struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, int *parent_tidptr, int *child_tidptr) {
+struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, int *ptid, int *ctid, struct user_desc *newtls) {
     struct task_struct *task = alloc_pages(TASK_STACK_PAGES, TASK_STACK_PAGES_POW, 0);
     if (!task)
         return ERR_PTR(-ENOMEM);
@@ -177,8 +184,8 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
             fxsave(task->fxsave_data);
     }
 
-    if (flags & CLONE_PARENT_SETTID)
-        *parent_tidptr = task->pid;
+    if (flags & CLONE_PARENT_SETTID && ptid)
+        *ptid = task->pid;
 
     // The position of this struct intr_info controls where the stack is going
     // to end up, not any of the contents in the struct, bacause we are using
@@ -191,7 +198,8 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         .eax    = (uint32_t)flags,
         .ebx    = (uint32_t)fn,
         .ecx    = (uint32_t)args,
-        .edx    = (uint32_t)child_tidptr,
+        .edx    = (uint32_t)ctid,
+        .esi    = (uint32_t)newtls,
         .eflags = EFLAGS_BASE | IF,
         .eip    = (uint32_t)&entry_task,
         .cs     = KERNEL_CS,
@@ -216,7 +224,42 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
  *   RETURN VALUE: new task
  */
 struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
-    return do_clone(SIGCHLD, fn, args, NULL, NULL);
+    return do_clone(SIGCHLD, fn, args, NULL, NULL, NULL);
 }
 
-// TODO: fork syscall: cline intr_info to child, set child eax = 0, set parent_tidptr = parent eax
+DEFINE_SYSCALL_COMPLEX(LINUX, clone, regs) {
+    uint32_t flags = regs->ebx;
+    uint32_t child_stack = regs->ecx;
+    int *ptid = (void *)regs->edx;
+    struct user_desc *newtls = (void *)regs->esi;
+    int *ctid = (void *)regs->edi;
+
+    if (ptid && safe_buf(ptid, sizeof(*ptid), true) != sizeof(*ptid))
+        ptid = NULL;
+    if (ctid && safe_buf(ctid, sizeof(*ctid), true) != sizeof(*ctid))
+        ctid = NULL;
+    if (newtls && safe_buf(newtls, sizeof(*newtls), false) != sizeof(*newtls))
+        newtls = NULL;
+
+    struct intr_info *newregs = kmalloc(sizeof(*newregs));
+    if (!newregs) {
+        regs->eax = -ENOMEM;
+        return;
+    }
+    *newregs = *regs;
+
+    newregs->eax = 0;
+
+    if (child_stack)
+        newregs->esp = (uint32_t)child_stack;
+
+    struct task_struct *task = do_clone(flags, NULL, newregs, ptid, ctid, newtls);
+    if (IS_ERR(task)) {
+        kfree(newregs);
+        regs->eax = PTR_ERR(task);
+    } else {
+        regs->eax = task->pid;
+        wake_up_process(task);
+        printk("%d %d\n", current->pid, task->pid);
+    }
+}
