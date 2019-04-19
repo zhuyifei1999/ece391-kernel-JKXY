@@ -112,11 +112,7 @@ resolve_mount:;
         goto out_put_inode;
     }
 
-    if ((inode->mode & S_IFMT) == S_IFLNK) {
-        if (flags & O_NOFOLLOW) {
-            ret = ERR_PTR(-ELOOP);
-            goto out_put_inode;
-        }
+    if ((inode->mode & S_IFMT) == S_IFLNK && !(flags & O_NOFOLLOW)) {
         char *link_target = kmalloc(MAX_PATH + 1);
         if (!link_target) {
             ret = ERR_PTR(-ENOMEM);
@@ -195,6 +191,9 @@ struct file *filp_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t
 
     struct file_operations *file_op;
     switch (inode->mode & S_IFMT) {
+    case S_IFLNK:
+        ret = ERR_PTR(-ELOOP);
+        goto out;
     case S_IFCHR:
     case S_IFBLK:
         file_op = get_dev_file_op(inode->mode, inode->rdev);

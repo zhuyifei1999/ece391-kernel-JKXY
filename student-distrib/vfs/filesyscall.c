@@ -1,5 +1,6 @@
 #include "file.h"
 #include "path.h"
+#include "superblock.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
 #include "../task/task.h"
@@ -224,4 +225,77 @@ DEFINE_SYSCALL3(LINUX, readlink, const char *, path, char *, buf, uint32_t, nbyt
 
 DEFINE_SYSCALL2(LINUX, getcwd, char *, buf, uint32_t, nbytes) {
     return path_tostring(current->cwd->path, buf, nbytes);
+}
+
+struct timespec {
+    uint32_t sec;  /* seconds */
+    uint32_t nsec; /* nanoseconds */
+};
+
+struct stat {
+    unsigned long long dev; /* ID of device containing file */
+    unsigned short __pad1;
+    uint32_t ino;         /* Inode number */
+    uint32_t mode;        /* File type and mode */
+    uint32_t nlink;       /* Number of hard links */
+    uint32_t uid;         /* User ID of owner */
+    uint32_t gid;         /* Group ID of owner */
+    unsigned long long rdev;        /* Device ID (if special file) */
+    unsigned short __pad2;
+    uint32_t size;        /* Total size, in bytes */
+    uint32_t blksize;     /* Block size for filesystem I/O */
+    uint32_t blocks;      /* Number of 512B blocks allocated */
+
+    struct timespec atim;  /* Time of last access */
+    struct timespec mtim;  /* Time of last modification */
+    struct timespec ctim;  /* Time of last status change */
+    uint32_t __glibc_reserved4;
+    uint32_t __glibc_reserved5;
+};
+
+// What madness is this? <include/uapi/asm/stat.h>
+struct stat64 {
+    uint64_t dev; /* ID of device containing file */
+    uint32_t __pad1;
+    uint32_t __ino;
+    uint32_t mode;        /* File type and mode */
+    uint32_t nlink;       /* Number of hard links */
+    uint32_t uid;         /* User ID of owner */
+    uint32_t gid;         /* Group ID of owner */
+    uint64_t rdev;        /* Device ID (if special file) */
+    uint32_t __pad2;
+    uint64_t size;        /* Total size, in bytes */
+    uint32_t blksize;     /* Block size for filesystem I/O */
+    uint64_t blocks;      /* Number of 512B blocks allocated */
+
+    struct timespec atim;  /* Time of last access */
+    struct timespec mtim;  /* Time of last modification */
+    struct timespec ctim;  /* Time of last status change */
+    uint64_t ino;       /* Inode number */
+};
+
+DEFINE_SYSCALL2(LINUX, stat64, const char *, path, struct stat64 *, statbuf) {
+    uint32_t nbytes = safe_buf(statbuf, sizeof(*statbuf), true);
+    if (nbytes != sizeof(*statbuf))
+        return -EFAULT;
+
+    struct inode *inode = inode_open(AT_FDCWD, path, O_NOFOLLOW, 0, NULL);
+    if (IS_ERR(inode))
+        return PTR_ERR(inode);
+
+    *statbuf = (struct stat64){
+        .dev     = inode->sb->dev->inode->rdev,
+        .ino     = inode->ino,
+        .mode    = inode->mode,
+        .nlink   = inode->nlink,
+        .uid     = inode->uid,
+        .gid     = inode->gid,
+        .rdev    = inode->rdev,
+        .size    = inode->size,
+        .blksize = 512,
+        .blocks  = inode->size ? (inode->size - 1)/512 + 1 : 0,
+    };
+
+    put_inode(inode);
+    return 0;
 }
