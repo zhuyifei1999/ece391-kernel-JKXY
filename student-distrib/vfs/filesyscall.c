@@ -274,17 +274,13 @@ struct stat64 {
     uint64_t ino;       /* Inode number */
 };
 
-DEFINE_SYSCALL2(LINUX, stat64, const char *, path, struct stat64 *, statbuf) {
+static int32_t do_stat(struct inode *inode, struct stat64 * statbuf) {
     uint32_t nbytes = safe_buf(statbuf, sizeof(*statbuf), true);
     if (nbytes != sizeof(*statbuf))
         return -EFAULT;
 
-    struct inode *inode = inode_open(AT_FDCWD, path, O_NOFOLLOW, 0, NULL);
-    if (IS_ERR(inode))
-        return PTR_ERR(inode);
-
     *statbuf = (struct stat64){
-        .dev     = inode->sb->dev->inode->rdev,
+        .dev     = inode->sb->dev ? inode->sb->dev->inode->rdev : 0,
         .ino     = inode->ino,
         .mode    = inode->mode,
         .nlink   = inode->nlink,
@@ -296,6 +292,61 @@ DEFINE_SYSCALL2(LINUX, stat64, const char *, path, struct stat64 *, statbuf) {
         .blocks  = inode->size ? (inode->size - 1)/512 + 1 : 0,
     };
 
-    put_inode(inode);
     return 0;
+}
+
+DEFINE_SYSCALL2(LINUX, stat64, const char *, path, struct stat64 *, statbuf) {
+    uint32_t length = safe_arr_null_term(path, sizeof(char), false);
+    if (!length)
+        return -EFAULT;
+
+    // allocate kernel memory to store path
+    char *path_kern = strndup(path, length);
+    if (!path_kern)
+        return -ENOMEM;
+
+    // This is lstat
+    // struct inode *inode = inode_open(AT_FDCWD, path, O_NOFOLLOW, 0, NULL);
+    struct inode *inode = inode_open(AT_FDCWD, path, 0, 0, NULL);
+    if (IS_ERR(inode))
+        return PTR_ERR(inode);
+
+    kfree(path_kern);
+
+    int32_t res = do_stat(inode, statbuf);
+
+    put_inode(inode);
+    return res;
+}
+
+DEFINE_SYSCALL2(LINUX, lstat64, const char *, path, struct stat64 *, statbuf) {
+    uint32_t length = safe_arr_null_term(path, sizeof(char), false);
+    if (!length)
+        return -EFAULT;
+
+    // allocate kernel memory to store path
+    char *path_kern = strndup(path, length);
+    if (!path_kern)
+        return -ENOMEM;
+
+    struct inode *inode = inode_open(AT_FDCWD, path, O_NOFOLLOW, 0, NULL);
+    if (IS_ERR(inode))
+        return PTR_ERR(inode);
+
+    kfree(path_kern);
+
+    int32_t res = do_stat(inode, statbuf);
+
+    put_inode(inode);
+    return res;
+}
+
+DEFINE_SYSCALL2(LINUX, fstat64, int, fd, struct stat64 *, statbuf) {
+    struct file *file = array_get(&current->files->files, fd);
+    if (!file)
+        return -EBADF;
+
+    int32_t res = do_stat(file->inode, statbuf);
+
+    return res;
 }
