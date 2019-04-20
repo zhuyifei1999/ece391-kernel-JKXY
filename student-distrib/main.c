@@ -48,7 +48,7 @@ static int run_init_process(void *args) {
     char *envp[] = {
         "HOME=/",
         "TERM=linux",
-        "PATH=/:/bin",
+        "PATH=/bin",
         NULL
     };
 

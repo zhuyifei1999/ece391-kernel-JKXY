@@ -260,6 +260,5 @@ DEFINE_SYSCALL_COMPLEX(LINUX, clone, regs) {
     } else {
         regs->eax = task->pid;
         wake_up_process(task);
-        printk("%d %d\n", current->pid, task->pid);
     }
 }

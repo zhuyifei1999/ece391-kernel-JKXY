@@ -7,6 +7,8 @@
 #include "../panic.h"
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
+#include "../syscall.h"
+#include "../err.h"
 #include "../errno.h"
 
 static struct list free_tasks;
@@ -87,12 +89,16 @@ void do_exit(int exitcode) {
 }
 
 DEFINE_SYSCALL1(ECE391, halt, uint8_t, status) {
-    do_exit(status);
+    do_exit(status & 0377);
 }
 DEFINE_SYSCALL1(LINUX, exit, int, status) {
     if (status < 0 || status > 255)
         status = 255;
     do_exit(status);
+}
+// We don't yet support thread groups, silence the warnng
+DEFINE_SYSCALL0(LINUX, exit_group) {
+    return -ENOSYS;
 }
 
 // Reap a child process, return its exitcode
@@ -133,14 +139,14 @@ int32_t do_wait(struct task_struct *task) {
     return ret;
 }
 
-int32_t do_waitall(uint16_t *pid) {
+int32_t do_waitpg(uint32_t pgid, uint16_t *pid, bool wait) {
     while (true) {
         bool haschild = false;
 
         struct list_node *node;
         list_for_each(&tasks, node) {
             struct task_struct *task = node->value;
-            if (task->ppid == current->pid) {
+            if (task->ppid == current->pid && (!pgid || task->pgid == pgid)) {
                 haschild = true;
                 if (task->state == TASK_ZOMBIE) {
                     if (pid)
@@ -152,6 +158,11 @@ int32_t do_waitall(uint16_t *pid) {
 
         if (!haschild)
             return -ECHILD;
+
+        if (!wait) {
+            *pid = 0;
+            return 0;
+        }
 
         struct sigaction oldaction = current->sigactions->sigactions[SIGCHLD];
 
@@ -167,6 +178,7 @@ int32_t do_waitall(uint16_t *pid) {
             uint16_t signal = kernel_peek_pending_sig();
             if (signal) {
                 if (signal == SIGCHLD) {
+                    // TODO: If the signal source is not the corresponding PG this should -EINTR
                     kernel_get_pending_sig();
                     break;
                 } else {
@@ -185,4 +197,42 @@ void do_free_tasks() {
         struct task_struct *task = list_pop_front(&free_tasks);
         free_pages(task, TASK_STACK_PAGES, 0);
     }
+}
+
+// source: <uapi/linux/wait.h>
+#define WNOHANG   0x00000001
+#define WUNTRACED 0x00000002
+#define WSTOPPED  WUNTRACED
+
+// FIXME: wstatus is not exitcode
+DEFINE_SYSCALL3(LINUX, waitpid, int32_t, pid, int *, wstatus, int, options) {
+    int32_t exitcode;
+    if (pid < 1) {
+        uint16_t pgid;
+        if (pid < -1)
+            pgid = -pid;
+        else if (pid == -1)
+            pgid = 0;
+        else // pid == 0
+            pgid = current->pgid;
+        uint16_t pid_k;
+        exitcode = do_waitpg(pgid, &pid_k, !(options & WNOHANG));
+        pid = pid_k;
+    } else {
+        struct task_struct *task = get_task_from_pid(pid);
+        if (IS_ERR(task))
+            return PTR_ERR(task);
+
+        if (task->state != TASK_ZOMBIE && (options & WNOHANG))
+            return 0;
+        exitcode = do_wait(task);
+    }
+
+    if (exitcode < 0)
+        return exitcode;
+
+    if (safe_buf(wstatus, sizeof(*wstatus), true) == sizeof(*wstatus))
+        *wstatus = exitcode;
+
+    return pid;
 }
