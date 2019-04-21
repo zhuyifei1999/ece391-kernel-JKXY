@@ -120,18 +120,16 @@ int32_t do_sys_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mo
         goto out_free;
     }
 
-    uint32_t i;
     // loop until fd is free
-    for (i = 0;; i++) {
-        if (!array_get(&current->files->files, i)) {
-            if (!array_set(&current->files->files, i, file)) {
-                res = i;
-                break;
-            }
-        }
+    for (res = 0;; res++) {
+        if (
+            !array_get(&current->files->files, res) &&
+            !array_set(&current->files->files, res, file)
+        )
+            break;
     }
 
-    array_set(&current->files->cloexec, i, (void *)(flags & O_CLOEXEC));
+    array_set(&current->files->cloexec, res, (void *)(flags & O_CLOEXEC));
 
 // free the memory allocated to store path
 out_free:
@@ -195,23 +193,6 @@ DEFINE_SYSCALL3(LINUX, ioctl, int32_t, fd, uint32_t, request, unsigned long, arg
         return -EBADF;
 
     return filp_ioctl(file, request, arg, true);
-}
-
-DEFINE_SYSCALL2(LINUX, dup2, int32_t, oldfd, int32_t, newfd) {
-    struct file *oldfile = array_get(&current->files->files, oldfd);
-    if (!oldfile)
-        return -EBADF;
-
-    struct file *newfile = array_get(&current->files->files, newfd);
-    if (newfile)
-        filp_close(newfile);
-
-    array_set(&current->files->files, newfd, oldfile);
-    atomic_inc(&oldfile->refcount);
-
-    array_set(&current->files->cloexec, newfd, array_get(&current->files->cloexec, oldfd));
-
-    return newfd;
 }
 
 DEFINE_SYSCALL3(LINUX, readlink, const char *, path, char *, buf, uint32_t, nbytes) {
@@ -415,4 +396,97 @@ DEFINE_SYSCALL3(LINUX, getdents64, int32_t, fd, struct linux_dirent64_head *, di
         return res;
 
     return data.res;
+}
+
+// TODO: All these three variants of 'dup needs code dedup cleanup
+DEFINE_SYSCALL2(LINUX, dup2, int32_t, oldfd, int32_t, newfd) {
+    struct file *file = array_get(&current->files->files, oldfd);
+    if (!file)
+        return -EBADF;
+
+    struct file *newfile = array_get(&current->files->files, newfd);
+    if (newfile)
+        filp_close(newfile);
+
+    array_set(&current->files->files, newfd, file);
+    atomic_inc(&file->refcount);
+
+    array_set(&current->files->cloexec, newfd, array_get(&current->files->cloexec, oldfd));
+
+    return newfd;
+}
+
+// source: <uapi/asm-generic/fcntl.h>
+
+#define F_DUPFD  0 /* dup */
+#define F_GETFD  1 /* get close_on_exec */
+#define F_SETFD  2 /* set/clear close_on_exec */
+#define F_GETFL  3 /* get file->f_flags */
+#define F_SETFL  4 /* set file->f_flags */
+#define F_GETLK  5
+#define F_SETLK  6
+#define F_SETLKW 7
+#define F_SETOWN 8  /* for sockets. */
+#define F_GETOWN 9  /* for sockets. */
+#define F_SETSIG 10 /* for sockets. */
+#define F_GETSIG 11 /* for sockets. */
+
+#define F_GETLK64  12 /*  using 'struct flock64' */
+#define F_SETLK64  13
+#define F_SETLKW64 14
+
+#define F_SETOWN_EX 15
+#define F_GETOWN_EX 16
+
+#define F_GETOWNER_UIDS 17
+
+#define FD_CLOEXEC 1
+
+#define F_LINUX_SPECIFIC_BASE 1024
+
+// source: <uapi/linux/fcntl.h>
+#define F_DUPFD_CLOEXEC (F_LINUX_SPECIFIC_BASE + 6)
+
+DEFINE_SYSCALL3(LINUX, fcntl64, int32_t, fd, uint32_t, request, unsigned long, arg) {
+    struct file *file = array_get(&current->files->files, fd);
+    if (!file)
+        return -EBADF;
+
+    // int32_t res;
+
+    switch (request) {
+    case F_DUPFD:
+        // loop until fd is free
+        for (;; arg++) {
+            if (
+                !array_get(&current->files->files, arg) &&
+                !array_set(&current->files->files, arg, file)
+            )
+                break;
+        }
+        atomic_inc(&file->refcount);
+
+        array_set(&current->files->cloexec, arg, array_get(&current->files->cloexec, fd));
+        return arg;
+    case F_DUPFD_CLOEXEC:
+        // loop until fd is free
+        for (;; arg++) {
+            if (
+                !array_get(&current->files->files, arg) &&
+                !array_set(&current->files->files, arg, file)
+            )
+                break;
+        }
+        atomic_inc(&file->refcount);
+
+        array_set(&current->files->cloexec, arg, (void *)true);
+        return arg;
+    case F_GETFD:
+        return !!array_get(&current->files->cloexec, fd);
+    case F_SETFD:
+        array_set(&current->files->cloexec, fd, (void *)(arg & FD_CLOEXEC));
+        return 0;
+    }
+
+    return -EINVAL;
 }
