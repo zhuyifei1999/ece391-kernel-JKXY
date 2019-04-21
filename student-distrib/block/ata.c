@@ -53,6 +53,8 @@
 
 #define SECTOR_SIZE      512
 
+//credit: https://github.com/ilufang/saenaios/blob/master/student-distrib/atadriver/ata.c
+
 struct ata_data {
     int32_t slave_bit;    // master/slave
     int32_t ata_base_reg; // primary/secondary
