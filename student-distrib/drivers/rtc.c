@@ -67,7 +67,7 @@ static void rtc_hw_handler(struct intr_info *info) {
         (*handler)();
     }
 
-    rtc_schedule(info);
+    pit_schedule(info);
 }
 
 static void rtc_set_rate(unsigned char rate) {

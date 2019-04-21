@@ -11,7 +11,7 @@ extern struct list schedule_queue;
 
 void schedule(void);
 void cond_schedule(void);
-void rtc_schedule(struct intr_info *info);
+void pit_schedule(struct intr_info *info);
 
 void wake_up_process(struct task_struct *task);
 
