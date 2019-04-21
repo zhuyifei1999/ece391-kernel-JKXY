@@ -4,6 +4,7 @@
 #include "signal.h"
 #include "fp.h"
 #include "../lib/stdint.h"
+#include "../lib/stdbool.h"
 #include "../lib/string.h"
 #include "../mm/paging.h"
 #include "../compiler.h"
@@ -29,6 +30,8 @@ struct mm_struct {
 struct files_struct {
     atomic_t refcount;
     struct array files;
+    // This is a hack, but I'm too lazy to manage the array within array files
+    struct array cloexec;
 };
 
 enum task_state {

@@ -47,6 +47,7 @@ void do_exit(int exitcode) {
                     filp_close(file);
             }
             array_destroy(&current->files->files);
+            array_destroy(&current->files->cloexec);
             kfree(current->files);
         }
     }

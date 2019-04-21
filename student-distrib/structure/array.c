@@ -45,7 +45,9 @@ int32_t array_set(struct array *arr, uint32_t index, void *value) {
         restore_flags(flags);
     }
 
-    arr->values[index] = value;
+    // The space may not be allocated if value was NULL
+    if (index < arr->size)
+        arr->values[index] = value;
     return 0;
 }
 

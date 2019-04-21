@@ -225,10 +225,11 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         uint32_t i;
         array_for_each(&current->files->files, i) {
             struct file *file = array_get(&current->files->files, i);
-            if (file && (file->flags & O_CLOEXEC)) {
+            if (file && array_get(&current->files->cloexec, i)) {
                 // close the file if necessary
                 filp_close(file);
                 array_set(&current->files->files, i, NULL);
+                array_set(&current->files->cloexec, i, NULL);
             }
         }
     } else {

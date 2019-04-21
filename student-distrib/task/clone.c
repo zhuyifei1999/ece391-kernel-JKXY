@@ -162,6 +162,11 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
                     atomic_inc(&file->refcount);
                 }
             }
+            array_for_each(&current->files->cloexec, i) {
+                void *val = array_get(&current->files->cloexec, i);
+                if (val)
+                    array_set(&task->files->cloexec, i, val);
+            }
         }
     }
 

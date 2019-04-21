@@ -113,13 +113,12 @@ int32_t do_sys_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mo
 
     int32_t res;
 
-    // call flip_open
+    // call filp_open
     struct file *file = filp_openat(dfd, path, flags, mode);
     if (IS_ERR(file)) {
         res = PTR_ERR(file);
         goto out_free;
     }
-
 
     uint32_t i;
     // loop until fd is free
@@ -127,10 +126,12 @@ int32_t do_sys_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mo
         if (!array_get(&current->files->files, i)) {
             if (!array_set(&current->files->files, i, file)) {
                 res = i;
-                goto out_free;
+                break;
             }
         }
     }
+
+    array_set(&current->files->cloexec, i, (void *)(flags & O_CLOEXEC));
 
 // free the memory allocated to store path
 out_free:
@@ -138,7 +139,7 @@ out_free:
     return res;
 }
 DEFINE_SYSCALL1(ECE391, open, const char *, filename) {
-    int fd = do_sys_openat(AT_FDCWD, filename, O_RDWR, 0);
+    int fd = do_sys_openat(AT_FDCWD, filename, O_RDWR | O_CLOEXEC, 0);
     if (fd < 8)
         return fd;
 
@@ -174,6 +175,8 @@ int32_t do_sys_close(int32_t fd) {
     if (res < 0)
         return res;
 
+    array_set(&current->files->cloexec, fd, NULL);
+
     return 0;
 }
 DEFINE_SYSCALL1(ECE391, close, int32_t, fd) {
@@ -205,6 +208,9 @@ DEFINE_SYSCALL2(LINUX, dup2, int32_t, oldfd, int32_t, newfd) {
 
     array_set(&current->files->files, newfd, oldfile);
     atomic_inc(&oldfile->refcount);
+
+    array_set(&current->files->cloexec, newfd, array_get(&current->files->cloexec, oldfd));
+
     return newfd;
 }
 
