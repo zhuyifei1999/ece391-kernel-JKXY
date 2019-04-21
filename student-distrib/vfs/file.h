@@ -56,6 +56,11 @@
 struct inode;
 struct file;
 
+struct timespec {
+    uint32_t sec;  /* seconds */
+    uint32_t nsec; /* nanoseconds */
+};
+
 struct file_operations {
     int32_t (*seek)(struct file *, int32_t, int32_t);
     int32_t (*read)(struct file *, char *, uint32_t);
@@ -105,9 +110,9 @@ struct inode {
     uint32_t gid;
     uint32_t rdev;
     uint32_t size;
-    // struct timespec atime;
-    // struct timespec mtime;
-    // struct timespec ctime;
+    struct timespec atime;
+    struct timespec mtime;
+    struct timespec ctime;
     // uint32_t blocks;
     // unsigned short bytes;
     uint16_t mode;

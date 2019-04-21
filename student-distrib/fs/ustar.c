@@ -56,8 +56,8 @@ struct ustar_inode_info root_info = {
 };
 
 // function source: https://wiki.osdev.org/USTAR
-static int oct2bin(const char *str, int size) {
-    int n = 0;
+static uint32_t oct2bin(const char *str, int size) {
+    uint32_t n = 0;
     const char *c = str;
     while (size-- > 0) {
         if (*c < '0' || *c > '7')
@@ -312,6 +312,11 @@ static int32_t ustar_read_inode(struct inode *inode) {
     inode->mode = OCT2BIN(info->metadata.mode);
     inode->uid = OCT2BIN(info->metadata.uid);
     inode->gid = OCT2BIN(info->metadata.gid);
+
+    uint32_t time = OCT2BIN(info->metadata.mtime);
+    inode->atime.sec = time;
+    inode->mtime.sec = time;
+    inode->ctime.sec = time;
 
     switch (info->metadata.type) {
     case '\0':

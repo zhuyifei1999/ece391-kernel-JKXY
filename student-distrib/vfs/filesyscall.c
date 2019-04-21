@@ -227,11 +227,6 @@ DEFINE_SYSCALL2(LINUX, getcwd, char *, buf, uint32_t, nbytes) {
     return path_tostring(current->cwd->path, buf, nbytes);
 }
 
-struct timespec {
-    uint32_t sec;  /* seconds */
-    uint32_t nsec; /* nanoseconds */
-};
-
 struct stat {
     unsigned long long dev; /* ID of device containing file */
     unsigned short __pad1;
@@ -288,6 +283,9 @@ static int32_t do_stat(struct inode *inode, struct stat64 * statbuf) {
         .gid     = inode->gid,
         .rdev    = inode->rdev,
         .size    = inode->size,
+        .atim    = inode->atime,
+        .mtim    = inode->mtime,
+        .ctim    = inode->ctime,
         .blksize = 512,
         .blocks  = inode->size ? (inode->size - 1)/512 + 1 : 0,
     };
