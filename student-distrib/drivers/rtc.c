@@ -96,7 +96,7 @@ static void init_rtc() {
 
     struct rtc_timestamp timestamp;
     rtc_get_timestamp(&timestamp);
-    printk("rtc.c: Initialized time: %d-%d-%d %d:%d:%d\n",
+    printk("rtc: Initialized time: %04d-%02d-%02d %02d:%02d:%02d\n",
         timestamp.year,
         timestamp.month,
         timestamp.day,
