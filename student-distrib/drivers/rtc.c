@@ -4,6 +4,7 @@
 #include "../lib/cli.h"
 #include "../lib/io.h"
 #include "../structure/list.h"
+#include "../compiler.h"
 #include "../initcall.h"
 
 struct list rtc_handlers;
@@ -20,12 +21,42 @@ LIST_STATIC_INIT(rtc_handlers);
 
 static uint32_t rtc_irq_count;
 
+static inline __always_inline uint8_t cmos_read_irqdisabled(uint8_t reg) {
+    NMI_disable_select_register(reg);
+    uint8_t ret = inb(RTC_IMR_PORT);
+
+    NMI_enable();
+    return ret;
+}
+
+static inline __always_inline uint8_t cmos_read(uint8_t reg) {
+    unsigned long flags;
+    cli_and_save(flags);
+    uint8_t ret = cmos_read_irqdisabled(reg);
+
+    restore_flags(flags);
+    return ret;
+}
+
+static inline __always_inline void cmos_write_irqdisabled(uint8_t val, uint8_t reg) {
+    NMI_disable_select_register(reg);
+    outb(val, RTC_IMR_PORT);
+
+    NMI_enable();
+}
+
+static inline __always_inline void cmos_write(uint8_t val, uint8_t reg) {
+    unsigned long flags;
+    cli_and_save(flags);
+    cmos_write_irqdisabled(val, reg);
+
+    restore_flags(flags);
+}
+
 // RTC interrupt handler, make run with interrupts disabled
 static void rtc_hw_handler(struct intr_info *info) {
     // discard register C to we get interrupts again
-    NMI_disable_select_register(0xC);
-    inb(RTC_IMR_PORT);
-    NMI_enable();
+    cmos_read_irqdisabled(0xC);
 
     rtc_irq_count++;
 
@@ -39,61 +70,28 @@ static void rtc_hw_handler(struct intr_info *info) {
 }
 
 static void rtc_set_rate(unsigned char rate) {
-    unsigned long flags;
-    cli_and_save(flags);
-
     // rate must be above 2 and not over 15
     rate &= 0x0F;
 
-    // disable NMI and get initial value of register A
-    NMI_disable_select_register(0xA);
-    // read the current value of register A
-    char prev = inb(RTC_IMR_PORT);
-
     // write only our rate to A. rate is the bottom 4 bits.
-    NMI_disable_select_register(0xA);
-    outb((prev & 0xF0) | rate, RTC_IMR_PORT);
-
-    NMI_enable();
-    restore_flags(flags);
+    cmos_write((cmos_read(0xA) & 0xF0) | rate, 0xA);
 }
 
 // FIXME: Is this actually needed anywhere?
 __attribute__((unused))
 static unsigned char rtc_get_rate() {
-    unsigned long flags;
-    cli_and_save(flags);
-
-    // disable NMI and get initial value of register A
-    NMI_disable_select_register(0xA);
     // read the current value of register A. rate is the bottom 4 bits.
-    char rate = inb(RTC_IMR_PORT) & 0xF;
-
-    NMI_enable();
-    restore_flags(flags);
-
-    return rate;
+    return cmos_read(0xA) & 0xF;
 }
 
 static void init_rtc() {
-    unsigned long flags;
-    cli_and_save(flags);
-
-    set_irq_handler(RTC_IRQ, &rtc_hw_handler);
-
-    NMI_disable_select_register(0xB);
-    // read the current value of register B
-    char prev = inb(RTC_IMR_PORT);
-
-    // disable NMI and enable RTC in register B
-    NMI_disable_select_register(0xB);
-    outb(prev | 0x40, RTC_IMR_PORT);
-
-    NMI_enable();
-    restore_flags(flags);
+    // enable RTC in register B
+    cmos_write(cmos_read(0xB) | 0x40, 0xB);
 
     // initialize to default 1024Hz
     rtc_set_rate(RTC_HW_RATE);
+
+    set_irq_handler(RTC_IRQ, &rtc_hw_handler);
 }
 DEFINE_INITCALL(init_rtc, drivers);
 
@@ -102,16 +100,7 @@ void register_rtc_handler(void (*handler)(void)) {
 }
 
 uint8_t rtc_get_second() {
-    unsigned long flags;
-    cli_and_save(flags);
-
-    // register 0 is seconds register
-    NMI_disable_select_register(0x0);
-    uint8_t seconds = inb(RTC_IMR_PORT);
-
-    NMI_enable();
-    restore_flags(flags);
-    return seconds;
+    return cmos_read(0x0);
 }
 
 #include "../tests.h"
