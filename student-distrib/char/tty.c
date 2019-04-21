@@ -353,6 +353,18 @@ static int32_t tty_ioctl(struct file *file, uint32_t request, unsigned long arg,
     struct tty *tty = file->vendor;
 
     switch (request) {
+    case TCGETS:
+        if (arg_user && safe_buf((struct termios *)arg, sizeof(struct termios), true) != sizeof(struct termios))
+            return -EFAULT;
+        *(struct termios *)arg = tty->termios;
+        return 0;
+    case TCSETS:
+    case TCSETSW:
+    case TCSETSF:
+        if (arg_user && safe_buf((struct termios *)arg, sizeof(struct termios), false) != sizeof(struct termios))
+            return -EFAULT;
+        tty->termios = *(struct termios *)arg;
+        return 0;
     case TIOCGPGRP:
         if (!tty->session || tty->session != current->session)
             return -ENOTTY;
