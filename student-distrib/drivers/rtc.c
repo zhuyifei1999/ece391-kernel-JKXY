@@ -1,6 +1,7 @@
 #include "rtc.h"
 #include "../irq.h"
 #include "../task/sched.h"
+#include "../lib/stdlib.h"
 #include "../lib/cli.h"
 #include "../lib/io.h"
 #include "../structure/list.h"
@@ -92,6 +93,17 @@ static void init_rtc() {
     rtc_set_rate(RTC_HW_RATE);
 
     set_irq_handler(RTC_IRQ, &rtc_hw_handler);
+
+    struct rtc_timestamp timestamp;
+    rtc_get_timestamp(&timestamp);
+    printk("rtc.c: Initialized time: %d-%d-%d %d:%d:%d\n",
+        timestamp.year,
+        timestamp.month,
+        timestamp.day,
+        timestamp.hour,
+        timestamp.minute,
+        timestamp.second
+    );
 }
 DEFINE_INITCALL(init_rtc, drivers);
 
@@ -99,8 +111,63 @@ void register_rtc_handler(void (*handler)(void)) {
     list_insert_back(&rtc_handlers, handler);
 }
 
+// Make sure we don't read while "update in progress"
+uint8_t rtc_get_year() {
+    return cmos_read(0x9);
+}
+uint8_t rtc_get_month() {
+    return cmos_read(0x8);
+}
+uint8_t rtc_get_day() {
+    return cmos_read(0x7);
+}
+uint8_t rtc_get_hour() {
+    return cmos_read(0x4);
+}
+uint8_t rtc_get_minute() {
+    return cmos_read(0x2);
+}
 uint8_t rtc_get_second() {
     return cmos_read(0x0);
+}
+
+void rtc_get_timestamp(struct rtc_timestamp *timestamp) {
+    // Update in progress
+    while (cmos_read(0xA) & 0x80)
+        asm volatile ("pause");
+
+    // adapted from: osdev
+    // FIXME: What a bad hack
+    #define CURRENT_YEAR atoi(&__DATE__[7], NULL)
+
+    timestamp->year = rtc_get_year();
+    timestamp->month = rtc_get_month();
+    timestamp->day = rtc_get_day();
+    timestamp->hour = rtc_get_hour();
+    timestamp->minute = rtc_get_minute();
+    timestamp->second = rtc_get_second();
+
+    uint8_t format = cmos_read(0xB);
+
+    // Convert BCD to binary values if necessary
+    if (!(format & 0x04)) {
+        timestamp->second = (timestamp->second & 0x0F) + ((timestamp->second / 16) * 10);
+        timestamp->minute = (timestamp->minute & 0x0F) + ((timestamp->minute / 16) * 10);
+        timestamp->hour = ( (timestamp->hour & 0x0F) + (((timestamp->hour & 0x70) / 16) * 10) ) | (timestamp->hour & 0x80);
+        timestamp->day = (timestamp->day & 0x0F) + ((timestamp->day / 16) * 10);
+        timestamp->month = (timestamp->month & 0x0F) + ((timestamp->month / 16) * 10);
+        timestamp->year = (timestamp->year & 0x0F) + ((timestamp->year / 16) * 10);
+    }
+
+    // Convert 12 hour clock to 24 hour clock if necessary
+    if (!(format & 0x02) && (timestamp->hour & 0x80)) {
+        timestamp->hour = ((timestamp->hour & 0x7F) + 12) % 24;
+    }
+
+    // Calculate the full (4-digit) year
+    timestamp->year += (CURRENT_YEAR / 100) * 100;
+    if (timestamp->year < CURRENT_YEAR)
+        timestamp->year += 100;
 }
 
 #include "../tests.h"
