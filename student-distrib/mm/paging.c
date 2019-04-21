@@ -704,7 +704,6 @@ page_directory_t *clone_directory(page_directory_t *src) {
 
     uint16_t i, j;
 
-
     // copy all entries
     for (i = 0; i < NUM_ENTRIES; i++) {
         struct page_directory_entry *src_dir_entry = &(*src)[i];
@@ -721,6 +720,7 @@ page_directory_t *clone_directory(page_directory_t *src) {
                 dst_dir_entry->flags |= PAGE_COW_RO;
             }
             use_phys_mem((void __physaddr *)PAGE_IDX_ADDR(src_dir_entry->addr), GFP_USER | GFP_LARGE);
+            invlpg((void *)(i * PAGE_SIZE_LARGE));
         } else {
             *dst_dir_entry = (struct page_directory_entry){0};
 
@@ -746,6 +746,7 @@ page_directory_t *clone_directory(page_directory_t *src) {
                         dst_table_entry->flags |= PAGE_COW_RO;
                     }
                     use_phys_mem((void __physaddr *)PAGE_IDX_ADDR(src_table_entry->addr), GFP_USER);
+                    invlpg((void *)(i * PAGE_SIZE_LARGE + j * PAGE_SIZE_SMALL));
                 }
             }
         }
