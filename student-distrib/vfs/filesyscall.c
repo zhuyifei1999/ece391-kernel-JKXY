@@ -100,7 +100,7 @@ DEFINE_SYSCALL3(LINUX, writev, int32_t, fd, const struct iovec *, iov, int, iovc
  *   INPUTS: int32_t dfd, char *path, uint32_t flags, uint16_t mode
  *   RETURN VALUE: int32_t result code
  */
-int32_t do_sys_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
+int32_t do_sys_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mode) {
     // determine the length of the path
     uint32_t length = safe_arr_null_term(path, sizeof(char), false);
     if (!length)
@@ -137,7 +137,7 @@ out_free:
     kfree(path_kern);
     return res;
 }
-DEFINE_SYSCALL1(ECE391, open, /* const */ char *, filename) {
+DEFINE_SYSCALL1(ECE391, open, const char *, filename) {
     int fd = do_sys_openat(AT_FDCWD, filename, O_RDWR, 0);
     if (fd < 8)
         return fd;
