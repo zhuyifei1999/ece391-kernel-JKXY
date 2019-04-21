@@ -177,11 +177,12 @@ static int32_t ustar_readdir(struct file *file, void *data, filldir_t filldir) {
             i++;
             if (res)
                 break;
+        } else {
+            file->pos += size_to_sectors(OCT2BIN(info->metadata.size));
         }
 
         path_destroy(path);
         path = NULL;
-        file->pos += size_to_sectors(OCT2BIN(info->metadata.size));
     }
 
     if (path)

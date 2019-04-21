@@ -341,7 +341,7 @@ DEFINE_SYSCALL2(LINUX, lstat64, const char *, path, struct stat64 *, statbuf) {
     return res;
 }
 
-DEFINE_SYSCALL2(LINUX, fstat64, int, fd, struct stat64 *, statbuf) {
+DEFINE_SYSCALL2(LINUX, fstat64, int32_t, fd, struct stat64 *, statbuf) {
     struct file *file = array_get(&current->files->files, fd);
     if (!file)
         return -EBADF;
@@ -349,4 +349,66 @@ DEFINE_SYSCALL2(LINUX, fstat64, int, fd, struct stat64 *, statbuf) {
     int32_t res = do_stat(file->inode, statbuf);
 
     return res;
+}
+
+struct linux_dirent64_head {
+    uint64_t ino;    /* 64-bit inode number */
+    uint64_t off;    /* 64-bit offset to next structure */
+    uint16_t reclen; /* Size of this dirent */
+    uint8_t  type;   /* File type */
+    char     name[]; /* Filename (null-terminated) */
+};
+
+struct getdents64_data {
+    struct linux_dirent64_head *dirp;
+    uint32_t nbytes;
+    int32_t res;
+};
+
+static int getdents64_cb(void *_data, const char *name, uint32_t namelen, uint32_t offset, uint32_t ino, uint32_t d_type) {
+    struct getdents64_data *data = _data;
+
+    uint32_t len = sizeof(*data->dirp) + namelen + 1;
+    if (len > data->nbytes) {
+        if (!data->res)
+            data->res = -EINVAL;
+        return -EINVAL;
+    }
+
+    *data->dirp = (struct linux_dirent64_head){
+        .ino = ino,
+        .off = offset,
+        .reclen = len,
+        .type = d_type,
+    };
+
+    memcpy(data->dirp->name, name, namelen);
+    data->dirp->name[namelen] = '\0';
+
+    data->res += len;
+    data->nbytes -= len;
+    data->dirp = (void *)((char *)data->dirp + len);
+
+    return 0;
+}
+
+DEFINE_SYSCALL3(LINUX, getdents64, int32_t, fd, struct linux_dirent64_head *, dirp, uint32_t, nbytes) {
+    struct file *file = array_get(&current->files->files, fd);
+    if (!file)
+        return -EBADF;
+
+    uint32_t safe_nbytes = safe_buf(dirp, nbytes, true);
+    if (nbytes && !safe_nbytes)
+        return -EFAULT;
+
+    struct getdents64_data data = {
+        .dirp = dirp,
+        .nbytes = safe_nbytes,
+    };
+
+    int32_t res = filp_readdir(file, &data, &getdents64_cb);
+    if (res < 0)
+        return res;
+
+    return data.res;
 }

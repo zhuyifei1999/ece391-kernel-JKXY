@@ -111,7 +111,6 @@ static int32_t ece391fs_readdir(struct file *file, void *data, filldir_t filldir
         if (!ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry))
             break;
 
-
         char *name = dentry->name;
         uint8_t len = strlen(name);
 
