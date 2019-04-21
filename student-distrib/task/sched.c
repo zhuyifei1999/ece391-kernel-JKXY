@@ -9,11 +9,11 @@
 struct list schedule_queue;
 LIST_STATIC_INIT(schedule_queue);
 
-static uint32_t schedule_rtc_counter;
+static uint32_t schedule_pit_counter;
 
 // Actually, this won't return, but jump directly to ISR return
 static void _switch_to(struct task_struct *task, struct intr_info *info) {
-    schedule_rtc_counter = 0;
+    schedule_pit_counter = 0;
     current->return_regs = info;
 
     if (task->mm) // this task has userspace, update page directory
@@ -59,13 +59,13 @@ void schedule(void) {
 }
 
 void cond_schedule(void) {
-    if (schedule_rtc_counter < SCHEDULE_TICK)
+    if (schedule_pit_counter < SCHEDULE_TICK)
         return;
     schedule();
 }
 
-void rtc_schedule(struct intr_info *info) {
-    schedule_rtc_counter++;
+void pit_schedule(struct intr_info *info) {
+    schedule_pit_counter++;
 }
 
 void wake_up_process(struct task_struct *task) {
