@@ -7,7 +7,7 @@
 
 extern struct list schedule_queue;
 
-#define SCHEDULE_TICK 8 // Let's schedule every 8 ticks
+#define SCHEDULE_TICK 1 // Let's schedule every 1 PIT tick
 
 void schedule(void);
 void cond_schedule(void);
