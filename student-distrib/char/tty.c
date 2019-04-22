@@ -417,7 +417,11 @@ void tty_foreground_signal(uint16_t signum) {
     if (!foreground_tty->session || !foreground_tty->session->foreground_pgid)
         return;
 
-    send_sig_pg(foreground_tty->session->foreground_pgid, signum);
+    struct siginfo siginfo = {
+        .signo = signum,
+        .code = SI_KERNEL,
+    };
+    send_sig_info_pg(foreground_tty->session->foreground_pgid, &siginfo);
 }
 
 /*

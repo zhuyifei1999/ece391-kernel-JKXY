@@ -41,6 +41,16 @@
 #define SIGSYS    31
 #define SIGUNUSED 31
 
+#define SI_USER   0    /* sent by kill, sigsend, raise */
+#define SI_KERNEL 0x80 /* sent by the kernel from somewhere */
+
+#define CLD_EXITED  1   /* child has exited */
+#define CLD_KILLED  2   /* child was killed */
+#define CLD_DUMPED  3   /* child terminated abnormally */
+#define CLD_TRAPPED 4   /* traced child has trapped */
+#define CLD_STOPPED 5   /* child has stopped */
+#define CLD_CONTINUED 6 /* stopped child has continued */
+
 #define SIG_ECE391_DIV_ZERO  0
 #define SIG_ECE391_SEGFAULT  1
 #define SIG_ECE391_INTERRUPT 2
@@ -68,6 +78,7 @@
 
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
+#include "../structure/array.h"
 #include "../atomic.h"
 
 // source : <asm-generic/siginfo.h>
@@ -167,7 +178,10 @@ bool signal_is_fatal(struct task_struct *task, uint16_t signum);
 void send_sig_info(struct task_struct *task, struct siginfo *siginfo);
 void force_sig_info(struct task_struct *task, struct siginfo *siginfo);
 
-int32_t send_sig_pg_info(uint16_t pgid, struct siginfo *siginfo);
+void send_sig(struct task_struct *task, uint16_t signum);
+void force_sig(struct task_struct *task, uint16_t signum);
+
+int32_t send_sig_info_pg(uint16_t pgid, struct siginfo *siginfo);
 
 void kernel_mask_signal(uint16_t signum);
 void kernel_unmask_signal(uint16_t signum);

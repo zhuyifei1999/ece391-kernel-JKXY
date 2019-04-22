@@ -4,6 +4,7 @@
 #include "exit.h"
 #include "userstack.h"
 #include "../lib/bsr.h"
+#include "../mm/kmalloc.h"
 #include "../panic.h"
 #include "../syscall.h"
 #include "../err.h"
@@ -66,9 +67,9 @@ bool signal_is_fatal(struct task_struct *task, uint16_t signum) {
 }
 
 void send_sig_info(struct task_struct *task, struct siginfo *siginfo) {
-    if (task->sigpending.pending_mask & MASKVAL(signum))
+    if (task->sigpending.pending_mask & MASKVAL(siginfo->signo))
         return;
-    struct sigaction *sigaction = &task->sigactions->sigactions[signum];
+    struct sigaction *sigaction = &task->sigactions->sigactions[siginfo->signo];
     if (sigaction->sigaction == SIG_IGN)
         return;
 
@@ -81,21 +82,37 @@ void send_sig_info(struct task_struct *task, struct siginfo *siginfo) {
         return;
     }
 
-    task->sigpending.pending_mask |= MASKVAL(signum);
+    task->sigpending.pending_mask |= MASKVAL(siginfo->signo);
 
     struct siginfo *siginfo_h = kmalloc(sizeof(*siginfo_h));
     *siginfo_h = *siginfo;
 
-    array_set(&task->sigpending->siginfos, siginfo->signo, siginfo_h);
+    array_set(&task->sigpending.siginfos, siginfo->signo, siginfo_h);
 
     if (task->state == TASK_INTERRUPTIBLE)
         wake_up_process(task);
 }
 
 void force_sig_info(struct task_struct *task, struct siginfo *siginfo) {
-    send_sig_info(task, siginfo)
+    send_sig_info(task, siginfo);
 
-    task->sigpending.forced_mask |= MASKVAL(signum);
+    task->sigpending.forced_mask |= MASKVAL(siginfo->signo);
+}
+
+void send_sig(struct task_struct *task, uint16_t signum) {
+    struct siginfo siginfo = {
+        .signo = signum,
+        .code = SI_KERNEL,
+    };
+    send_sig_info(task, &siginfo);
+}
+
+void force_sig(struct task_struct *task, uint16_t signum) {
+    struct siginfo siginfo = {
+        .signo = signum,
+        .code = SI_KERNEL,
+    };
+    force_sig_info(task, &siginfo);
 }
 
 int32_t send_sig_info_pg(uint16_t pgid, struct siginfo *siginfo) {
@@ -105,7 +122,7 @@ int32_t send_sig_info_pg(uint16_t pgid, struct siginfo *siginfo) {
 
     if (leader->pgid != pgid) {
         // Not a leader
-        send_sig(leader, siginfo);
+        send_sig_info(leader, siginfo);
         return 0;
     }
 
@@ -113,7 +130,7 @@ int32_t send_sig_info_pg(uint16_t pgid, struct siginfo *siginfo) {
     list_for_each(&tasks, node) {
         struct task_struct *task = node->value;
         if (task->pgid == pgid)
-            send_sig(task, siginfo);
+            send_sig_info(task, siginfo);
     }
 
     return 0;
@@ -135,12 +152,13 @@ bool kernel_peek_pending_sig(uint16_t signum, struct siginfo *siginfo) {
     if (!kernel_sig_ispending(signum))
         return false;
 
-    *siginfo = array_get(&task->sigpending->siginfos, signum);
+    if (siginfo)
+        *siginfo = *(struct siginfo *)array_get(&current->sigpending.siginfos, signum);
     return true;
 }
 
 bool kernel_get_pending_sig(uint16_t signum, struct siginfo *siginfo) {
-    bool ret = kernel_peek_pending_sig();
+    bool ret = kernel_peek_pending_sig(signum, siginfo);
     current->sigpending.pending_mask &= ~MASKVAL(signum);
     current->sigpending.forced_mask &= ~MASKVAL(signum);
     return ret;
@@ -307,7 +325,7 @@ DEFINE_SYSCALL2(ECE391, set_handler, int32_t, signum, void *, handler_address) {
 }
 
 DEFINE_SYSCALL3(LINUX, rt_sigaction, int, signum, const struct linux_sigaction *, act, struct linux_sigaction *, oldact) {
-    if (signum <= 0 || signum >= _NSIG)
+    if (signum <= 0 || signum >= NSIG)
         return -EINVAL;
     if (signum == SIGKILL || signum == SIGSTOP)
         return -EINVAL;
@@ -359,7 +377,7 @@ DEFINE_SYSCALL_COMPLEX(ECE391, sigreturn, regs) {
 }
 
 DEFINE_SYSCALL2(LINUX, kill, int32_t, pid, uint32_t, sig) {
-    if (sig > _NSIG)
+    if (sig > NSIG)
         return -EINVAL;
 
     printk("%d %d\n", pid, sig);

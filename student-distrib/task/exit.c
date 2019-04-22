@@ -66,12 +66,12 @@ void do_exit(int exitcode) {
         kfree(current->fxsave_data);
 
     uint32_t i;
-    array_for_each(&current->sigpending->siginfos, i) {
-        struct siginfo *siginfo = array_get(&current->sigpending->siginfos, i);
+    array_for_each(&current->sigpending.siginfos, i) {
+        struct siginfo *siginfo = array_get(&current->sigpending.siginfos, i);
         if (siginfo)
             kfree(siginfo);
     }
-    array_destroy(&current->sigpending->siginfos);
+    array_destroy(&current->sigpending.siginfos);
 
     if (!current->ppid)
         panic("Killing process tree!\n");
@@ -81,7 +81,15 @@ void do_exit(int exitcode) {
     if (parent->sigactions->sigactions[SIGCHLD].sigaction == SIG_IGN) {
         _do_wait(current);
     } else {
-        send_sig(parent, SIGCHLD);
+        struct siginfo siginfo = {
+            .signo = SIGCHLD,
+            .code = CLD_EXITED,
+            .sifields.sigchld = {
+                .pid = current->pid,
+                .status = exitcode,
+            },
+        };
+        send_sig_info(parent, &siginfo);
     }
 
     // Reparent children to init
@@ -131,15 +139,17 @@ int32_t do_wait(struct task_struct *task) {
         schedule();
         current->state = TASK_RUNNING;
 
-        uint16_t signal = kernel_peek_pending_sig();
-        if (signal) {
-            if (signal == SIGCHLD && task->state == TASK_ZOMBIE) {
-                kernel_get_pending_sig();
-                ret = _do_wait(task);
-            } else {
-                ret = -EINTR;
+        if (signal_pending(current)) {
+            struct siginfo siginfo;
+            if (kernel_peek_pending_sig(SIGCHLD, &siginfo)) {
+                if (siginfo.code == CLD_EXITED && siginfo.sifields.sigchld.pid == task->pid) {
+                    kernel_get_pending_sig(SIGCHLD, &siginfo);
+                    current->sigactions->sigactions[SIGCHLD] = oldaction;
+                    return _do_wait(task);
+                }
             }
-            break;
+            current->sigactions->sigactions[SIGCHLD] = oldaction;
+            return -EINTR;
         }
     }
 
@@ -149,55 +159,55 @@ int32_t do_wait(struct task_struct *task) {
 }
 
 int32_t do_waitpg(uint32_t pgid, uint16_t *pid, bool wait) {
+    bool haschild = false;
+
+    struct list_node *node;
+    list_for_each(&tasks, node) {
+        struct task_struct *task = node->value;
+        if (task->ppid == current->pid && (!pgid || task->pgid == pgid)) {
+            haschild = true;
+            if (task->state == TASK_ZOMBIE) {
+                if (pid)
+                    *pid = task->pid;
+                return _do_wait(task);
+            }
+        }
+    }
+
+    if (!haschild)
+        return -ECHILD;
+
+    if (!wait) {
+        *pid = 0;
+        return 0;
+    }
+
+    struct sigaction oldaction = current->sigactions->sigactions[SIGCHLD];
+
+    current->sigactions->sigactions[SIGCHLD] = (struct sigaction){
+        .sigaction = SIG_DFL,
+    };
+
     while (true) {
-        bool haschild = false;
+        current->state = TASK_INTERRUPTIBLE;
+        schedule();
+        current->state = TASK_RUNNING;
 
-        struct list_node *node;
-        list_for_each(&tasks, node) {
-            struct task_struct *task = node->value;
-            if (task->ppid == current->pid && (!pgid || task->pgid == pgid)) {
-                haschild = true;
-                if (task->state == TASK_ZOMBIE) {
-                    if (pid)
-                        *pid = task->pid;
-                    return _do_wait(task);
+        if (signal_pending(current)) {
+            struct siginfo siginfo;
+            if (kernel_peek_pending_sig(SIGCHLD, &siginfo)) {
+                if (siginfo.code == CLD_EXITED) {
+                    struct task_struct *task = get_task_from_pid(siginfo.sifields.sigchld.pid);
+                    if (!pgid || task->pgid == pgid) {
+                        kernel_get_pending_sig(SIGCHLD, &siginfo);
+                        current->sigactions->sigactions[SIGCHLD] = oldaction;
+                        return _do_wait(task);
+                    }
                 }
             }
+            current->sigactions->sigactions[SIGCHLD] = oldaction;
+            return -EINTR;
         }
-
-        if (!haschild)
-            return -ECHILD;
-
-        if (!wait) {
-            *pid = 0;
-            return 0;
-        }
-
-        struct sigaction oldaction = current->sigactions->sigactions[SIGCHLD];
-
-        current->sigactions->sigactions[SIGCHLD] = (struct sigaction){
-            .sigaction = SIG_DFL,
-        };
-
-        while (true) {
-            current->state = TASK_INTERRUPTIBLE;
-            schedule();
-            current->state = TASK_RUNNING;
-
-            uint16_t signal = kernel_peek_pending_sig();
-            if (signal) {
-                if (signal == SIGCHLD) {
-                    // TODO: If the signal source is not the corresponding PG this should -EINTR
-                    kernel_get_pending_sig();
-                    break;
-                } else {
-                    current->sigactions->sigactions[SIGCHLD] = oldaction;
-                    return -EINTR;
-                }
-            }
-        }
-
-        current->sigactions->sigactions[SIGCHLD] = oldaction;
     }
 }
 

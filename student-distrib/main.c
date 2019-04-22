@@ -89,7 +89,9 @@ static int kernel_init_shepherd(void *args) {
     wake_up_process(userspace_init);
 
     while (true) {
-        uint16_t signal = kernel_get_pending_sig();
+        uint16_t signal = signal_pending_one(current);
+        if (signal)
+            kernel_get_pending_sig(signal, NULL);
         switch (signal) {
         case SIGTERM: // TODO: Do subsystem switch
             send_sig(userspace_init, SIGTERM);
@@ -137,7 +139,9 @@ static int kernel_dummy_init(void *args) {
 
     // TODO: Make a centain signal do the subsystem switch
     while (true) {
-        uint16_t signal = kernel_get_pending_sig();
+        uint16_t signal = signal_pending_one(current);
+        if (signal)
+            kernel_get_pending_sig(signal, NULL);
         switch (signal) {
         case SIGTERM:
             goto do_switch;

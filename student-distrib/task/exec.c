@@ -281,7 +281,8 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
 
     if (!atomic_dec(&current->sigactions->refcount))
         kfree(current->sigactions);
-    current->sigactions = (struct sigactions){
+    current->sigactions = kmalloc(sizeof(*current->sigactions));
+    *current->sigactions = (struct sigactions){
         .refcount = ATOMIC_INITIALIZER(1),
     };
 
