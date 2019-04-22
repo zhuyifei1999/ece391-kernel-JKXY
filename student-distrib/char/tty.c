@@ -368,16 +368,16 @@ static int32_t tty_ioctl(struct file *file, uint32_t request, unsigned long arg,
     case TIOCGPGRP:
         if (!tty->session || tty->session != current->session)
             return -ENOTTY;
-        if (arg_user && safe_buf((uint16_t *)arg, sizeof(uint16_t), true) != sizeof(uint16_t))
+        if (arg_user && safe_buf((uint32_t *)arg, sizeof(uint32_t), true) != sizeof(uint32_t))
             return -EFAULT;
-        *(uint16_t *)arg = tty->session->foreground_pgid;
+        *(uint32_t *)arg = tty->session->foreground_pgid;
         return 0;
     case TIOCSPGRP: {
         if (!tty->session || tty->session != current->session)
             return -ENOTTY;
-        if (arg_user && safe_buf((uint16_t *)arg, sizeof(uint16_t), false) != sizeof(uint16_t))
+        if (arg_user && safe_buf((uint32_t *)arg, sizeof(uint32_t), false) != sizeof(uint32_t))
             return -EFAULT;
-        uint16_t pgid = *(uint16_t *)arg;
+        uint32_t pgid = *(uint32_t *)arg;
         struct task_struct *leader = get_task_from_pid(pgid);
         if (IS_ERR(leader))
             return -EINVAL;
@@ -389,9 +389,9 @@ static int32_t tty_ioctl(struct file *file, uint32_t request, unsigned long arg,
     case TIOCGSID:
         if (!tty->session || tty->session != current->session)
             return -ENOTTY;
-        if (arg_user && safe_buf((uint16_t *)arg, sizeof(uint16_t), true) != sizeof(uint16_t))
+        if (arg_user && safe_buf((uint32_t *)arg, sizeof(uint32_t), true) != sizeof(uint32_t))
             return -EFAULT;
-        *(uint16_t *)arg = tty->session->sid;
+        *(uint32_t *)arg = tty->session->sid;
         return 0;
     case TIOCGWINSZ:
         if (arg_user && safe_buf((struct winsize *)arg, sizeof(struct winsize), true) != sizeof(struct winsize))
