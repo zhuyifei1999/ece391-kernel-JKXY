@@ -44,7 +44,12 @@ struct vidmaps_entry {
 };
 
 // meh... Can't this logic be in userspace?
-#define tty_should_read(tty) (tty->buffer_end && tty->buffer[tty->buffer_end - 1] == WAKEUP_CHAR)
+static inline bool tty_should_read(struct tty *tty) {
+    if (tty->termios.lflag & ICANON)
+        return tty->buffer_end && tty->buffer[tty->buffer_end - 1] == WAKEUP_CHAR;
+    else
+        return tty->buffer_end;
+}
 
 static void tty_clear(struct tty *tty);
 
@@ -104,6 +109,9 @@ struct tty *tty_get(uint32_t device_num) {
         .device_num = device_num,
         .video_mem = video_mem,
         .refcount = ATOMIC_INITIALIZER(1),
+        .termios = {
+            .lflag = ECHO | ICANON,
+        },
     };
     // create list of vidmaps
     list_init(&ret->vidmaps);
@@ -450,18 +458,21 @@ void tty_foreground_keyboard(char chr, bool has_ctrl, bool has_alt) {
         if (tty_should_read(foreground_tty))
             return;
 
-        if (chr == '\b') {
+        if ((foreground_tty->termios.lflag & ICANON) && chr == '\b') {
             if (foreground_tty->buffer_end) {
-                tty_foreground_puts((char []){chr, 0});
+                if (foreground_tty->termios.lflag & ECHO)
+                    tty_foreground_puts((char []){chr, 0});
                 foreground_tty->buffer_end--;
             }
         } else {
             if (foreground_tty->buffer_end < TTY_BUFFER_SIZE) {
                 foreground_tty->buffer[foreground_tty->buffer_end++] = chr;
-                tty_foreground_puts((char []){chr, 0});
+                if (foreground_tty->termios.lflag & ECHO)
+                    tty_foreground_puts((char []){chr, 0});
 
-                if (chr == WAKEUP_CHAR && foreground_tty->task) {
-                    wake_up_process(foreground_tty->task);
+                if (foreground_tty->task) {
+                    if (!(foreground_tty->termios.lflag & ICANON) || chr == WAKEUP_CHAR)
+                        wake_up_process(foreground_tty->task);
                 }
             }
         }

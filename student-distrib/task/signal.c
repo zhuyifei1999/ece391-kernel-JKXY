@@ -608,6 +608,8 @@ DEFINE_SYSCALL_COMPLEX(LINUX, sigreturn, regs) {
     regs->fs     = context->sc.fs;
     regs->gs     = context->sc.gs;
 
+    set_sigmask(context->sc.oldmask);
+
     // FIXME: Bad regs here can cause a panic
 
     return;

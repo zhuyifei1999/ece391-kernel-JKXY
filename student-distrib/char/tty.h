@@ -26,7 +26,7 @@ struct termios {
     uint8_t  cc[19]; /* control characters */
 };
 
-/* c_cc characters */
+/* cc characters */
 #define VINTR 0
 #define VQUIT 1
 #define VERASE 2
@@ -45,7 +45,7 @@ struct termios {
 #define VLNEXT 15
 #define VEOL2 16
 
-/* c_iflag bits */
+/* iflag bits */
 #define IGNBRK  0000001
 #define BRKINT  0000002
 #define IGNPAR  0000004
@@ -62,7 +62,7 @@ struct termios {
 #define IMAXBEL 0020000
 #define IUTF8   0040000
 
-/* c_oflag bits */
+/* oflag bits */
 #define OPOST  0000001
 #define OLCUC  0000002
 #define ONLCR  0000004
@@ -95,7 +95,7 @@ struct termios {
 #define FF0    0000000
 #define FF1    0100000
 
-/* c_cflag bit meaning */
+/* cflag bit meaning */
 #define CBAUD    0010017
 #define B0       0000000        /* hang up */
 #define B50      0000001
@@ -149,7 +149,7 @@ struct termios {
 
 #define IBSHIFT      16        /* Shift from CBAUD to CIBAUD */
 
-/* c_lflag bits */
+/* lflag bits */
 #define ISIG    0000001
 #define ICANON  0000002
 #define XCASE   0000004

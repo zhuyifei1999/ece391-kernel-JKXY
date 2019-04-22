@@ -490,3 +490,8 @@ DEFINE_SYSCALL3(LINUX, fcntl64, int32_t, fd, uint32_t, request, unsigned long, a
 
     return -EINVAL;
 }
+
+DEFINE_SYSCALL0(LINUX, poll) {
+    // Doesn't work yet. Mute it
+    return 1;
+}
