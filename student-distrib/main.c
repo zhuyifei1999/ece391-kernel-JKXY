@@ -26,7 +26,7 @@
 struct task_struct *swapper_task;
 struct task_struct *init_task;
 
-#define HAS_ECE391 1
+// #define HAS_ECE391 1
 
 static void mount_root_device(uint32_t device_num, char *fsname) {
     struct file *root_block = filp_open_anondevice(device_num, 0, S_IFBLK | 0666);
@@ -183,7 +183,7 @@ do_switch_loop:;
     // device (8, 2) is secondary ATA master
     mount_root_device(MKDEV(8, 2), "ustar");
 
-    // attach to TTY 7
+    // attach to TTY 4
     do_setsid();
     struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, 4), O_RDWR, S_IFCHR | 0666);
     if (!IS_ERR(file))

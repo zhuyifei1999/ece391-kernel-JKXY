@@ -167,8 +167,7 @@ int32_t do_waitpg(uint32_t pgid, uint16_t *pid, bool wait) {
         if (task->ppid == current->pid && (!pgid || task->pgid == pgid)) {
             haschild = true;
             if (task->state == TASK_ZOMBIE) {
-                if (pid)
-                    *pid = task->pid;
+                *pid = task->pid;
                 return _do_wait(task);
             }
         }
@@ -201,6 +200,7 @@ int32_t do_waitpg(uint32_t pgid, uint16_t *pid, bool wait) {
                     if (!pgid || task->pgid == pgid) {
                         kernel_get_pending_sig(SIGCHLD, &siginfo);
                         current->sigactions->sigactions[SIGCHLD] = oldaction;
+                        *pid = task->pid;
                         return _do_wait(task);
                     }
                 }
