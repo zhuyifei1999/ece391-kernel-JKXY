@@ -71,7 +71,7 @@ static inline void outw(uint8_t data, uint16_t port) {
 
 /* Writes four bytes to four consecutive ports */
 static inline void outl(uint8_t data, uint16_t port) {
-    asm volatile ("outl %l1, (%w0)"
+    asm volatile ("outl %k1, (%w0)"
             :
             : "d"(port), "a"(data)
             : "memory", "cc"
