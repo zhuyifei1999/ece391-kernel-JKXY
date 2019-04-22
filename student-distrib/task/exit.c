@@ -74,7 +74,7 @@ void do_exit(int exitcode) {
     array_destroy(&current->sigpending.siginfos);
 
     if (!current->ppid)
-        panic("Killing process tree!\n");
+        panic("Killing process tree! exitcode=%d\n", exitcode);
 
     // Signal parent so it can mourn us
     struct task_struct *parent = get_task_from_pid(current->ppid);
