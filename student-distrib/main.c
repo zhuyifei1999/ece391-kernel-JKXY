@@ -26,7 +26,7 @@
 struct task_struct *swapper_task;
 struct task_struct *init_task;
 
-// #define HAS_ECE391 1
+#define HAS_ECE391 1
 
 static void mount_root_device(uint32_t device_num, char *fsname) {
     struct file *root_block = filp_open_anondevice(device_num, 0, S_IFBLK | 0666);
@@ -55,10 +55,6 @@ static int run_init_process(void *args) {
     if (!current->session) {
         do_setsid();
     }
-
-    int i;
-    for (i = 0; i < _NSIG; i++)
-        kernel_unmask_signal(i);
 
     int32_t res = do_execve(argv[0], argv, envp);
     if (res)
@@ -207,7 +203,7 @@ noreturn void kernel_main(void) {
     };
 
     int i;
-    for (i = 0; i < _NSIG; i++)
+    for (i = 0; i < NSIG; i++)
         kernel_mask_signal(i);
 
     // Initialize drivers

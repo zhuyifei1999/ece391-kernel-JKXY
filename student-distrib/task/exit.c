@@ -65,6 +65,14 @@ void do_exit(int exitcode) {
     if (current->fxsave_data)
         kfree(current->fxsave_data);
 
+    uint32_t i;
+    array_for_each(&current->sigpending->siginfos, i) {
+        struct siginfo *siginfo = array_get(&current->sigpending->siginfos, i);
+        if (siginfo)
+            kfree(siginfo);
+    }
+    array_destroy(&current->sigpending->siginfos);
+
     if (!current->ppid)
         panic("Killing process tree!\n");
 

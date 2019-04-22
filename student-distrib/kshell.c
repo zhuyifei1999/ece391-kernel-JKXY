@@ -62,6 +62,7 @@ static int kshell(void *args) {
 
                 char stat_field[FIELD_WIDTH+1];
                 snprintf(stat_field, FIELD_WIDTH + 1, "%s%s%s",
+                    task->stopped ? "T" :
                     task->state == TASK_RUNNING ? "R" :
                     task->state == TASK_INTERRUPTIBLE ? "S" :
                     task->state == TASK_UNINTERRUPTIBLE ? "D" :

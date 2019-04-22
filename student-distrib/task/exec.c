@@ -279,6 +279,12 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     }
     finit();
 
+    if (!atomic_dec(&current->sigactions->refcount))
+        kfree(current->sigactions);
+    current->sigactions = (struct sigactions){
+        .refcount = ATOMIC_INITIALIZER(1),
+    };
+
     current->subsystem = subsystem;
 
     set_current_comm(list_peek_back(&exe->path->components));

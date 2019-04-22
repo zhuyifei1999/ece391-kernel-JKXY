@@ -3,12 +3,16 @@
 #include "task.h"
 #include "exit.h"
 #include "userstack.h"
+#include "../lib/bsr.h"
+#include "../panic.h"
 #include "../syscall.h"
 #include "../err.h"
 
 enum default_action {
     SIG_IGNORE,
     SIG_KILL,
+    SIG_STOP,
+    SIG_CONT,
 };
 
 static enum default_action default_sig_action(uint16_t signum) {
@@ -24,63 +28,84 @@ static enum default_action default_sig_action(uint16_t signum) {
     case SIGPIPE:
     case SIGTERM:
         return SIG_KILL;
+    case SIGSTOP:
+    case SIGTSTP:
+    case SIGTTIN:
+    case SIGTTOU:
+        return SIG_STOP;
+    case SIGCONT:
+        return SIG_CONT;
     default:
         return SIG_IGNORE;
     }
 }
 
-static inline bool is_fatal_signal(uint16_t signum) {
-    return signum == SIGKILL;
-}
-
-bool signal_pending(struct task_struct *task) {
-    return task->sigpending.is_pending;
-}
-
-bool fatal_signal_pending(struct task_struct *task) {
+uint32_t fatal_signal_pending(struct task_struct *task) {
     // We assume all forced signals are fatal
-    return task->sigpending.is_pending && (task->sigpending.forced || is_fatal_signal(task->sigpending.signum));
+    return (task->sigpending.pending_mask & (task->sigpending.forced_mask | SIG_UNMASKABLE));
 }
 
-void send_sig(struct task_struct *task, uint16_t signum) {
-    if (signal_pending(task))
+uint32_t signal_pending(struct task_struct *task) {
+    return fatal_signal_pending(task) | (task->sigpending.pending_mask & ~task->sigpending.blocked_mask);
+}
+
+uint16_t signal_pending_one(struct task_struct *task) {
+    uint32_t mask;
+    // priortize fatals
+    mask = fatal_signal_pending(task);
+    if (mask)
+        return bsr(mask);
+    mask = signal_pending(task);
+    if (mask)
+        return bsr(mask);
+    return 0;
+}
+
+bool signal_is_fatal(struct task_struct *task, uint16_t signum) {
+    return MASKVAL(signum) & (task->sigpending.forced_mask | SIG_UNMASKABLE);
+}
+
+void send_sig_info(struct task_struct *task, struct siginfo *siginfo) {
+    if (task->sigpending.pending_mask & MASKVAL(signum))
         return;
     struct sigaction *sigaction = &task->sigactions->sigactions[signum];
     if (sigaction->sigaction == SIG_IGN)
         return;
 
-    task->sigpending = (struct sigpending){
-        .is_pending = true,
-        .signum     = signum,
-        .forced     = false,
-    };
-
-    if (task->state == TASK_INTERRUPTIBLE)
-        wake_up_process(task);
-}
-
-void force_sig(struct task_struct *task, uint16_t signum) {
-    if (fatal_signal_pending(task))
+    // special case SIGCONT
+    if (siginfo->signo == SIGCONT) {
+        if (task->stopped) {
+            task->stopped = false;
+            wake_up_process(task);
+        }
         return;
+    }
 
-    task->sigpending = (struct sigpending){
-        .is_pending = true,
-        .signum     = signum,
-        .forced     = true,
-    };
+    task->sigpending.pending_mask |= MASKVAL(signum);
+
+    struct siginfo *siginfo_h = kmalloc(sizeof(*siginfo_h));
+    *siginfo_h = *siginfo;
+
+    array_set(&task->sigpending->siginfos, siginfo->signo, siginfo_h);
 
     if (task->state == TASK_INTERRUPTIBLE)
         wake_up_process(task);
 }
 
-int32_t send_sig_pg(uint16_t pgid, uint16_t signum) {
+void force_sig_info(struct task_struct *task, struct siginfo *siginfo) {
+    send_sig_info(task, siginfo)
+
+    task->sigpending.forced_mask |= MASKVAL(signum);
+}
+
+int32_t send_sig_info_pg(uint16_t pgid, struct siginfo *siginfo) {
     struct task_struct *leader = get_task_from_pid(pgid);
     if (IS_ERR(leader))
         return PTR_ERR(leader);
 
     if (leader->pgid != pgid) {
         // Not a leader
-        send_sig(leader, signum);
+        send_sig(leader, siginfo);
         return 0;
     }
 
@@ -88,7 +113,7 @@ int32_t send_sig_pg(uint16_t pgid, uint16_t signum) {
     list_for_each(&tasks, node) {
         struct task_struct *task = node->value;
         if (task->pgid == pgid)
-            send_sig(task, signum);
+            send_sig(task, siginfo);
     }
 
     return 0;
@@ -102,15 +127,22 @@ void kernel_unmask_signal(uint16_t signum) {
     current->sigactions->sigactions[signum].sigaction = SIG_DFL;
 }
 
-uint16_t kernel_peek_pending_sig() {
-    if (!current->sigpending.is_pending)
-        return 0;
-    return current->sigpending.signum;
+bool kernel_sig_ispending(uint16_t signum) {
+    return current->sigpending.pending_mask & MASKVAL(signum);
 }
 
-uint16_t kernel_get_pending_sig() {
-    uint16_t ret = kernel_peek_pending_sig();
-    current->sigpending.is_pending = false;
+bool kernel_peek_pending_sig(uint16_t signum, struct siginfo *siginfo) {
+    if (!kernel_sig_ispending(signum))
+        return false;
+
+    *siginfo = array_get(&task->sigpending->siginfos, signum);
+    return true;
+}
+
+bool kernel_get_pending_sig(uint16_t signum, struct siginfo *siginfo) {
+    bool ret = kernel_peek_pending_sig();
+    current->sigpending.pending_mask &= ~MASKVAL(signum);
+    current->sigpending.forced_mask &= ~MASKVAL(signum);
     return ret;
 }
 
@@ -135,17 +167,18 @@ struct ece391_user_context {
 };
 
 void deliver_signal(struct intr_info *regs) {
-    if (!signal_pending(current))
+    uint16_t signum = signal_pending_one(current);
+    if (!signum)
         return;
 
-    struct sigpending sigpending = current->sigpending;
-    current->sigpending.is_pending = false;
+    bool is_fatal = signal_is_fatal(current, signum);
 
-    uint16_t signum = sigpending.signum;
+    current->sigpending.pending_mask &= ~MASKVAL(signum);
+    current->sigpending.forced_mask &= ~MASKVAL(signum);
+
     struct sigaction *sigaction = &current->sigactions->sigactions[signum];
-    if (sigaction->sigaction == SIG_IGN)
-        return;
-    if (sigpending.forced || sigaction->sigaction == SIG_DFL) {
+
+    if (is_fatal || sigaction->sigaction == SIG_DFL) {
         switch (default_sig_action(signum)) {
         case SIG_IGNORE:
             return;
@@ -156,8 +189,17 @@ void deliver_signal(struct intr_info *regs) {
             case SUBSYSTEM_ECE391:
                 do_exit(256);
             }
+        case SIG_STOP:
+            current->stopped = true;
+            while (current->stopped)
+                schedule();
+        case SIG_CONT:
+            BUG(); // should be treated specially
         }
     }
+
+    if (sigaction->sigaction == SIG_IGN)
+        return;
 
     switch (current->subsystem) {
     case SUBSYSTEM_LINUX:
@@ -314,4 +356,40 @@ DEFINE_SYSCALL_COMPLEX(ECE391, sigreturn, regs) {
     // FIXME: Bad regs here can cause a panic
 
     return;
+}
+
+DEFINE_SYSCALL2(LINUX, kill, int32_t, pid, uint32_t, sig) {
+    if (sig > _NSIG)
+        return -EINVAL;
+
+    printk("%d %d\n", pid, sig);
+    return -ENOSYS;
+    // if (pid < 1) {
+    //     uint16_t pgid;
+    //     if (pid < -1)
+    //         pgid = -pid;
+    //     else if (pid == -1)
+    //         pgid = 0;
+    //     else // pid == 0
+    //         pgid = current->pgid;
+    //     uint16_t pid_k;
+    //     exitcode = do_waitpg(pgid, &pid_k, !(options & WNOHANG));
+    //     pid = pid_k;
+    // } else {
+    //     struct task_struct *task = get_task_from_pid(pid);
+    //     if (IS_ERR(task))
+    //         return PTR_ERR(task);
+    //
+    //     if (task->state != TASK_ZOMBIE && (options & WNOHANG))
+    //         return 0;
+    //     exitcode = do_wait(task);
+    // }
+    //
+    // if (exitcode < 0)
+    //     return exitcode;
+    //
+    // if (safe_buf(wstatus, sizeof(*wstatus), true) == sizeof(*wstatus))
+    //     *wstatus = exitcode;
+    //
+    // return pid;
 }
