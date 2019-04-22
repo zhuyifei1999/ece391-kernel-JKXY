@@ -64,6 +64,11 @@
 #define CLD_STOPPED 5   /* child has stopped */
 #define CLD_CONTINUED 6 /* stopped child has continued */
 
+// source: <uapi/asm-generic/signal-defs.h>
+#define SIG_BLOCK          0 /* for blocking signals */
+#define SIG_UNBLOCK        1 /* for unblocking signals */
+#define SIG_SETMASK        2 /* for setting the signal mask */
+
 #define SIG_ECE391_DIV_ZERO  0
 #define SIG_ECE391_SEGFAULT  1
 #define SIG_ECE391_INTERRUPT 2

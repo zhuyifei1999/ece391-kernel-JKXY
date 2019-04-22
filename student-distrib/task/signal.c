@@ -615,6 +615,33 @@ DEFINE_SYSCALL_COMPLEX(LINUX, sigreturn, regs) {
     return;
 }
 
+DEFINE_SYSCALL4(LINUX, rt_sigprocmask, int, how, const uint32_t *, set, uint32_t *, oldset, uint32_t, sigsetsize) {
+    if (safe_buf(oldset, sizeof(*oldset), false) == sizeof(*oldset))
+        *oldset = current->sigpending.blocked_mask;
+
+    if (safe_buf(set, sizeof(*set), false) == sizeof(*set)) {
+        uint32_t curset = current->sigpending.blocked_mask;
+
+        switch (how) {
+        case SIG_BLOCK:
+            curset |= *set;
+            break;
+        case SIG_UNBLOCK:
+            curset &= ~*set;
+            break;
+        case SIG_SETMASK:
+            curset = *set;
+            break;
+        default:
+            return -EINVAL;
+        }
+
+        set_sigmask(curset);
+    }
+
+    return 0;
+}
+
 DEFINE_SYSCALL2(LINUX, kill, int32_t, pid, uint32_t, signum) {
     if (signum > NSIG)
         return -EINVAL;
