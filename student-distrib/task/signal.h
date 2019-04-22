@@ -41,6 +41,19 @@
 #define SIGSYS    31
 #define SIGUNUSED 31
 
+#define SA_NOCLDSTOP 0x00000001u
+#define SA_NOCLDWAIT 0x00000002u
+#define SA_SIGINFO   0x00000004u
+#define SA_ONSTACK   0x08000000u
+#define SA_RESTART   0x10000000u
+#define SA_NODEFER   0x40000000u
+#define SA_RESETHAND 0x80000000u
+
+#define SA_NOMASK  SA_NODEFER
+#define SA_ONESHOT SA_RESETHAND
+
+#define SA_RESTORER 0x04000000
+
 #define SI_USER   0    /* sent by kill, sigsend, raise */
 #define SI_KERNEL 0x80 /* sent by the kernel from somewhere */
 
