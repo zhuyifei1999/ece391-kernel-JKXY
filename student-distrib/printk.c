@@ -12,7 +12,7 @@ static void do_printk_line(char *line) {
     struct timespec uptime;
     get_uptime(&uptime);
 
-    printf("[%d.%06d] %s\n", uptime.sec, uptime.nsec / 1000, line);
+    printf("[%d.%03d] %s\n", uptime.sec, uptime.nsec / 1000000, line);
 }
 
 __printf(1, 2)

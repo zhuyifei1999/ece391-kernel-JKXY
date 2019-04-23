@@ -47,9 +47,10 @@ void get_uptime(struct timespec *data) {
     if (counter >= last_calibration)
         counter = last_calibration - 1;
 
+    // multiply in two stages because otherwise we will overflow
     *data = (struct timespec){
         .sec = seconds,
-        .nsec = counter * NSEC / last_calibration
+        .nsec = counter * 1000000 / last_calibration * 1000
     };
 
     restore_flags(flags);
