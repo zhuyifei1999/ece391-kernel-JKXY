@@ -1,4 +1,4 @@
-#include "timer.h"
+#include "uptime.h"
 #include "../lib/cli.h"
 #include "../drivers/rtc.h"
 #include "../initcall.h"
@@ -38,7 +38,7 @@ static void rtc_handler() {
     rtc_counter++;
 }
 
-void get_timer(struct timer_data *data) {
+void get_uptime(struct uptime_data *data) {
     unsigned long flags;
     cli_and_save(flags);
 
@@ -47,7 +47,7 @@ void get_timer(struct timer_data *data) {
     if (counter >= last_calibration)
         counter = last_calibration - 1;
 
-    *data = (struct timer_data) {
+    *data = (struct uptime_data) {
         .seconds = seconds,
         .millis = counter * 1000 / last_calibration
     };
@@ -55,7 +55,7 @@ void get_timer(struct timer_data *data) {
     restore_flags(flags);
 }
 
-static void init_timer() {
+static void init_uptime() {
     register_rtc_handler(&rtc_handler);
 }
-DEFINE_INITCALL(init_timer, drivers);
+DEFINE_INITCALL(init_uptime, drivers);
