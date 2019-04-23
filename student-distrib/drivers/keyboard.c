@@ -26,7 +26,6 @@
 // function keys map, 0x80 to 0xFF, unassigned have 0xFF
 #define DO_GUI    0xFF
 #define DO_APPS   0xFF
-#define DO_ESC    0x80
 #define DO_F1     0x81
 #define DO_F2     0x82
 #define DO_F3     0x83
@@ -106,7 +105,7 @@ static unsigned char scancode_map[256] = {
     [0x5B]=DO_GUI,[0xDB]=DO_GUI,
     [0x5C]=DO_GUI,[0xDC]=DO_GUI,
     [0x5D]=DO_APPS,[0xDD]=DO_APPS,
-    [0x01]=DO_ESC,[0x81]=DO_ESC,
+    [0x01]='\33',[0x81]='\33',
     [0x3B]=DO_F1,[0xBB]=DO_F1,
     [0x3C]=DO_F2,[0xBC]=DO_F2,
     [0x3D]=DO_F3,[0xBD]=DO_F3,
@@ -230,7 +229,7 @@ static bool do_function(unsigned char scancode_mapped) {
     if (!has_ctrl && has_alt && scancode_mapped >= DO_F1 && scancode_mapped <= DO_F12) {
         tty_switch_foreground(MKDEV(TTY_MAJOR, scancode_mapped - DO_F1 + 1));
         return true;
-    } else if (!has_ctrl && has_alt && (scancode_mapped == DO_ESC || scancode_mapped == '`')) {
+    } else if (!has_ctrl && has_alt && (scancode_mapped == 'c')) {
         tty_switch_foreground(TTY_CONSOLE);
         return true;
     } else if (!has_ctrl && !has_alt) {
