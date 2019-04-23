@@ -15,6 +15,8 @@
 
 struct session;
 
+#define CONTROL_OFFSET 0x40
+
 // source: <uapi/asm-generic/termbits.h>
 
 struct termios {
@@ -183,6 +185,11 @@ struct termios {
 #define TCSADRAIN 1
 #define TCSAFLUSH 2
 
+struct ansi_decode {
+    uint8_t buffer_end;
+    char buffer[16];
+};
+
 struct tty {
     atomic_t refcount;
     uint32_t device_num;
@@ -191,6 +198,7 @@ struct tty {
     char *video_mem;
     struct list vidmaps;
     struct termios termios;
+    struct ansi_decode ansi_dec;
     uint16_t cursor_x;
     uint16_t cursor_y;
     int16_t mouse_cursor_x;

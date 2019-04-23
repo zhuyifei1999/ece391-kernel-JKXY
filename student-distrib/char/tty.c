@@ -10,6 +10,7 @@
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
+#include "../lib/stdlib.h"
 #include "../lib/string.h"
 #include "../lib/cli.h"
 #include "../printk.h"
@@ -43,7 +44,6 @@ struct vidmaps_entry {
     struct page_table_entry *table;
 };
 
-// meh... Can't this logic be in userspace?
 static inline bool tty_should_read(struct tty *tty) {
     if (tty->termios.lflag & ICANON)
         return tty->buffer_end && tty->buffer[tty->buffer_end - 1] == WAKEUP_CHAR;
@@ -51,7 +51,7 @@ static inline bool tty_should_read(struct tty *tty) {
         return tty->buffer_end;
 }
 
-static void tty_clear(struct tty *tty);
+static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes);
 
 /*
  *   tty_get
@@ -110,7 +110,11 @@ struct tty *tty_get(uint32_t device_num) {
         .video_mem = video_mem,
         .refcount = ATOMIC_INITIALIZER(1),
         .termios = {
-            .lflag = ECHO | ICANON,
+            .lflag = ECHO | ECHOE | ECHOCTL | ICANON | ISIG,
+            .cc = {
+                [VINTR] = 'C' - 0x40,
+                [VERASE] = '\b',
+            }
         },
     };
     // create list of vidmaps
@@ -119,7 +123,7 @@ struct tty *tty_get(uint32_t device_num) {
     //insert to back of ttys
     list_insert_back(&ttys, ret);
 
-    tty_clear(ret);
+    raw_tty_write(ret, "\33[2J", sizeof("\33[2J") - 1);
 
 out:
     restore_flags(flags);
@@ -269,6 +273,70 @@ static inline void tty_commit_cursor(struct tty *tty) {
         vga_set_cursor(foreground_tty->cursor_x, foreground_tty->cursor_y);
 }
 
+static char decode_ansi_type(struct ansi_decode *ansi_dec)  {
+    uint8_t len = ansi_dec->buffer_end;
+    const char *buf = ansi_dec->buffer;
+
+    buf++;
+    len--;
+
+    if (!len)
+        return '\0';
+
+    char type = '\0';
+
+    if (buf[0] == '[' || buf[0] == '(' || buf[0] == ')' || buf[0] == '#')
+        type = buf[0];
+
+    if (len && type == '[' && buf[1] == '?')
+        type = buf[1];
+
+    return type;
+}
+
+static void decode_ansi(struct ansi_decode *ansi_dec, uint8_t *arg1, uint8_t *arg2)  {
+    const char *buf = strndup(ansi_dec->buffer, ansi_dec->buffer_end);
+    const char *buf_free = buf;
+
+    char type = decode_ansi_type(ansi_dec);
+    switch (type) {
+    case '[':
+    case '(':
+    case ')':
+    case '#':
+        buf += 2;
+        break;
+    case '?':
+        buf += 3;
+        break;
+    }
+
+    uint8_t arg;
+    const char *end;
+
+    arg = atoi(buf, &end);
+    if (end == buf)
+        goto out;
+
+    if (arg1)
+        *arg1 = arg;
+    buf = end;
+
+    if (buf[0] != ';')
+        goto out;
+    buf++;
+
+    arg = atoi(buf, &end);
+    if (end == buf)
+        goto out;
+
+    *arg2 = arg;
+    buf = end;
+
+out:
+    kfree((void *)buf_free);
+}
+
 /*
  *   raw_tty_write
  *   DESCRIPTION: wirte content to teminal from buffer
@@ -282,47 +350,185 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
     int i;
     for (i = 0; i < nbytes; i++) {
         char c = buf[i];
-        if (c == '\n' || c == '\r') {
-            if (c == '\n')
-                tty->cursor_y++;
-            tty->cursor_x = 0;
-        } else if (c == '\b') {
-            if (!tty->cursor_x) {
-                if (tty->cursor_y) {
-                    tty->cursor_y--;
-                    tty->cursor_x = NUM_COLS - 1;
-                }
+        if (tty->ansi_dec.buffer_end) {
+            if (c == '\33') {
+                tty->ansi_dec.buffer_end = 0;
+                tty->ansi_dec.buffer[tty->ansi_dec.buffer_end++] = c;
+            } else if (
+                c == '[' || c == '?' || c == '(' || c == ')' || c == ';' || c == '#' ||
+                (c >= '0' && c <= '9')
+            ) {
+                if (tty->ansi_dec.buffer_end < sizeof(tty->ansi_dec.buffer) - 1)
+                    tty->ansi_dec.buffer[tty->ansi_dec.buffer_end++] = c;
             } else {
-                tty->cursor_x--;
+                char type = decode_ansi_type(&tty->ansi_dec);
+                switch (c) {
+                case 'H':
+                case 'f':
+                    switch (type) {
+                    case '[': {
+                        uint8_t arg1 = 0;
+                        uint8_t arg2 = 0;
+                        decode_ansi(&tty->ansi_dec, &arg1, &arg2);
+
+                        tty->cursor_y = arg1;
+                        tty->cursor_x = arg2;
+                        break;
+                    }
+                    }
+                    break;
+                case 'F':
+                    switch (type) {
+                    case '[': {
+                        uint8_t arg1 = NUM_ROWS - 1;
+                        uint8_t arg2 = NUM_COLS - 1;
+                        decode_ansi(&tty->ansi_dec, &arg1, &arg2);
+
+                        tty->cursor_y = arg1;
+                        tty->cursor_x = arg2;
+                        break;
+                    }
+                    }
+                    break;
+                case 'A':
+                    switch (type) {
+                    case '[': {
+                        uint8_t arg1 = 1;
+                        decode_ansi(&tty->ansi_dec, &arg1, NULL);
+
+                        tty->cursor_y -= arg1;
+                        break;
+                    }
+                    }
+                    break;
+                case 'B':
+                    switch (type) {
+                    case '[': {
+                        uint8_t arg1 = 1;
+                        decode_ansi(&tty->ansi_dec, &arg1, NULL);
+
+                        tty->cursor_y += arg1;
+                        break;
+                    }
+                    }
+                    break;
+                case 'C':
+                    switch (type) {
+                    case '[': {
+                        uint8_t arg1 = 1;
+                        decode_ansi(&tty->ansi_dec, &arg1, NULL);
+
+                        tty->cursor_x += arg1;
+                        break;
+                    }
+                    }
+                    break;
+                case 'D':
+                    switch (type) {
+                    case '[': {
+                        uint8_t arg1 = 1;
+                        decode_ansi(&tty->ansi_dec, &arg1, NULL);
+
+                        tty->cursor_x -= arg1;
+                        break;
+                    }
+                    }
+                    break;
+                case 'J':
+                    switch (type) {
+                    case '[': {
+                        uint8_t arg1 = 0;
+                        decode_ansi(&tty->ansi_dec, &arg1, NULL);
+
+                        uint32_t i;
+                        uint32_t curpos = NUM_COLS * tty->cursor_y + tty->cursor_x;
+
+                        switch (arg1) {
+                        case 0:
+                            for (i = curpos; i < VGA_CHARS; i++) {
+                                tty->video_mem[i * 2] = ' ';
+                                tty->video_mem[i * 2 + 1] = WHITE_ON_BLACK;
+                            }
+                            break;
+                        case 1:
+                            for (i = 0; i < curpos; i++) {
+                                tty->video_mem[i * 2] = ' ';
+                                tty->video_mem[i * 2 + 1] = WHITE_ON_BLACK;
+                            }
+                            break;
+                        case 2:
+                            tty->cursor_x = tty->cursor_y = 0;
+                            for (i = 0; i < VGA_CHARS; i++) {
+                                tty->video_mem[i * 2] = ' ';
+                                tty->video_mem[i * 2 + 1] = WHITE_ON_BLACK;
+                            }
+
+                            // raw_tty_write(tty, tty->buffer, tty->buffer_end);
+                            break;
+                        }
+                        break;
+                    }
+                    }
+                    break;
+                }
+
+                if (tty->cursor_x > NUM_COLS - 1)
+                    tty->cursor_x = NUM_COLS - 1;
+
+                if (tty->cursor_y > NUM_ROWS - 1)
+                    tty->cursor_y = NUM_ROWS - 1;
+
+                tty->ansi_dec.buffer_end = 0;
             }
-            tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2] = ' ';
-            tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] = WHITE_ON_BLACK;
-        } else if (c == '\t') {
-            // TODO
-            raw_tty_write(tty, " ", 1);
         } else {
-            tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2] = c;
-            tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] = WHITE_ON_BLACK;
-            tty->cursor_x++;
-        }
+            if (c == '\n' || c == '\r') {
+                if (c == '\n')
+                    tty->cursor_y++;
+                tty->cursor_x = 0;
+            } else if (c == tty->termios.cc[VERASE]) {
+                if (!tty->cursor_x) {
+                    if (tty->cursor_y) {
+                        tty->cursor_y--;
+                        tty->cursor_x = NUM_COLS - 1;
+                    }
+                } else {
+                    tty->cursor_x--;
+                }
+                if ((tty->termios.lflag & ECHOE) && (tty->termios.lflag & ICANON)) {
+                    tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2] = ' ';
+                    tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] = WHITE_ON_BLACK;
+                }
+            } else if (c == '\t') {
+                // TODO
+                raw_tty_write(tty, " ", 1);
+            } else if (c == '\a') {
+                // alert
+            } else if (c == '\33') {
+                tty->ansi_dec.buffer[tty->ansi_dec.buffer_end++] = c;
+            } else {
+                if (tty->cursor_x == NUM_COLS) {
+                    tty->cursor_x = 0;
+                    tty->cursor_y++;
+                }
 
-        if (tty->cursor_x == NUM_COLS) {
-            tty->cursor_x = 0;
-            tty->cursor_y++;
-        }
+                if (tty->cursor_y == NUM_ROWS) {
+                    tty->cursor_y--;
 
-        if (tty->cursor_y == NUM_ROWS) {
-            tty->cursor_y--;
+                    // do scrolling
+                    int32_t i;
+                    for (i = 0; i < (NUM_ROWS - 1) * NUM_COLS; i++) {
+                        tty->video_mem[i * 2] = tty->video_mem[(i + NUM_COLS) * 2];
+                        // tty->video_mem[i * 2 + 1] = tty->video_mem[(i + NUM_COLS) * 2 + 1];
+                    }
+                    for (i = (NUM_ROWS - 1) * NUM_COLS; i < NUM_ROWS * NUM_COLS; i++) {
+                        tty->video_mem[i * 2] = ' ';
+                        // tty->video_mem[i * 2 + 1] = ATTRIB;
+                    }
+                }
 
-            // do scrolling
-            int32_t i;
-            for (i = 0; i < (NUM_ROWS - 1) * NUM_COLS; i++) {
-                tty->video_mem[i * 2] = tty->video_mem[(i + NUM_COLS) * 2];
-                // tty->video_mem[i * 2 + 1] = tty->video_mem[(i + NUM_COLS) * 2 + 1];
-            }
-            for (i = (NUM_ROWS - 1) * NUM_COLS; i < NUM_ROWS * NUM_COLS; i++) {
-                tty->video_mem[i * 2] = ' ';
-                // tty->video_mem[i * 2 + 1] = ATTRIB;
+                tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2] = c;
+                tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] = WHITE_ON_BLACK;
+                tty->cursor_x++;
             }
         }
     }
@@ -441,21 +647,28 @@ void tty_foreground_keyboard(char chr, bool has_ctrl, bool has_alt) {
     if (foreground_tty == &early_console)
         return;
 
-    if (has_ctrl && !has_alt) {
-        switch (chr) {
-        case 'l':
-        case 'L':
-            tty_clear(foreground_tty);
-            break;
-        case 'c':
-        case 'C':
-            tty_foreground_puts("^C");
-            tty_foreground_signal(SIGINT);
-            break;
+    if (has_ctrl && !has_alt && chr >= CONTROL_OFFSET) {
+        chr = chr & ~(CONTROL_OFFSET | 0x20);
+        has_ctrl = false;
+    }
+    if (!has_ctrl && !has_alt) {
+        if (foreground_tty->termios.lflag & ICANON) {
+            if (chr == 'L' - CONTROL_OFFSET) {
+                tty_foreground_puts("\33[2J");
+                return;
+            }
         }
-    } else if (!has_ctrl && !has_alt) {
+        if (foreground_tty->termios.lflag & ISIG && chr) {
+            if (chr == foreground_tty->termios.cc[VINTR]) {
+                if (foreground_tty->termios.lflag & ECHOCTL)
+                    tty_foreground_puts("^C");
+                tty_foreground_signal(SIGINT);
+                return;
+            }
+        }
+
         // When you press enter, the line is committed
-        if (tty_should_read(foreground_tty))
+        if ((foreground_tty->termios.lflag & ICANON) && tty_should_read(foreground_tty))
             return;
 
         if ((foreground_tty->termios.lflag & ICANON) && chr == '\b') {
@@ -499,21 +712,6 @@ static struct file_operations tty_dev_op = {
     .open    = &tty_open,
     .release = &tty_release,
 };
-
-// FIXME: support ANSI/VT100. this is evil
-// http://www.termsys.demon.co.uk/vtansi.htm
-static void tty_clear(struct tty *tty) {
-    tty->cursor_x = tty->cursor_y = 0;
-    tty_commit_cursor(tty);
-
-    int32_t i;
-    for (i = 0; i < VGA_CHARS; i++) {
-        tty->video_mem[i * 2] = ' ';
-        tty->video_mem[i * 2 + 1] = WHITE_ON_BLACK;
-    }
-
-    raw_tty_write(tty, tty->buffer, tty->buffer_end);
-}
 
 /*
  *   tty_switch_foreground
