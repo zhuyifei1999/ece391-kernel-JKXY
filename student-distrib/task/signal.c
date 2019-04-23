@@ -686,3 +686,26 @@ DEFINE_SYSCALL2(LINUX, kill, int32_t, pid, uint32_t, signum) {
 
     return 0;
 }
+
+DEFINE_SYSCALL3(LINUX, tgkill, int32_t, tgid, int32_t, tid, uint32_t, signum) {
+    if (signum > NSIG)
+        return -EINVAL;
+
+    if (tid != tgid)
+        return -ESRCH;
+
+    struct siginfo siginfo = {
+        .signo = signum,
+        .code = SI_USER,
+        .sifields.kill.pid = current->pid,
+    };
+
+    struct task_struct *task = get_task_from_pid(tid);
+    if (IS_ERR(task))
+        return PTR_ERR(task);
+
+    if (signum)
+        send_sig_info(task, &siginfo);
+
+    return 0;
+}

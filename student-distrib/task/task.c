@@ -32,6 +32,10 @@ void return_to_userspace(struct intr_info *info) {
     retuser_fxrstor();
 }
 
+DEFINE_SYSCALL0(LINUX, gettid) {
+    return current->pid;
+}
+
 DEFINE_SYSCALL0(LINUX, getpid) {
     return current->pid;
 }
