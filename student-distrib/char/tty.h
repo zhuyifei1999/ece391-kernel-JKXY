@@ -185,6 +185,19 @@ struct termios {
 #define TCSADRAIN 1
 #define TCSAFLUSH 2
 
+// #define COLOR_SWAP(val) (((val) & 0x88) | ((val) & 0x70) >> 4 | ((val) & 0x07) << 4)
+#define COLOR_SWAP(val) (((val) & 0xF0) >> 4 | ((val) & 0x0F) << 4)
+
+#define SLOW_FACTOR_X 16
+#define SLOW_FACTOR_Y 32
+
+#define IS_MOUSE_POS(tty, x, y) (                   \
+    (tty)->mouse_cursor_shown &&                    \
+    (x) == (tty)->mouse_cursor_x / SLOW_FACTOR_X && \
+    (y) == (tty)->mouse_cursor_y / SLOW_FACTOR_Y    \
+)
+#define WHITE_ON_BLACK_M(tty, x, y) (IS_MOUSE_POS(tty, x, y) ? BLACK_IN_WHITE : WHITE_ON_BLACK)
+
 struct ansi_decode {
     uint8_t buffer_end;
     char buffer[16];
@@ -201,6 +214,8 @@ struct tty {
     struct ansi_decode ansi_dec;
     uint16_t cursor_x;
     uint16_t cursor_y;
+    uint8_t color;
+    bool mouse_cursor_shown;
     int16_t mouse_cursor_x;
     int16_t mouse_cursor_y;
     // FIXME: This should be handled by the line discipline

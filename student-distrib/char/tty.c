@@ -10,6 +10,7 @@
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
+#include "../lib/limits.h"
 #include "../lib/stdlib.h"
 #include "../lib/string.h"
 #include "../lib/cli.h"
@@ -21,8 +22,6 @@
 #include "../errno.h"
 
 #define TTY_BUFFER_SIZE 128
-#define SLOW_FACTOR_X 16
-#define SLOW_FACTOR_Y 32
 
 #define WAKEUP_CHAR '\n'
 
@@ -116,6 +115,7 @@ struct tty *tty_get(uint32_t device_num) {
                 [VERASE] = '\b',
             }
         },
+        .color = WHITE_ON_BLACK,
     };
     // create list of vidmaps
     list_init(&ret->vidmaps);
@@ -241,26 +241,33 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
  *   INPUTS: uint16_t dx, uint16_t dy
  */
 void tty_foreground_mouse(uint16_t dx, uint16_t dy) {
-    foreground_tty->video_mem[(NUM_COLS *(foreground_tty->mouse_cursor_y/SLOW_FACTOR_Y)
-    + foreground_tty->mouse_cursor_x/SLOW_FACTOR_X) * 2+1] = WHITE_ON_BLACK;
-    int16_t mouse_x, mouse_y;
-    mouse_x = foreground_tty->mouse_cursor_x + dx;
-    mouse_y = foreground_tty->mouse_cursor_y - dy;
+    char *attrib;
+    if (foreground_tty->mouse_cursor_shown) {
+        attrib = &foreground_tty->video_mem[
+            (NUM_COLS * (foreground_tty->mouse_cursor_y / SLOW_FACTOR_Y)
+            + foreground_tty->mouse_cursor_x / SLOW_FACTOR_X) * 2 + 1];
+        *attrib = COLOR_SWAP(*attrib);
+    }
+
+    foreground_tty->mouse_cursor_shown = true;
+
+    foreground_tty->mouse_cursor_x += dx;
+    foreground_tty->mouse_cursor_y -= dy;
     // check the position of mouse cursor
-    if (mouse_x < 0)
-        mouse_x = 0;
-    else if (mouse_x >= NUM_COLS * SLOW_FACTOR_X)
-        mouse_x = NUM_COLS * SLOW_FACTOR_X - 1;
-    if (mouse_y < 0)
-        mouse_y = 0;
-    else if (mouse_y >= NUM_ROWS * SLOW_FACTOR_Y)
-        mouse_y = NUM_ROWS * SLOW_FACTOR_Y -1;
+    if (foreground_tty->mouse_cursor_x < 0)
+        foreground_tty->mouse_cursor_x = 0;
+    if (foreground_tty->mouse_cursor_x > NUM_COLS * SLOW_FACTOR_X - 1)
+        foreground_tty->mouse_cursor_x = NUM_COLS * SLOW_FACTOR_X - 1;
+    if (foreground_tty->mouse_cursor_y < 0)
+        foreground_tty->mouse_cursor_y = 0;
+    if (foreground_tty->mouse_cursor_y > NUM_ROWS * SLOW_FACTOR_Y - 1)
+        foreground_tty->mouse_cursor_y = NUM_ROWS * SLOW_FACTOR_Y - 1;
 
     // update the mouse cursor
-    foreground_tty->mouse_cursor_x = mouse_x;
-    foreground_tty->mouse_cursor_y = mouse_y;
-    foreground_tty->video_mem[(NUM_COLS *(foreground_tty->mouse_cursor_y/SLOW_FACTOR_Y)
-        + foreground_tty->mouse_cursor_x/SLOW_FACTOR_X) * 2+1] = BLACK_IN_WHITE;
+    attrib = &foreground_tty->video_mem[
+        (NUM_COLS * (foreground_tty->mouse_cursor_y / SLOW_FACTOR_Y)
+        + foreground_tty->mouse_cursor_x / SLOW_FACTOR_X) * 2 + 1];
+    *attrib = COLOR_SWAP(*attrib);
 }
 
 /*
@@ -335,6 +342,32 @@ static void decode_ansi(struct ansi_decode *ansi_dec, uint8_t *arg1, uint8_t *ar
 
 out:
     kfree((void *)buf_free);
+}
+
+static void tty_fixscroll(struct tty *tty) {
+    while (tty->cursor_x >= NUM_COLS) {
+        tty->cursor_x -= NUM_COLS;
+        tty->cursor_y++;
+    }
+
+    while (tty->cursor_y >= NUM_ROWS) {
+        tty->cursor_y--;
+
+        // do scrolling
+        int32_t i;
+        for (i = 0; i < (NUM_ROWS - 1) * NUM_COLS; i++) {
+            tty->video_mem[i * 2] = tty->video_mem[(i + NUM_COLS) * 2];
+            tty->video_mem[i * 2 + 1] = (
+                IS_MOUSE_POS(tty, i % NUM_COLS, i / NUM_COLS) ||
+                IS_MOUSE_POS(tty, i % NUM_COLS, i / NUM_COLS + 1)) ?
+                COLOR_SWAP(tty->video_mem[(i + NUM_COLS) * 2 + 1]) :
+                tty->video_mem[(i + NUM_COLS) * 2 + 1];
+        }
+        for (i = (NUM_ROWS - 1) * NUM_COLS; i < NUM_ROWS * NUM_COLS; i++) {
+            tty->video_mem[i * 2] = ' ';
+            tty->video_mem[i * 2 + 1] = WHITE_ON_BLACK_M(tty, i % NUM_COLS, i / NUM_COLS);
+        }
+    }
 }
 
 /*
@@ -447,20 +480,23 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
                         case 0:
                             for (i = curpos; i < VGA_CHARS; i++) {
                                 tty->video_mem[i * 2] = ' ';
-                                tty->video_mem[i * 2 + 1] = WHITE_ON_BLACK;
+                                tty->video_mem[i * 2 + 1] =
+                                    WHITE_ON_BLACK_M(tty, i % NUM_COLS, i / NUM_COLS);
                             }
                             break;
                         case 1:
                             for (i = 0; i < curpos; i++) {
                                 tty->video_mem[i * 2] = ' ';
-                                tty->video_mem[i * 2 + 1] = WHITE_ON_BLACK;
+                                tty->video_mem[i * 2 + 1] =
+                                    WHITE_ON_BLACK_M(tty, i % NUM_COLS, i / NUM_COLS);
                             }
                             break;
                         case 2:
                             tty->cursor_x = tty->cursor_y = 0;
                             for (i = 0; i < VGA_CHARS; i++) {
                                 tty->video_mem[i * 2] = ' ';
-                                tty->video_mem[i * 2 + 1] = WHITE_ON_BLACK;
+                                tty->video_mem[i * 2 + 1] =
+                                    WHITE_ON_BLACK_M(tty, i % NUM_COLS, i / NUM_COLS);
                             }
 
                             // raw_tty_write(tty, tty->buffer, tty->buffer_end);
@@ -470,13 +506,41 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
                     }
                     }
                     break;
+                case 'm':
+                    switch (type) {
+                    case '[': {
+                        uint8_t arg1 = 0, arg2 = UCHAR_MAX;
+                        decode_ansi(&tty->ansi_dec, &arg1, &arg2);
+
+                        uint8_t args[] = { arg1, arg2 };
+                        uint8_t i;
+                        for (i = 0; i < sizeof(args) / sizeof(*args); i++) {
+                            uint8_t arg = args[i];
+#define ANSI_TO_VGA(val) ( \
+    (val) == 0 ? 0 :       \
+    (val) == 1 ? 4 :       \
+    (val) == 2 ? 2 :       \
+    (val) == 3 ? 6 :       \
+    (val) == 4 ? 1 :       \
+    (val) == 5 ? 5 :       \
+    (val) == 6 ? 3 :       \
+    (val) == 7 ? 7 : 0     \
+)
+                            if (arg >= 30 && arg <= 37) {
+                                tty->color = (tty->color & 0xF8) | ANSI_TO_VGA(arg - 30);
+                            } else if (arg >= 40 && arg <= 47) {
+                                tty->color = (tty->color & 0x8F) | (ANSI_TO_VGA(arg - 40) << 4);
+                            } else if (arg == 0) {
+                                tty->color = WHITE_ON_BLACK;
+                            } else if (arg == 1) {
+                                tty->color |= 0x08;
+                            }
+                        }
+                        break;
+                    }
+                    }
+                    break;
                 }
-
-                if (tty->cursor_x > NUM_COLS - 1)
-                    tty->cursor_x = NUM_COLS - 1;
-
-                if (tty->cursor_y > NUM_ROWS - 1)
-                    tty->cursor_y = NUM_ROWS - 1;
 
                 tty->ansi_dec.buffer_end = 0;
             }
@@ -486,6 +550,8 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
                     tty->cursor_y++;
                 tty->cursor_x = 0;
             } else if (c == tty->termios.cc[VERASE]) {
+                tty_fixscroll(tty);
+
                 if (!tty->cursor_x) {
                     if (tty->cursor_y) {
                         tty->cursor_y--;
@@ -496,7 +562,8 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
                 }
                 if ((tty->termios.lflag & ECHOE) && (tty->termios.lflag & ICANON)) {
                     tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2] = ' ';
-                    tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] = WHITE_ON_BLACK;
+                    tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] =
+                        WHITE_ON_BLACK_M(tty, tty->cursor_x, tty->cursor_y);
                 }
             } else if (c == '\t') {
                 // TODO
@@ -506,28 +573,11 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
             } else if (c == '\33') {
                 tty->ansi_dec.buffer[tty->ansi_dec.buffer_end++] = c;
             } else {
-                if (tty->cursor_x == NUM_COLS) {
-                    tty->cursor_x = 0;
-                    tty->cursor_y++;
-                }
-
-                if (tty->cursor_y == NUM_ROWS) {
-                    tty->cursor_y--;
-
-                    // do scrolling
-                    int32_t i;
-                    for (i = 0; i < (NUM_ROWS - 1) * NUM_COLS; i++) {
-                        tty->video_mem[i * 2] = tty->video_mem[(i + NUM_COLS) * 2];
-                        // tty->video_mem[i * 2 + 1] = tty->video_mem[(i + NUM_COLS) * 2 + 1];
-                    }
-                    for (i = (NUM_ROWS - 1) * NUM_COLS; i < NUM_ROWS * NUM_COLS; i++) {
-                        tty->video_mem[i * 2] = ' ';
-                        // tty->video_mem[i * 2 + 1] = ATTRIB;
-                    }
-                }
+                tty_fixscroll(tty);
 
                 tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2] = c;
-                tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] = WHITE_ON_BLACK;
+                tty->video_mem[(NUM_COLS * tty->cursor_y + tty->cursor_x) * 2 + 1] =
+                    tty->color;
                 tty->cursor_x++;
             }
         }
