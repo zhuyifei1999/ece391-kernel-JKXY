@@ -102,7 +102,7 @@ DEFINE_SYSCALL3(LINUX, writev, int32_t, fd, const struct iovec *, iov, int, iovc
  */
 int32_t do_sys_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mode) {
     // determine the length of the path
-    uint32_t length = safe_arr_null_term(path, sizeof(char), false);
+    uint32_t length = safe_arr_null_term(path, sizeof(*path), false);
     if (!length)
         return -EFAULT;
 
@@ -281,7 +281,7 @@ static int32_t do_stat(struct inode *inode, struct stat64 * statbuf) {
 }
 
 DEFINE_SYSCALL2(LINUX, stat64, const char *, path, struct stat64 *, statbuf) {
-    uint32_t length = safe_arr_null_term(path, sizeof(char), false);
+    uint32_t length = safe_arr_null_term(path, sizeof(*path), false);
     if (!length)
         return -EFAULT;
 
@@ -305,7 +305,7 @@ DEFINE_SYSCALL2(LINUX, stat64, const char *, path, struct stat64 *, statbuf) {
 }
 
 DEFINE_SYSCALL2(LINUX, lstat64, const char *, path, struct stat64 *, statbuf) {
-    uint32_t length = safe_arr_null_term(path, sizeof(char), false);
+    uint32_t length = safe_arr_null_term(path, sizeof(*path), false);
     if (!length)
         return -EFAULT;
 
@@ -489,6 +489,35 @@ DEFINE_SYSCALL3(LINUX, fcntl64, int32_t, fd, uint32_t, request, unsigned long, a
     }
 
     return -EINVAL;
+}
+
+DEFINE_SYSCALL1(LINUX, chdir, const char *, path) {
+    // determine the length of the path
+    uint32_t length = safe_arr_null_term(path, sizeof(*path), false);
+    if (!length)
+        return -EFAULT;
+
+    // allocate kernel memory to store path
+    char *path_kern = strndup(path, length);
+    if (!path_kern)
+        return -ENOMEM;
+
+    int32_t res = 0;
+
+    // call filp_open
+    struct file *file = filp_openat(AT_FDCWD, path, O_DIRECTORY, 0);
+    if (IS_ERR(file)) {
+        res = PTR_ERR(file);
+        goto out_free;
+    }
+
+    filp_close(current->cwd);
+    current->cwd = file;
+
+// free the memory allocated to store path
+out_free:
+    kfree(path_kern);
+    return res;
 }
 
 DEFINE_SYSCALL0(LINUX, poll) {

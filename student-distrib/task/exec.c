@@ -195,7 +195,7 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     filp_seek(exe, 0, SEEK_SET);
 
     if (!current->cwd)
-        current->cwd = filp_open("/", 0, 0);
+        current->cwd = filp_open("/", O_DIRECTORY, 0);
 
     if (IS_ERR(current->cwd)) {
         ret = PTR_ERR(current->cwd);

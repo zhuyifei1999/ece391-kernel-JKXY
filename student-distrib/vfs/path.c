@@ -22,15 +22,27 @@ void path_destroy(struct path *path) {
     kfree(path);
 }
 
-static int32_t path_add_component(struct list *components, const char *component, uint32_t size) {
+static int32_t path_add_component(struct path *path, const char *component, uint32_t size) {
     if (!size || !strncmp(component, ".", size))
         return 0;
+
+    if (!strncmp(component, "..", size)) {
+        if (!list_isempty(&path->components)) {
+            kfree(list_pop_back(&path->components));
+            return 0;
+        }
+
+        // This is absolute with a mount. squash it.
+        // TODO: maybe check parent mount?
+        if (path->absolute || path->mnt)
+            return 0;
+    }
 
     char *component_dup = strndup(component, size);
     if (!component_dup)
         return -ENOMEM;
 
-    list_insert_back(components, component_dup);
+    list_insert_back(&path->components, component_dup);
     return 0;
 }
 
@@ -55,7 +67,7 @@ struct path *path_fromstr(const char *pathstr) {
     // find the sepeartion character
     char *splitter;
     while (*pathstr && (splitter = strchr(pathstr, '/'))) {
-        res = path_add_component(&path->components, pathstr, splitter - pathstr);
+        res = path_add_component(path, pathstr, splitter - pathstr);
         if (res)
             goto err_destroy;
 
@@ -64,7 +76,7 @@ struct path *path_fromstr(const char *pathstr) {
 
     // maybe there's more after the last one
     if (*pathstr) {
-        res = path_add_component(&path->components, pathstr, strlen(pathstr));
+        res = path_add_component(path, pathstr, strlen(pathstr));
         if (res)
             goto err_destroy;
     }
@@ -97,13 +109,13 @@ struct path *path_join(struct path *x, struct path *y) {
     // add components from x
     struct list_node *node;
     list_for_each(&x->components, node) {
-        res = path_add_component(&path->components, node->value, strlen(node->value));
+        res = path_add_component(path, node->value, strlen(node->value));
         if (res)
             goto err_destroy;
     }
     // and from y
     list_for_each(&y->components, node) {
-        res = path_add_component(&path->components, node->value, strlen(node->value));
+        res = path_add_component(path, node->value, strlen(node->value));
         if (res)
             goto err_destroy;
     }
