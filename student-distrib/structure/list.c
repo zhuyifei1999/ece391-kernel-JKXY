@@ -42,6 +42,7 @@ int32_t list_insert_front(struct list *list, void *value) {
     restore_flags(flags);
     return 0;
 }
+
 int32_t list_insert_back(struct list *list, void *value) {
     unsigned long flags;
 
@@ -58,6 +59,39 @@ int32_t list_insert_back(struct list *list, void *value) {
         .value = value,
         .prev = list->last.prev,
         .next = &list->last,
+    };
+
+    node->prev->next = node;
+    node->next->prev = node;
+
+    restore_flags(flags);
+    return 0;
+}
+
+int32_t list_insert_ordered(struct list *list, void *value, int (*compare)(const void *, const void *)) {
+    unsigned long flags;
+
+    if (!value)
+        return -EINVAL;
+
+    struct list_node *node = kmalloc(sizeof(*node));
+    if (!node)
+        return -ENOMEM;
+
+    cli_and_save(flags);
+
+    // I know, prev-pointers are ugly, but double pointers work best for singly linked lists
+    struct list_node *prev;
+    for (
+        prev = &list->first;
+        prev->next->value && compare(prev->next->value, value) > 0;
+        prev = prev->next
+    );
+
+    *node = (struct list_node){
+        .value = value,
+        .prev = prev,
+        .next = prev->next,
     };
 
     node->prev->next = node;

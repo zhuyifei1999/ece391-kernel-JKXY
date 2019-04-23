@@ -9,10 +9,10 @@ static char printk_buf[1024];
 static uint32_t printk_buf_pos;
 
 static void do_printk_line(char *line) {
-    struct uptime_data uptime;
+    struct timespec uptime;
     get_uptime(&uptime);
 
-    printf("[%d.%03d] %s\n", uptime.seconds, uptime.millis, line);
+    printf("[%d.%06d] %s\n", uptime.sec, uptime.nsec / 1000, line);
 }
 
 __printf(1, 2)

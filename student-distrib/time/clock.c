@@ -5,9 +5,8 @@
 
 // source: kernel/time/time.c
 uint64_t mktime64(const unsigned int year0, const unsigned int mon0,
-        const unsigned int day, const unsigned int hour,
-        const unsigned int min, const unsigned int sec)
-{
+                  const unsigned int day, const unsigned int hour,
+                  const unsigned int min, const unsigned int sec) {
     unsigned int mon = mon0, year = year0;
 
     /* 1..12 -> 11,12,1..10 */
@@ -24,7 +23,7 @@ uint64_t mktime64(const unsigned int year0, const unsigned int mon0,
     )*60 + sec; /* finally seconds */
 }
 
-DEFINE_SYSCALL1(LINUX, time, uint64_t *, tloc) {
+uint64_t time_now() {
     struct rtc_timestamp timestamp;
     rtc_get_timestamp(&timestamp);
     uint64_t time = mktime64(
@@ -35,6 +34,12 @@ DEFINE_SYSCALL1(LINUX, time, uint64_t *, tloc) {
         timestamp.minute,
         timestamp.second
     );
+
+    return time;
+}
+
+DEFINE_SYSCALL1(LINUX, time, uint64_t *, tloc) {
+    uint64_t time = time_now();
 
     if (safe_buf(tloc, sizeof(*tloc), true) == sizeof(*tloc))
         *tloc = time;

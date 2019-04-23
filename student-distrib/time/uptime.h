@@ -1,13 +1,9 @@
 #ifndef _UPTIME_H
 #define _UPTIME_H
 
+#include "time.h"
 #include "../lib/stdint.h"
 
-struct uptime_data {
-    uint32_t seconds;
-    uint16_t millis;
-};
-
-void get_timer(struct uptime_data *data);
+void get_uptime(struct timespec *data);
 
 #endif

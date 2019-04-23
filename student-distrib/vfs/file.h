@@ -3,6 +3,7 @@
 
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
+#include "../time/time.h"
 #include "readdir.h"
 #include "../atomic.h"
 
@@ -56,11 +57,6 @@
 
 struct inode;
 struct file;
-
-struct timespec {
-    uint32_t sec;  /* seconds */
-    uint32_t nsec; /* nanoseconds */
-};
 
 struct file_operations {
     int32_t (*seek)(struct file *, int32_t, int32_t);

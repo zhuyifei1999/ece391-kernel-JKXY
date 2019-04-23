@@ -38,18 +38,18 @@ static void rtc_handler() {
     rtc_counter++;
 }
 
-void get_uptime(struct uptime_data *data) {
+void get_uptime(struct timespec *data) {
     unsigned long flags;
     cli_and_save(flags);
 
-    // Make sure millis can never go above 1000
+    // Make sure nsec can never go above NSEC
     uint32_t counter = rtc_counter;
     if (counter >= last_calibration)
         counter = last_calibration - 1;
 
-    *data = (struct uptime_data) {
-        .seconds = seconds,
-        .millis = counter * 1000 / last_calibration
+    *data = (struct timespec){
+        .sec = seconds,
+        .nsec = counter * NSEC / last_calibration
     };
 
     restore_flags(flags);
