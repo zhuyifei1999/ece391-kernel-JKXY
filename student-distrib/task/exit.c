@@ -111,7 +111,7 @@ DEFINE_SYSCALL1(ECE391, halt, uint8_t, status) {
 DEFINE_SYSCALL1(LINUX, exit, int, status) {
     if (status < 0 || status > 255)
         status = 255;
-    do_exit(status);
+    do_exit(status << 8);
 }
 // We don't yet support thread groups, silence the warnng
 DEFINE_SYSCALL0(LINUX, exit_group) {

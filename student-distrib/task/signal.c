@@ -380,7 +380,7 @@ void deliver_signal(struct intr_info *regs) {
         case SIG_KILL:
             switch (current->subsystem) {
             case SUBSYSTEM_LINUX:
-                do_exit(127 + signum);
+                do_exit(128 + signum);
             case SUBSYSTEM_ECE391:
                 do_exit(256);
             }
