@@ -14,9 +14,13 @@ static void init_fp() {
         "movl %%cr4, %%eax;"
         "orw $(3<<9), %%ax;"  // set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
         "movl %%eax, %%cr4;"
+        // "xor %%ecx, %%ecx;"
+        // ".byte 0x0F,0x01,0xD0;" // xgetbv, Load XCR0 register
+        // "orl $0x7, %%eax;"       // Set AVX, SSE, X87 bits
+        // ".byte 0x0F,0x01,0xD1;" // xsetbv, Save back to XCR0
         :
         :
-        : "eax", "cc"
+        : "eax", "ecx", "edx", "cc"
     );
 }
 DEFINE_INITCALL(init_fp, early);

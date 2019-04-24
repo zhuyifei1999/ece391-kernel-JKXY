@@ -69,7 +69,7 @@ DEFINE_SYSCALL2(LINUX, nanosleep, const struct timespec *, req, struct timespec 
     if (!spec)
         return -ENOMEM;
 
-    if (safe_buf(rem, sizeof(*rem), true) != sizeof(*rem))
+    if (safe_buf(rem, sizeof(*rem), true) == sizeof(*rem))
         *rem = (struct timespec){0};
 
     int32_t res = 0;
@@ -88,7 +88,7 @@ DEFINE_SYSCALL2(LINUX, nanosleep, const struct timespec *, req, struct timespec 
             break;
 
         if (signal_pending(current)) {
-            if (safe_buf(rem, sizeof(*rem), true) != sizeof(*rem)) {
+            if (safe_buf(rem, sizeof(*rem), true) == sizeof(*rem)) {
                 *rem = spec->endtime;
                 timespec_sub(rem, &now);
             }

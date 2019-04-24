@@ -47,7 +47,7 @@ static int run_init_process(void *args) {
     };
     char *envp[] = {
         "HOME=/",
-        "TERM=linux",
+        "TERM=linux-16color",
         "PATH=/bin:/",
         NULL
     };

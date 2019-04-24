@@ -61,9 +61,9 @@ void schedule(void) {
         current->wakeup_current = false;
     }
 
-    if (list_isempty(&schedule_queue)) {
+    if (list_isempty(&schedule_queue))
         switch_to(swapper_task);
-    } else
+    else
         switch_to(list_pop_front(&schedule_queue));
 
     // we are safe to clean up whatever task that needs clean up here
