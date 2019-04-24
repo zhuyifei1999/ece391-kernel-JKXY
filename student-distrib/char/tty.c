@@ -549,6 +549,8 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
                 if (c == '\n')
                     tty->cursor_y++;
                 tty->cursor_x = 0;
+
+                tty_fixscroll(tty);
             } else if (c == tty->termios.cc[VERASE]) {
                 tty_fixscroll(tty);
 
