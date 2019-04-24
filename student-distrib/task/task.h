@@ -66,6 +66,7 @@ struct task_struct {
     struct intr_info *entry_regs;  // for kernel execve
     struct intr_info *return_regs; // for scheduler
     enum task_state state;
+    bool wakeup_current;
     bool stopped;
     enum subsystem subsystem;
     int exitcode;

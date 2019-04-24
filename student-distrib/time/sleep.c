@@ -14,7 +14,6 @@ static struct list sleep_queue;
 LIST_STATIC_INIT(sleep_queue);
 
 struct sleep_spec {
-    bool hit;
     struct task_struct *task;
     struct timespec endtime;
 };
@@ -55,7 +54,6 @@ static void rtc_handler() {
     get_uptime(&now);
 
     list_remove_on_cond_extra(&sleep_queue, struct sleep_spec *, spec, timespec_cmp(&now, &spec->endtime) >= 0, ({
-        spec->hit = true;
         wake_up_process(spec->task);
     }));
 }
@@ -76,7 +74,6 @@ DEFINE_SYSCALL2(LINUX, nanosleep, const struct timespec *, req, struct timespec 
 
     int32_t res = 0;
 
-    spec->hit = false;
     spec->task = current;
     get_uptime(&spec->endtime);
     timespec_add(&spec->endtime, req);
@@ -84,14 +81,14 @@ DEFINE_SYSCALL2(LINUX, nanosleep, const struct timespec *, req, struct timespec 
     list_insert_ordered(&sleep_queue, spec, (void *)&timespec_cmp);
 
     while (true) {
-        if (spec->hit)
+        struct timespec now;
+        get_uptime(&now);
+
+        if (timespec_cmp(&now, &spec->endtime) >= 0)
             break;
 
         if (signal_pending(current)) {
             if (safe_buf(rem, sizeof(*rem), true) != sizeof(*rem)) {
-                struct timespec now;
-                get_uptime(&now);
-
                 *rem = spec->endtime;
                 timespec_sub(rem, &now);
             }

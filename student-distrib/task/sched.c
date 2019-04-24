@@ -1,8 +1,9 @@
 #include "sched.h"
 #include "exit.h"
 #include "fp.h"
-#include "../x86_desc.h"
+#include "../lib/cli.h"
 #include "../mm/paging.h"
+#include "../x86_desc.h"
 #include "../interrupt.h"
 #include "../initcall.h"
 #include "../panic.h"
@@ -46,10 +47,19 @@ static void switch_to(struct task_struct *task) {
 }
 
 void schedule(void) {
-    extern struct task_struct *swapper_task;
+    unsigned long flags;
+    cli_and_save(flags);
 
-    if (current != swapper_task && current->state == TASK_RUNNING && !current->stopped)
+    extern struct task_struct *swapper_task;
+    if (
+        current != swapper_task && !current->stopped && (
+            current->state == TASK_RUNNING ||
+            current->wakeup_current
+        )
+    ) {
         list_insert_back(&schedule_queue, current);
+        current->wakeup_current = false;
+    }
 
     if (list_isempty(&schedule_queue)) {
         switch_to(swapper_task);
@@ -58,6 +68,8 @@ void schedule(void) {
 
     // we are safe to clean up whatever task that needs clean up here
     do_free_tasks();
+
+    restore_flags(flags);
 }
 
 void cond_schedule(void) {
@@ -71,8 +83,14 @@ void pit_schedule(struct intr_info *info) {
 }
 
 void wake_up_process(struct task_struct *task) {
-    if (task == current)
-        return; // can't wake up self
+    if (task == current) {
+        // One case where this happens is interrupts. The task is added to
+        // a structure accessible by an interrupt handler, who wakes the task
+        // up before the task goes to sleep. We workaround this by letting
+        // its next schedule() call 'wake up' itself as if it's running.
+        current->wakeup_current = true;
+        return;
+    }
 
     unsigned long flags;
     cli_and_save(flags);
