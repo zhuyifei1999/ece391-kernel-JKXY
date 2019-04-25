@@ -120,7 +120,7 @@ struct tty *tty_get(uint32_t device_num) {
     // create list of vidmaps
     list_init(&ret->vidmaps);
 
-    //insert to back of ttys
+    // insert to back of ttys
     list_insert_back(&ttys, ret);
 
     raw_tty_write(ret, "\33[2J", sizeof("\33[2J") - 1);
