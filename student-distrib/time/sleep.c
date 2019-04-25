@@ -69,14 +69,14 @@ DEFINE_SYSCALL2(LINUX, nanosleep, const struct timespec *, req, struct timespec 
     if (!spec)
         return -ENOMEM;
 
-    if (safe_buf(rem, sizeof(*rem), true) == sizeof(*rem))
-        *rem = (struct timespec){0};
-
     int32_t res = 0;
 
     spec->task = current;
     get_uptime(&spec->endtime);
     timespec_add(&spec->endtime, req);
+
+    if (safe_buf(rem, sizeof(*rem), true) == sizeof(*rem))
+        *rem = (struct timespec){0};
 
     list_insert_ordered(&sleep_queue, spec, (void *)&timespec_cmp);
 
