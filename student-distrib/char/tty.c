@@ -713,9 +713,7 @@ void tty_foreground_keyboard(char chr, bool has_ctrl, bool has_alt) {
         if (foreground_tty->termios.lflag & ISIG && chr) {
             if (chr == foreground_tty->termios.cc[VINTR]) {
                 if (foreground_tty->termios.lflag & ECHOCTL) {
-                    char ctl[] = "^X";
-                    ctl[1] = chr + CONTROL_OFFSET;
-                    tty_foreground_puts(ctl);
+                    tty_foreground_puts((char []){'^', chr + CONTROL_OFFSET, 0});
                 }
                 tty_foreground_signal(SIGINT);
                 return;
