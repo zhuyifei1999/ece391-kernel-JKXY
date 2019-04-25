@@ -7,6 +7,7 @@
 #include "../initcall.h"
 #include "../task/task.h"
 #include "../task/sched.h"
+#include "../structure/array.h"
 #include "../structure/list.h"
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
@@ -59,6 +60,7 @@ struct ata_data {
     int32_t slave_bit;    // master/slave
     int32_t ata_base_reg; // primary/secondary
     int32_t prt_size;     // partition size
+    struct array disk_cache;
 };
 
 #define ATA_IRQ_PRIM 14
@@ -245,11 +247,6 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     if (!nbytes)
         return 0;
 
-    // malloc the data buf
-    char *read_head_buf = kmalloc(SECTOR_SIZE);
-    if (!read_head_buf)
-        return -ENOMEM;
-
     // use mutex to resist other processes
     mutex_lock_uninterruptable(&ata_mutex);
     in_service = current;
@@ -259,12 +256,23 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     while (nbytes) {
         uint32_t sector_num = pos / SECTOR_SIZE;
         uint32_t sector_off = pos % SECTOR_SIZE;
-        // call ata_read_28 to read data
-        ret = ata_read_28(sector_num, read_head_buf, ata);
 
-        // if it read all
-        if (ret)
-            goto out;
+        char *read_head_buf = array_get(&ata->disk_cache, sector_num);
+        if (!read_head_buf) {
+            // malloc the data buf
+            read_head_buf = kmalloc(SECTOR_SIZE);
+            if (!read_head_buf) {
+                ret = -ENOMEM;
+                goto out;
+            }
+
+            ret = ata_read_28(sector_num, read_head_buf, ata);
+            // if it read fail
+            if (ret)
+                goto out;
+
+            array_set(&ata->disk_cache, sector_num, read_head_buf);
+        }
 
         uint32_t inner_nbytes = SECTOR_SIZE - sector_off;
         if (inner_nbytes > nbytes)
@@ -282,9 +290,6 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     ret = byte_count;
 
 out:
-    // free the malloced buf
-    kfree(read_head_buf);
-
     file->pos = pos;
     in_service = NULL;
 
