@@ -1063,7 +1063,7 @@ DEFINE_TEST(paging_content_test);
 __testfunc
 static void page_fault_good() {
     TEST_ASSERT_NOINTR(INTR_EXC_PAGE_FAULT, ({
-        volatile char a;
+        __attribute__((unused)) volatile char a;
         // first byte of kernel
         a = *(char *)KLOW_ADDR;
         // last byte of kernel, after 4 MiB page
@@ -1083,7 +1083,7 @@ DEFINE_TEST(page_fault_good);
  */
 __testfunc
 static void page_fault_bad() {
-    volatile char a;
+    __attribute__((unused)) volatile char a;
     TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({
         // NULL pointer dereference
         a = *(char *)NULL;
