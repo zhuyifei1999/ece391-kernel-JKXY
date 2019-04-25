@@ -524,3 +524,42 @@ DEFINE_SYSCALL0(LINUX, poll) {
     // Doesn't work yet. Mute it
     return 1;
 }
+
+DEFINE_SYSCALL0(LINUX, _newselect) {
+    // Doesn't work yet. Mute it
+    return -ENOSYS;
+}
+
+int32_t do_sys_faccessat(int32_t dfd, const char *path, uint16_t mode, uint32_t flags) {
+    // determine the length of the path
+    uint32_t length = safe_arr_null_term(path, sizeof(*path), false);
+    if (!length)
+        return -EFAULT;
+
+    // allocate kernel memory to store path
+    char *path_kern = strndup(path, length);
+    if (!path_kern)
+        return -ENOMEM;
+
+    int32_t res = 0;
+
+    // call filp_open
+    struct file *file = filp_openat(dfd, path, flags, mode);
+    if (IS_ERR(file)) {
+        res = PTR_ERR(file);
+        goto out_free;
+    }
+
+    filp_close(file);
+
+// free the memory allocated to store path
+out_free:
+    kfree(path_kern);
+    return res;
+}
+DEFINE_SYSCALL2(LINUX, access, const char *, path, int, mode) {
+    return do_sys_faccessat(AT_FDCWD, path, mode, 0);
+}
+DEFINE_SYSCALL4(LINUX, faccessat, int, dirfd, const char *, path, int, mode, int, flags) {
+    return do_sys_faccessat(dirfd, path, mode, flags);
+}
