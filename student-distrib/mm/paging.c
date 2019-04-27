@@ -206,14 +206,14 @@ static void __physaddr *alloc_phys_mem_consecutive(uint32_t num, uint32_t gfp_fl
     for (; start_idx < end_idx; start_idx++) {
         uint16_t j;
         for (j = start_idx; j < start_idx + num; j++)
-            if (phys_dir[start_idx / LEN_1K] || phys_dir[start_idx])
+            if (phys_dir[j / LEN_1K] || phys_dir[j])
                 goto cont;
 
         for (j = start_idx; j < start_idx + num; j++)
-             phys_dir[start_idx] = PHYS_DIR_KERNEL;
+            phys_dir[j] = PHYS_DIR_KERNEL;
 
         restore_flags(flags);
-        return (void  __physaddr *)(start_idx * page_size(gfp_flags)); 
+        return (void  __physaddr *)(start_idx * page_size(gfp_flags));
         cont:;
     }
     restore_flags(flags);
@@ -499,10 +499,10 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                 if (heap_tables[PAGE_IDX((uint32_t)ret)+offset].present)
                     goto err_nofree;
             }
-            if (gfp_flags & GFP_CONS || 1) {
+            if (gfp_flags & GFP_CONS) {
                 void __physaddr *physaddr = alloc_phys_mem_consecutive(num, gfp_flags);
                 if (!physaddr)
-                    goto err;            
+                    goto err;
                 for (offset = 0; offset < num; offset++) {
                     heap_tables[PAGE_IDX((uint32_t)ret)+offset] = (struct page_table_entry){
                         .present = 1,
