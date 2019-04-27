@@ -154,6 +154,8 @@ void switch_directory(page_directory_t *dir);
 // #define GFP_RW      0
 #define GFP_RO      (1<<2)
 
+#define GFP_CONS    (1<<3)
+
 __attribute__((malloc))
 void *request_pages(void *page, uint32_t num, uint32_t gfp_flags);
 
