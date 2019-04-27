@@ -183,13 +183,13 @@ do_switch_loop:;
     // device (8, 2) is secondary ATA master
     mount_root_device(MKDEV(8, 2), "ustar");
 
-    // attach to TTY 4
+    // attach to TTY 1
     do_setsid();
-    struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, 4), O_RDWR, S_IFCHR | 0666);
+    struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, 1), O_RDWR, S_IFCHR | 0666);
     if (!IS_ERR(file))
         filp_close(file);
 
-    tty_switch_foreground(MKDEV(TTY_MAJOR, 4));
+    tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
 
     return run_init_process("/bin/sh");
 }

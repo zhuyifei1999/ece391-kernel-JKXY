@@ -26,7 +26,7 @@ static void init_fp() {
 DEFINE_INITCALL(init_fp, early);
 
 void sched_fxsave() {
-    if (current->fxsave_data || !current->mm)
+    if (current->fxsave_data || !current->mm || current->state == TASK_ZOMBIE || current->state == TASK_DEAD)
         return;
 
     current->fxsave_data = kmalloc(sizeof(*current->fxsave_data));
