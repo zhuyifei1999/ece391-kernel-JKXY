@@ -1,43 +1,74 @@
-#ifndef _PCI_H
-#define _PCI_H
-#include "../irq.h"
+#ifndef PCI_H
+#define PCI_H
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
 #include "../lib/string.h"
-#include "../vfs/file.h"
-#include "../vfs/device.h"
-#include "../initcall.h"
-#include "../task/task.h"
-#include "../task/sched.h"
-#include "../structure/list.h"
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
-#include "../mutex.h"
-#include "../panic.h"
-#include "../err.h"
-#include "../errno.h"
-// https://wiki.osdev.org/PCI
-// register	offset	bits 31-24	bits 23-16	bits 15-8	bits 7-0
-// 00	00	Device ID	Vendor ID
-// 01	04	Status	Command
-// 02	08	Class code	Subclass	Prog IF	Revision ID
-// 03	0C	BIST	Header type	Latency Timer	Cache Line Size
-// 04	10	Base address #0 (BAR0)
-// 05	14	Base address #1 (BAR1)
-// 06	18	Base address #2 (BAR2)
-// 07	1C	Base address #3 (BAR3)
-// 08	20	Base address #4 (BAR4)
-// 09	24	Base address #5 (BAR5)
-// 0A	28	Cardbus CIS Pointer
-// 0B	2C	Subsystem ID	Subsystem Vendor ID
-// 0C	30	Expansion ROM base address
-// 0D	34	Reserved	Capabilities Pointer
-// 0E	38	Reserved
-// 0F	3C	Max latency	Min Grant	Interrupt PIN	Interrupt Line
+#include "../lib/stdio.h"
+// I love bit fields So much better than ugly big twidling :)
+typedef union pci_dev {
+    uint32_t bits;
+    struct {
+        uint32_t always_zero    : 2;
+        uint32_t field_num      : 6;
+        uint32_t function_num   : 3;
+        uint32_t device_num     : 5;
+        uint32_t bus_num        : 8;
+        uint32_t reserved       : 7;
+        uint32_t enable         : 1;
+    };
+} pci_dev_t;
 
-uint32_t pci_scan_device(uint16_t deviceID, uint16_t vendorID);
-uint32_t pci_readl(uint32_t address);
+// Ports
+#define PCI_CONFIG_ADDRESS  0xCF8
+#define PCI_CONFIG_DATA     0xCFC
 
+// Config Address Register
+
+// Offset
+#define PCI_VENDOR_ID            0x00
+#define PCI_DEVICE_ID            0x02
+#define PCI_COMMAND              0x04
+#define PCI_STATUS               0x06
+#define PCI_REVISION_ID          0x08
+#define PCI_PROG_IF              0x09
+#define PCI_SUBCLASS             0x0a
+#define PCI_CLASS                0x0b
+#define PCI_CACHE_LINE_SIZE      0x0c
+#define PCI_LATENCY_TIMER        0x0d
+#define PCI_HEADER_TYPE          0x0e
+#define PCI_BIST                 0x0f
+#define PCI_BAR0                 0x10
+#define PCI_BAR1                 0x14
+#define PCI_BAR2                 0x18
+#define PCI_BAR3                 0x1C
+#define PCI_BAR4                 0x20
+#define PCI_BAR5                 0x24
+#define PCI_INTERRUPT_LINE       0x3C
+#define PCI_SECONDARY_BUS        0x09
+
+// Device type
+#define PCI_HEADER_TYPE_DEVICE  0
+#define PCI_HEADER_TYPE_BRIDGE  1
+#define PCI_HEADER_TYPE_CARDBUS 2
+#define PCI_TYPE_BRIDGE 0x0604
+#define PCI_TYPE_SATA   0x0106
+#define PCI_NONE 0xFFFF
+
+
+#define DEVICE_PER_BUS           32
+#define FUNCTION_PER_DEVICE      32
+
+uint32_t pci_read(pci_dev_t dev, uint32_t field);
+void pci_write(pci_dev_t dev, uint32_t field, uint32_t value);
+uint32_t get_device_type(pci_dev_t dev);
+uint32_t get_secondary_bus(pci_dev_t dev);
+uint32_t pci_reach_end(pci_dev_t dev);
+pci_dev_t pci_scan_function(uint16_t vendor_id, uint16_t device_id, uint32_t bus, uint32_t device, uint32_t function, int device_type);
+pci_dev_t pci_scan_device(uint16_t vendor_id, uint16_t device_id, uint32_t bus, uint32_t device, int device_type);
+pci_dev_t pci_scan_bus(uint16_t vendor_id, uint16_t device_id, uint32_t bus, int device_type);
+pci_dev_t pci_get_device(uint16_t vendor_id, uint16_t device_id, int device_type);
+void pci_init();
 
 #endif
-
