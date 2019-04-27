@@ -72,6 +72,9 @@
  * PAGE TABLES are global page tables for Kernel Heap
  */
 
+#define PAGEDIR_INDEX(vaddr) (((uint32_t)vaddr) >> 22)
+#define PAGETBL_INDEX(vaddr) ((((uint32_t)vaddr) >>12) & 0x3ff)
+
 #define KLOW_ADDR  LEN_4M  // kernel address
 #define VIDEO_ADDR 0xB8000 // video memory address
 

@@ -221,6 +221,20 @@ static void __physaddr *alloc_phys_mem_consecutive(uint32_t num, uint32_t gfp_fl
     return NULL; // no enough memory
 }
 
+// consider no page boundary
+void * kheap_virtual2phys(void *virtual_addr) {
+    if (virtual_addr < KHEAP_ADDR)
+        goto err;
+
+    struct page_table_entry *entry = &heap_tables[PAGE_IDX(virtual_addr)];
+
+    if (entry->present)
+        return PAGE_IDX_ADDR(entry->addr);    
+
+err:
+    panic("Invalid kheap virtual addr for translation %p", virtual_addr);
+}
+
 /*  alloc_phys_mem
  *  DESCRIPTION: allocate physical memory.
  *  INPUTS: uint32_t gfp_flags
@@ -509,7 +523,7 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                         .user    = 0,
                         .rw      = !(gfp_flags & GFP_RO),
                         .global  = 1,
-                        .addr    = PAGE_IDX((uint32_t)physaddr + offset * LEN_4K)
+                        .addr    = PAGE_IDX((uint32_t)physaddr + offset * PAGE_SIZE_SMALL)
                     };
                 }
             } else {
