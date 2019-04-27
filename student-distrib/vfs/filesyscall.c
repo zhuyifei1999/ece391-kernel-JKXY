@@ -520,11 +520,6 @@ out_free:
     return res;
 }
 
-DEFINE_SYSCALL0(LINUX, poll) {
-    // Doesn't work yet. Mute it
-    return 1;
-}
-
 DEFINE_SYSCALL0(LINUX, _newselect) {
     // Doesn't work yet. Mute it
     return -ENOSYS;

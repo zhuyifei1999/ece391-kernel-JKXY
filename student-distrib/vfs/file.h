@@ -58,12 +58,14 @@
 struct inode;
 struct file;
 
+struct poll_entry;
+
 struct file_operations {
     int32_t (*seek)(struct file *, int32_t, int32_t);
     int32_t (*read)(struct file *, char *, uint32_t);
     int32_t (*write)(struct file *, const char *, uint32_t);
     int32_t (*readdir)(struct file *, void *, filldir_t);
-    // int32_t (*select)(struct file *, int32_t, select_table *);
+    int32_t (*poll)(struct file *, struct poll_entry *);
     int32_t (*ioctl)(struct file *, uint32_t, unsigned long, bool);
     // int32_t (*mmap)(struct file *, struct vm_area_struct *);
     int32_t (*open)(struct file *, struct inode *);

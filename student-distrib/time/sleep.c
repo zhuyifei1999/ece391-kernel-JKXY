@@ -8,6 +8,7 @@
 #include "../task/sched.h"
 #include "../syscall.h"
 #include "../initcall.h"
+#include "../err.h"
 #include "../errno.h"
 
 static struct list sleep_queue;
@@ -58,6 +59,31 @@ static void rtc_handler() {
     }));
 }
 
+struct sleep_spec *sleep_add(const struct timespec *time) {
+    struct sleep_spec *spec = kmalloc(sizeof(*spec));
+    if (!spec)
+        return ERR_PTR(-ENOMEM);
+
+    spec->task = current;
+    get_uptime(&spec->endtime);
+    timespec_add(&spec->endtime, time);
+
+    list_insert_ordered(&sleep_queue, spec, (void *)&timespec_cmp);
+    return spec;
+}
+
+bool sleep_hashit(const struct sleep_spec *spec) {
+    struct timespec now;
+    get_uptime(&now);
+
+    return timespec_cmp(&now, &spec->endtime) >= 0;
+}
+
+void sleep_finalize(struct sleep_spec *spec) {
+    list_remove(&sleep_queue, spec);
+    kfree(spec);
+}
+
 DEFINE_SYSCALL2(LINUX, nanosleep, const struct timespec *, req, struct timespec *, rem) {
     if (safe_buf(req, sizeof(*req), false) != sizeof(*req))
         return -EFAULT;
@@ -65,30 +91,24 @@ DEFINE_SYSCALL2(LINUX, nanosleep, const struct timespec *, req, struct timespec 
     if (req->nsec >= NSEC)
         return -EINVAL;
 
-    struct sleep_spec *spec = kmalloc(sizeof(*spec));
-    if (!spec)
-        return -ENOMEM;
-
-    int32_t res = 0;
-
-    spec->task = current;
-    get_uptime(&spec->endtime);
-    timespec_add(&spec->endtime, req);
+    struct sleep_spec *spec = sleep_add(req);
+    if (IS_ERR(spec))
+        return PTR_ERR(spec);
 
     if (safe_buf(rem, sizeof(*rem), true) == sizeof(*rem))
         *rem = (struct timespec){0};
 
-    list_insert_ordered(&sleep_queue, spec, (void *)&timespec_cmp);
+    int32_t res = 0;
 
     while (true) {
-        struct timespec now;
-        get_uptime(&now);
-
-        if (timespec_cmp(&now, &spec->endtime) >= 0)
+        if (sleep_hashit(spec))
             break;
 
         if (signal_pending(current)) {
             if (safe_buf(rem, sizeof(*rem), true) == sizeof(*rem)) {
+                struct timespec now;
+                get_uptime(&now);
+
                 *rem = spec->endtime;
                 timespec_sub(rem, &now);
             }
@@ -102,8 +122,7 @@ DEFINE_SYSCALL2(LINUX, nanosleep, const struct timespec *, req, struct timespec 
         current->state = TASK_RUNNING;
     }
 
-    list_remove(&sleep_queue, spec);
-    kfree(spec);
+    sleep_finalize(spec);
 
     return res;
 }

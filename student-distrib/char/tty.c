@@ -1,6 +1,7 @@
 #include "tty.h"
 #include "../vfs/file.h"
 #include "../vfs/device.h"
+#include "../vfs/poll.h"
 #include "../task/task.h"
 #include "../task/sched.h"
 #include "../task/session.h"
@@ -202,13 +203,10 @@ static int32_t tty_read(struct file *file, char *buf, uint32_t nbytes) {
     struct tty *tty = file->vendor;
 
     // Only one task can wait per tty
-    cli();
     if (tty->task) {
-        sti();
         return -EBUSY;
     }
     tty->task = current;
-    sti();
 
     current->state = TASK_INTERRUPTIBLE;
     // Until the last character in buffer is '\n'
@@ -602,6 +600,35 @@ static int32_t tty_write(struct file *file, const char *buf, uint32_t nbytes) {
     return raw_tty_write(file->vendor, buf, nbytes);
 }
 
+static void tty_poll_cb(struct poll_entry *poll_entry) {
+    struct tty *tty = poll_entry->file->vendor;
+
+    if (tty->task == current) {
+        tty->task = NULL;
+    }
+}
+
+static int32_t tty_poll(struct file *file, struct poll_entry *poll_entry) {
+    struct tty *tty = file->vendor;
+
+    if (poll_entry->events & POLLOUT)
+        poll_entry->revents |= POLLOUT;
+
+    if (poll_entry->events & POLLIN) {
+        if (!tty->task) {
+            tty->task = current;
+        }
+
+        if (tty->task == current && tty_should_read(tty))
+            poll_entry->revents |= POLLIN;
+
+        if (!list_contains(&poll_entry->cleanup_cb, &tty_poll_cb))
+            list_insert_back(&poll_entry->cleanup_cb, &tty_poll_cb);
+    }
+
+    return 0;
+}
+
 struct winsize {
     unsigned short ws_row;
     unsigned short ws_col;
@@ -761,6 +788,7 @@ void tty_foreground_puts(const char *s) {
 static struct file_operations tty_dev_op = {
     .read    = &tty_read,
     .write   = &tty_write,
+    .poll    = &tty_poll,
     .ioctl   = &tty_ioctl,
     .open    = &tty_open,
     .release = &tty_release,
