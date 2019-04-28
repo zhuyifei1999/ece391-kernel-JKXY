@@ -110,6 +110,7 @@ struct tty *tty_get(uint32_t device_num) {
         .video_mem = video_mem,
         .refcount = ATOMIC_INITIALIZER(1),
         .termios = {
+            .oflag = OPOST,
             .lflag = ECHO | ECHOE | ECHOCTL | ICANON | ISIG,
             .cc = {
                 [VINTR] = 'C' - 0x40,
@@ -543,10 +544,12 @@ static int32_t raw_tty_write(struct tty *tty, const char *buf, uint32_t nbytes) 
                 tty->ansi_dec.buffer_end = 0;
             }
         } else {
-            if (c == '\n' || c == '\r') {
-                if (c == '\n')
-                    tty->cursor_y++;
+            if (c == '\r') {
                 tty->cursor_x = 0;
+            } else if (c == '\n') {
+                if (tty->termios.oflag & OPOST)
+                    raw_tty_write(tty, "\r", 1);
+                tty->cursor_y++;
 
                 tty_fixscroll(tty);
             } else if (c == tty->termios.cc[VERASE]) {
