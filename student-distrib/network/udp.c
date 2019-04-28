@@ -1,7 +1,5 @@
-#include <udp.h>
-#include <dhcp.h>
-#include <ip.h>
-#include <xxd.h>
+#include "udp.h"
+#include "ip.h"
 
 
 uint16_t udp_calculate_checksum(udp_packet_t * packet) {
@@ -20,7 +18,7 @@ void udp_send_packet(uint8_t * dst_ip, uint16_t src_port, uint16_t dst_port, voi
 
     // Copy data over
     memcpy((void*)packet + sizeof(udp_packet_t), data, len);
-    qemu_printf("UDP Packet sent\n");
+    printk("UDP Packet sent\n");
     ip_send_packet(dst_ip, packet, length);
 }
 
@@ -31,11 +29,8 @@ void udp_handle_packet(udp_packet_t * packet) {
 
     void * data_ptr = (void*)packet + sizeof(udp_packet_t);
     uint32_t data_len = length;
-    qemu_printf("Received UDP packet, dst_port %d, data dump:\n", dst_port);
-    xxd(data_ptr, data_len);
+    printk("Received UDP packet, dst_port %d, data dump:\n", dst_port);
 
-    if(ntohs(packet->dst_port) == 68) {
-        dhcp_handle_packet(data_ptr);
-    }
+    // TODO
     return;
 }

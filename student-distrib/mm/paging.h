@@ -165,6 +165,8 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags);
 __attribute__((malloc))
 void *alloc_pages(uint32_t num, uint16_t align, uint32_t gfp_flags);
 
+void * kheap_virtual2phys(void *virtual_addr);
+
 void free_pages(void *pages, uint32_t num, uint32_t gfp_flags);
 
 void remap_to_user(void *src, struct page_table_entry **dest, void **newmap_addr);

@@ -3,6 +3,17 @@
 
 #include "../mm/paging.h"
 #include "../irq.h"
+#include "../char/tty.h"
+#include "../vfs/device.h"
+#include "../lib/stdint.h"
+#include "../lib/stdbool.h"
+#include "../lib/string.h"
+#include "../lib/cli.h"
+#include "../mm/kmalloc.h"
+#include "ethernet.h"
+#include "../lib/io.h"
+#include "../initcall.h"
+
 
 // Define some constants
 #define RTL8139_VENDOR_ID 0x10EC
@@ -74,8 +85,6 @@ typedef struct rtl8139_dev {
 }rtl8139_dev_t;
 
 void rtl8139_send_packet(void * data, uint32_t len);
-
-void rtl8139_handler(register_t * reg);
 
 void rtl8139_init();
 

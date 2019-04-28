@@ -1,8 +1,17 @@
 #ifndef UDP_H
 #define UDP_H
-#include <system.h>
-#include <kheap.h>
-#include <string.h>
+#include "rtl8139.h"
+#include "../mm/paging.h"
+#include "../irq.h"
+#include "../char/tty.h"
+#include "../vfs/device.h"
+#include "../lib/stdint.h"
+#include "../lib/stdbool.h"
+#include "../lib/string.h"
+#include "../lib/cli.h"
+#include "../mm/kmalloc.h"
+#include "../lib/io.h"
+#include "../initcall.h"
 
 typedef struct udp_packet {
     uint16_t src_port;
@@ -16,6 +25,5 @@ uint16_t udp_calculate_checksum(udp_packet_t * packet);
 
 void udp_send_packet(uint8_t * dst_ip, uint16_t src_port, uint16_t dst_port, void * data, int len);
 
-void udp_handle_packet();
 
 #endif

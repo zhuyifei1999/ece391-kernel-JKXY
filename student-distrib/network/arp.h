@@ -1,8 +1,18 @@
 #ifndef ARP_H
 #define ARP_H
-#include <system.h>
-#include <ethernet.h>
-#include <rtl8139.h>
+#include "ethernet.h"
+#include "rtl8139.h"
+#include "../mm/paging.h"
+#include "../irq.h"
+#include "../char/tty.h"
+#include "../vfs/device.h"
+#include "../lib/stdint.h"
+#include "../lib/stdbool.h"
+#include "../lib/string.h"
+#include "../lib/cli.h"
+#include "../mm/kmalloc.h"
+#include "../lib/io.h"
+#include "../initcall.h"
 
 #define ARP_REQUEST 1
 #define ARP_REPLY 2
@@ -32,6 +42,5 @@ int arp_lookup(uint8_t * ret_hardware_addr, uint8_t * ip_addr);
 
 void arp_lookup_add(uint8_t * ret_hardware_addr, uint8_t * ip_addr);
 
-void arp_init();
 
 #endif

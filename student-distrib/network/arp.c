@@ -1,8 +1,6 @@
-#include <arp.h>
-#include <rtl8139.h>
-#include <network_utils.h>
-#include <string.h>
-#include <serial.h>
+#include "arp.h"
+#include "network_utils.h"
+#include "serial.h"
 
 arp_table_entry_t arp_table[512];
 int arp_table_size;
@@ -18,9 +16,10 @@ void arp_handle_packet(arp_packet_t * arp_packet, int len) {
     memcpy(dst_protocol_addr, arp_packet->src_protocol_addr, 4);
     // Reply arp request, if the ip address matches(have to hard code the IP eveywhere, because I don't have dhcp yet)
     if(ntohs(arp_packet->opcode) == ARP_REQUEST) {
-        //qemu_printf("Got ARP REQUEST......................");
         uint32_t my_ip = 0x0e02000a;
-        if(memcmp(arp_packet->dst_protocol_addr, &my_ip, 4)) {
+
+        // FIXME: need memcmp
+        if(strncmp(arp_packet->dst_protocol_addr, (int8_t)&my_ip, 4)) {
 
             // Set source MAC address, IP address (hardcode the IP address as 10.2.2.3 until we really get one..)
             get_mac_addr(arp_packet->src_hardware_addr);
@@ -50,16 +49,13 @@ void arp_handle_packet(arp_packet_t * arp_packet, int len) {
             ethernet_send_packet(dst_hardware_addr, arp_packet, sizeof(arp_packet_t), ETHERNET_TYPE_ARP);
 
             // For debug:
-            //qemu_printf("Replied Arp, the reply looks like this\n");
-            //xxd(arp_packet, sizeof(arp_packet_t));
         }
     }
     else if(ntohs(arp_packet->opcode) == ARP_REPLY){
         // May be we can handle the case where we get a reply after sending a request, but i don't think my os will ever need to do so...
-        //qemu_printf("Got ARP REPLY......................");
     }
     else {
-        qemu_printf("Got unknown ARP, opcode = %d\n", arp_packet->opcode);
+        printk("Got unknown ARP, opcode = %d\n", arp_packet->opcode);
     }
 
     // Now, store the ip-mac address mapping relation
@@ -116,7 +112,8 @@ void arp_lookup_add(uint8_t * ret_hardware_addr, uint8_t * ip_addr) {
 
 int arp_lookup(uint8_t * ret_hardware_addr, uint8_t * ip_addr) {
     uint32_t ip_entry = *((uint32_t*)(ip_addr));
-    for(int i = 0; i < 512; i++) {
+    int i;
+    for(i = 0; i < 512; i++) {
         if(arp_table[i].ip_addr == ip_entry) {
             memcpy(ret_hardware_addr, &arp_table[i].mac_addr, 6);
             return 1;
@@ -133,3 +130,4 @@ void arp_init() {
     memset(broadcast_mac, 0xff, 6);
     arp_lookup_add(broadcast_mac, broadcast_ip);
 }
+DEFINE_INITCALL(arp_init, drivers);

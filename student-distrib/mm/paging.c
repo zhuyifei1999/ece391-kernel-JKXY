@@ -222,14 +222,14 @@ static void __physaddr *alloc_phys_mem_consecutive(uint32_t num, uint32_t gfp_fl
 }
 
 // consider no page boundary
-void * kheap_virtual2phys(void *virtual_addr) {
+void __physaddr *kheap_virtual2phys(void *virtual_addr) {
     if (virtual_addr < KHEAP_ADDR)
         goto err;
 
-    struct page_table_entry *entry = &heap_tables[PAGE_IDX(virtual_addr)];
+    struct page_table_entry *entry = &heap_tables[PAGE_IDX((uint32_t)virtual_addr)];
 
     if (entry->present)
-        return PAGE_IDX_ADDR(entry->addr);    
+        return (void __physaddr *)PAGE_IDX_ADDR(entry->addr);    
 
 err:
     panic("Invalid kheap virtual addr for translation %p", virtual_addr);

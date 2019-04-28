@@ -1,18 +1,25 @@
-#include <ip.h>
-#include <arp.h>
-#include <printf.h>
-#include <serial.h>
-#include <ethernet.h>
-#include <network_utils.h>
-#include <dhcp.h>
-#include <udp.h>
+#include "ip.h"
+#include "arp.h"
+#include "serial.h"
+#include "network_utils.h"
+#include "udp.h"
 
 uint8_t my_ip[] = {10, 0, 2, 14};
 uint8_t test_target_ip[] = {10, 0, 2, 15};
 uint8_t zero_hardware_addr[] = {0,0,0,0,0,0};
 
+char ip_addr[4];
+int is_ip_allocated;
+static int gethostaddr(char * addr) {
+    memcpy(addr, ip_addr, 4);
+    if(!is_ip_allocated) {
+        return 0;
+    }
+    return 1;
+}
+
 void get_ip_str(char * ip_str, uint8_t * ip) {
-    sprintf(ip_str, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+    printk(ip_str, "%d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
 }
 
 uint16_t ip_calculate_checksum(ip_packet_t * packet) {
@@ -22,7 +29,8 @@ uint16_t ip_calculate_checksum(ip_packet_t * packet) {
     uint16_t * array = (uint16_t*)packet;
     uint8_t * array2 = (uint8_t*)packet;
     uint32_t sum = 0;
-    for(int i = 0; i < array_size; i++) {
+    int i;
+    for(i = 0; i < array_size; i++) {
         sum += flip_short(array[i]);
     }
     uint32_t carry = sum >> 16;
@@ -71,7 +79,8 @@ void ip_send_packet(uint8_t * dst_ip, void * data, int len) {
     packet->header_checksum = htons(ip_calculate_checksum(packet));
 
 
-    //packet->header_checksum = htons(cksum(packet));
+    //packet->header_checksum 
+    
     // Don't care to pad, because we don't use the option field in ip packet
     /*
      * If the ip is in the same network, the destination mac address is the routers's mac address, the router'll figure out how to route the packet
@@ -91,10 +100,9 @@ void ip_send_packet(uint8_t * dst_ip, void * data, int len) {
             arp_send_packet(zero_hardware_addr, dst_ip);
         }
     }
-    qemu_printf("IP Packet Sent...(checksum: %x)\n", packet->header_checksum);
+    printk("IP Packet Sent...(checksum: %x)\n", packet->header_checksum);
     // Got the mac address! Now send an ethernet packet
     ethernet_send_packet(dst_hardware_addr, packet, htons(packet->length), ETHERNET_TYPE_IP);
-    xxd(packet, ntohs(packet->length));
 }
 
 
@@ -103,9 +111,7 @@ void ip_handle_packet(ip_packet_t * packet) {
     *((uint8_t*)(&packet->version_ihl_ptr)) = ntohb(*((uint8_t*)(&packet->version_ihl_ptr)), 4);
     *((uint8_t*)(packet->flags_fragment_ptr)) = ntohb(*((uint8_t*)(packet->flags_fragment_ptr)), 3);
 
-    qemu_printf("Receive: the whole ip packet \n");
-    xxd(packet, ntohs(packet->length));
-    // Now, the ip packet handler simply dumps ip header info and the data with xxd and display on screen
+    printk("Receive: the whole ip packet \n");
     // Dump source ip, data, checksum
     char src_ip[20];
 
@@ -115,15 +121,12 @@ void ip_handle_packet(ip_packet_t * packet) {
         void * data_ptr = (void*)packet + packet->ihl * 4;
         int data_len = ntohs(packet->length) - sizeof(ip_packet_t);
 
-        qemu_printf("src: %s, data dump: \n", src_ip);
-        xxd(data_ptr, data_len);
+        printk("src: %s, data dump: \n", src_ip);
 
         // If this is a UDP packet
         if(packet->protocol == PROTOCOL_UDP) {
             udp_handle_packet(data_ptr);
         }
-
-
         // What ? that's it ? that's ip packet handling ??
         // not really... u need to handle ip fragmentation... but let's make sure we can handle one ip packet first
     }

@@ -1,6 +1,13 @@
 #ifndef PCI_H
 #define PCI_H
-#include <system.h>
+#include "../irq.h"
+#include "../char/tty.h"
+#include "../vfs/device.h"
+#include "../lib/stdint.h"
+#include "../lib/stdbool.h"
+#include "../lib/cli.h"
+#include "../lib/io.h"
+#include "../initcall.h"
 
 // I love bit fields So much better than ugly big twidling :)
 typedef union pci_dev {

@@ -1,10 +1,17 @@
 #ifndef ETHERNET_H
 #define ETHERNET_H
-#include <system.h>
-#include <string.h>
-#include <kheap.h>
-#include <paging.h>
-#include <rtl8139.h>
+#include "rtl8139.h"
+#include "../mm/paging.h"
+#include "../irq.h"
+#include "../char/tty.h"
+#include "../vfs/device.h"
+#include "../lib/stdint.h"
+#include "../lib/stdbool.h"
+#include "../lib/string.h"
+#include "../lib/cli.h"
+#include "../mm/kmalloc.h"
+#include "../lib/io.h"
+#include "../initcall.h"
 
 #define ETHERNET_TYPE_ARP 0x0806
 #define ETHERNET_TYPE_IP  0x0800
@@ -22,6 +29,5 @@ int ethernet_send_packet(uint8_t * dst_mac_addr, uint8_t * data, int len, uint16
 
 void ethernet_handle_packet(ethernet_frame_t * packet, int len);
 
-void ethernet_init();
 
 #endif
