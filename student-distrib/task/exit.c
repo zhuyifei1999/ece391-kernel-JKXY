@@ -223,8 +223,7 @@ void do_free_tasks() {
 #define WUNTRACED 0x00000002
 #define WSTOPPED  WUNTRACED
 
-// FIXME: wstatus is not exitcode
-DEFINE_SYSCALL3(LINUX, waitpid, int32_t, pid, int *, wstatus, int, options) {
+int32_t do_sys_waitpid(int32_t pid, int *wstatus, int options) {
     int32_t exitcode;
     if (pid < 1) {
         uint16_t pgid;
@@ -254,4 +253,12 @@ DEFINE_SYSCALL3(LINUX, waitpid, int32_t, pid, int *, wstatus, int, options) {
         *wstatus = exitcode;
 
     return pid;
+}
+
+DEFINE_SYSCALL3(LINUX, waitpid, int32_t, pid, int *, wstatus, int, options) {
+    return do_sys_waitpid(pid, wstatus, options);
+}
+
+DEFINE_SYSCALL4(LINUX, wait4, int32_t, pid, int *, wstatus, int, options, void *, rusage) {
+    return do_sys_waitpid(pid, wstatus, options);
 }

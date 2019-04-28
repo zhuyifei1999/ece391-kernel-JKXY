@@ -258,7 +258,7 @@ DEFINE_SYSCALL_COMPLEX(LINUX, clone, regs) {
     if (child_stack)
         newregs->esp = (uint32_t)child_stack;
 
-    struct task_struct *task = do_clone(flags, NULL, newregs, ptid, ctid, newtls);
+    struct task_struct *task = do_clone(SIGCHLD | flags, NULL, newregs, ptid, ctid, newtls);
     if (IS_ERR(task)) {
         kfree(newregs);
         regs->eax = PTR_ERR(task);
@@ -266,4 +266,26 @@ DEFINE_SYSCALL_COMPLEX(LINUX, clone, regs) {
         regs->eax = task->pid;
         wake_up_process(task);
     }
+}
+
+DEFINE_SYSCALL_COMPLEX(LINUX, vfork, regs) {
+    struct intr_info *newregs = kmalloc(sizeof(*newregs));
+    if (!newregs) {
+        regs->eax = -ENOMEM;
+        return;
+    }
+    *newregs = *regs;
+
+    newregs->eax = 0;
+
+    struct task_struct *task = do_clone(SIGCHLD | CLONE_VFORK | CLONE_VM, NULL, newregs, NULL, NULL, NULL);
+    if (IS_ERR(task)) {
+        kfree(newregs);
+        regs->eax = PTR_ERR(task);
+    } else {
+        regs->eax = task->pid;
+        wake_up_process(task);
+    }
+
+    // FIXME: We should block until child either exit() or execve()
 }

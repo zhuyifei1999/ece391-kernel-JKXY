@@ -192,7 +192,7 @@ do_switch_loop:;
     if (!IS_ERR(file))
         filp_close(file);
 
-    return run_init_process("/bin/login");
+    return run_init_process("/sbin/login");
 }
 
 noreturn void kernel_main(void) {
