@@ -19,17 +19,16 @@ int is_transmit_empty() {
 
 void write_serial(char a) {
    while (is_transmit_empty() == 0);
-   outportb(PORT_COM1,a);
+   outb(a, PORT_COM1);
 }
 
-
 void serial_init() {
-   outportb(PORT_COM1 + 1, 0x00);
-   outportb(PORT_COM1 + 3, 0x80);
-   outportb(PORT_COM1 + 0, 0x03);
-   outportb(PORT_COM1 + 1, 0x00);
-   outportb(PORT_COM1 + 3, 0x03);
-   outportb(PORT_COM1 + 2, 0xC7);
-   outportb(PORT_COM1 + 4, 0x0B);
+   outb(0x00, PORT_COM1 + 1);
+   outb(0x80, PORT_COM1 + 3);
+   outb(0x03, PORT_COM1 + 0);
+   outb(0x00, PORT_COM1 + 1);
+   outb(0x03, PORT_COM1 + 3);
+   outb(0xC7, PORT_COM1 + 2);
+   outb(0x0B, PORT_COM1 + 4);
 }
 DEFINE_INITCALL(serial_init, drivers);

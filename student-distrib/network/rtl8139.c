@@ -99,10 +99,10 @@ void rtl8139_init() {
     }
 
     // Send 0x00 to the CONFIG_1 register (0x52) to set the LWAKE + LWPTN to active high. this should essentially *power on* the device.
-    outportb(rtl8139_device.io_base + 0x52, 0x0);
+    outb(0x0, rtl8139_device.io_base + 0x52);
 
     // Soft reset
-    outportb(rtl8139_device.io_base + 0x37, 0x10);
+    outb(0x10, rtl8139_device.io_base + 0x37);
     while((inportb(rtl8139_device.io_base + 0x37) & 0x10) != 0) {
         // Do nothibg here...
     }
@@ -119,7 +119,7 @@ void rtl8139_init() {
     outportl(rtl8139_device.io_base + 0x44, 0xf | (1 << 7));
 
     // Sets the RE and TE bits high
-    outportb(rtl8139_device.io_base + 0x37, 0x0C);
+    outb(0x0C, rtl8139_device.io_base + 0x37);
 
     // Register and enable network interrupts
     uint32_t irq_num = pci_read(pci_rtl8139_device, PCI_INTERRUPT_LINE);
