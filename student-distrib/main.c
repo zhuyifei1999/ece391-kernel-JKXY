@@ -154,6 +154,7 @@ static int kernel_dummy_init(void *args) {
 
 do_switch:
     tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
+    printk("Starting Linux\n");
 
     for (i = 0; i < NUM_TERMS; i++) {
         send_sig(shepards[i], SIGTERM);

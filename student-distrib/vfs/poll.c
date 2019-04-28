@@ -94,6 +94,7 @@ DEFINE_SYSCALL3(LINUX, poll, struct pollfd *, fds, int32_t, nfds, int32_t, timeo
             poll_cleanup_t *cleanup_cb = node->value;
             (*cleanup_cb)(&poll_table[i]);
         }
+        list_destroy(&poll_table[i].cleanup_cb);
 
         filp_close(poll_table[i].file);
 
