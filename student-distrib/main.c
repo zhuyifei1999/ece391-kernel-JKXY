@@ -26,7 +26,7 @@
 struct task_struct *swapper_task;
 struct task_struct *init_task;
 
-// #define HAS_ECE391 1
+#define HAS_ECE391 1
 
 static void mount_root_device(uint32_t device_num, char *fsname) {
     struct file *root_block = filp_open_anondevice(device_num, 0, S_IFBLK | 0666);
@@ -153,6 +153,8 @@ static int kernel_dummy_init(void *args) {
     }
 
 do_switch:
+    tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
+
     for (i = 0; i < NUM_TERMS; i++) {
         send_sig(shepards[i], SIGTERM);
     }
@@ -188,8 +190,6 @@ do_switch_loop:;
     struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, 1), O_RDWR, S_IFCHR | 0666);
     if (!IS_ERR(file))
         filp_close(file);
-
-    tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
 
     return run_init_process("/bin/sh");
 }
