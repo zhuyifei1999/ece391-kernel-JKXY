@@ -386,7 +386,7 @@ static struct file_operations ata_dev_op = {
  *   ata_handler
  *   DESCRIPTION: wake up the read_28
  */
-static void ata_handler() {
+static void ata_handler(struct intr_info *info) {
     if (in_service)
         wake_up_process(in_service);
 }

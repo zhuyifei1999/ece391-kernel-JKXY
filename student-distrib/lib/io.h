@@ -61,7 +61,7 @@ static inline void outb_p(uint8_t data, uint16_t port) {
 }
 
 /* Writes two bytes to two consecutive ports */
-static inline void outw(uint8_t data, uint16_t port) {
+static inline void outw(uint16_t data, uint16_t port) {
     asm volatile ("outw %w1, (%w0)"
             :
             : "d"(port), "a"(data)
@@ -70,12 +70,61 @@ static inline void outw(uint8_t data, uint16_t port) {
 }
 
 /* Writes four bytes to four consecutive ports */
-static inline void outl(uint8_t data, uint16_t port) {
-    asm volatile ("outl %l1, (%w0)"
+static inline void outl(uint32_t data, uint16_t port) {
+    asm volatile ("outl %k1, (%w0)"
             :
             : "d"(port), "a"(data)
             : "memory", "cc"
     );
+}
+
+
+/*
+ * write a bytes
+ * */
+static inline void outportb(uint16_t port, uint8_t val) {
+    asm volatile("outb %1, %0" : : "dN"(port), "a"(val));
+}
+
+/*
+ * read a byte
+ * */
+static inline uint8_t inportb(uint16_t port) {
+    uint8_t ret;
+    asm volatile("inb %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
+/*
+ * Read 2 bytes
+ * */
+static inline uint16_t inports(uint16_t _port) {
+    uint16_t rv;
+    asm volatile ("inw %1, %0" : "=a" (rv) : "dN" (_port));
+    return rv;
+}
+
+/*
+ * Write 2 bytes
+ * */
+static inline void outports(uint16_t _port, uint16_t _data) {
+    asm volatile ("outw %1, %0" : : "dN" (_port), "a" (_data));
+}
+
+/*
+ * Readt 4 bytes
+ * */
+static inline uint32_t inportl(uint16_t _port) {
+    uint32_t rv;
+    asm volatile ("inl %%dx, %%eax" : "=a" (rv) : "dN" (_port));
+    return rv;
+}
+
+/*
+ * Write 4 bytes
+ * */
+static inline void outportl(uint16_t _port, uint32_t _data) {
+    asm volatile ("outl %%eax, %%dx" : : "dN" (_port), "a" (_data));
 }
 
 #endif

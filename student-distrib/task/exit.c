@@ -15,29 +15,40 @@ static struct list free_tasks;
 LIST_STATIC_INIT(free_tasks);
 
 static int _do_wait(struct task_struct *task) {
+    // set task state to TASK_DEAD
     task->state = TASK_DEAD;
 
+    // remove task from task list_node
     list_remove(&tasks, task);
+    // insert task to free_tasks list
     list_insert_back(&free_tasks, task);
 
+    // return the exitcode of the process
     return task->exitcode;
 }
 
 noreturn
 void do_exit(int exitcode) {
+    // place exitcode into current
     current->exitcode = exitcode;
+    // set the state of the current process to TASK_ZOMBIE
     current->state = TASK_ZOMBIE;
 
-    // HACK
+    // HACK: This is a userspace-mapped kernel memory. Attempting to free the
+    // page like a normal user page will cause a kernel panic. This must be
+    // done before attempting to free the page directory.
     exit_vidmap_cb();
 
+    // close current working directory
     if (current->cwd)
         filp_close(current->cwd);
     if (current->exe)
         filp_close(current->exe);
+    // close the session
     if (current->session)
         put_session();
 
+    // close opened files and free them
     if (current->files) {
         if (!atomic_dec(&current->files->refcount)) {
             uint32_t i;
@@ -52,6 +63,7 @@ void do_exit(int exitcode) {
         }
     }
 
+    // free memory management information
     if (current->mm) {
         if (!atomic_dec(&current->mm->refcount)) {
             free_directory(current->mm->page_directory);
@@ -59,6 +71,7 @@ void do_exit(int exitcode) {
         }
     }
 
+    // free signal handler information
     if (!atomic_dec(&current->sigactions->refcount))
         kfree(current->sigactions);
 
@@ -73,6 +86,7 @@ void do_exit(int exitcode) {
     }
     array_destroy(&current->sigpending.siginfos);
 
+    // if parent process id is 0, this is a child reaper
     if (!current->ppid)
         panic("Killing process tree! exitcode=%d\n", exitcode);
 
@@ -108,6 +122,7 @@ void do_exit(int exitcode) {
 DEFINE_SYSCALL1(ECE391, halt, uint8_t, status) {
     do_exit(status & 0377);
 }
+// check the range of status
 DEFINE_SYSCALL1(LINUX, exit, int, status) {
     if (status < 0 || status > 255)
         status = 255;
@@ -120,9 +135,11 @@ DEFINE_SYSCALL0(LINUX, exit_group) {
 
 // Reap a child process, return its exitcode
 int32_t do_wait(struct task_struct *task) {
+    // check whether the parent
     if (task->ppid != current->pid)
         return -ECHILD;
 
+    // if state is TASK_ZOMBIE, call _do_wait
     if (task->state == TASK_ZOMBIE)
         return _do_wait(task);
 
@@ -134,6 +151,7 @@ int32_t do_wait(struct task_struct *task) {
         .sigaction = SIG_DFL,
     };
 
+    // wait for the child process to end
     while (true) {
         current->state = TASK_INTERRUPTIBLE;
         schedule();
@@ -141,6 +159,7 @@ int32_t do_wait(struct task_struct *task) {
 
         if (signal_pending(current)) {
             struct siginfo siginfo;
+            // return exitcode when SIGCHILD is received
             if (kernel_peek_pending_sig(SIGCHLD, &siginfo)) {
                 if (siginfo.code == CLD_EXITED && siginfo.sifields.sigchld.pid == task->pid) {
                     kernel_get_pending_sig(SIGCHLD, &siginfo);
