@@ -273,7 +273,7 @@ struct stat64 {
     uint64_t ino;       /* Inode number */
 };
 
-static int32_t do_stat(struct inode *inode, struct stat64 * statbuf) {
+static int32_t do_stat(struct inode *inode, struct stat64 *statbuf) {
     uint32_t nbytes = safe_buf(statbuf, sizeof(*statbuf), true);
     if (nbytes != sizeof(*statbuf))
         return -EFAULT;

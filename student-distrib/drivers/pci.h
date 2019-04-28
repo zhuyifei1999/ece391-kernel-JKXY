@@ -1,11 +1,8 @@
 #ifndef PCI_H
 #define PCI_H
+
 #include "../lib/stdint.h"
-#include "../lib/stdbool.h"
-#include "../lib/string.h"
-#include "../mm/kmalloc.h"
-#include "../lib/io.h"
-#include "../lib/stdio.h"
+
 // I love bit fields So much better than ugly big twidling :)
 typedef union pci_dev {
     uint32_t bits;
@@ -56,7 +53,6 @@ typedef union pci_dev {
 #define PCI_TYPE_SATA   0x0106
 #define PCI_NONE 0xFFFF
 
-
 #define DEVICE_PER_BUS           32
 #define FUNCTION_PER_DEVICE      32
 
@@ -69,6 +65,5 @@ pci_dev_t pci_scan_function(uint16_t vendor_id, uint16_t device_id, uint32_t bus
 pci_dev_t pci_scan_device(uint16_t vendor_id, uint16_t device_id, uint32_t bus, uint32_t device, int device_type);
 pci_dev_t pci_scan_bus(uint16_t vendor_id, uint16_t device_id, uint32_t bus, int device_type);
 pci_dev_t pci_get_device(uint16_t vendor_id, uint16_t device_id, int device_type);
-void pci_init();
 
 #endif

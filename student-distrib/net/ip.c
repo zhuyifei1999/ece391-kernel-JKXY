@@ -1,36 +1,28 @@
 #include "ip.h"
 #include "arp.h"
-#include "serial.h"
-#include "network_utils.h"
+#include "inet.h"
 #include "udp.h"
+#include "ethernet.h"
+#include "../lib/stdio.h"
+#include "../lib/string.h"
+#include "../mm/kmalloc.h"
+#include "../printk.h"
 
-uint8_t my_ip[] = {10, 0, 2, 14};
-uint8_t test_target_ip[] = {10, 0, 2, 15};
-uint8_t zero_hardware_addr[] = {0,0,0,0,0,0};
+ip_addr_t my_ip = {10, 0, 2, 14};
+ip_addr_t test_target_ip = {10, 0, 2, 15};
+mac_addr_t zero_hardware_addr = {0,0,0,0,0,0};
 
-char ip_addr[4];
 int is_ip_allocated;
-static int gethostaddr(char * addr) {
-    memcpy(addr, ip_addr, 4);
-    if(!is_ip_allocated) {
-        return 0;
-    }
-    return 1;
-}
 
-void get_ip_str(char * ip_str, uint8_t * ip) {
-    printk(ip_str, "%d.%d.%d.%d\n", ip[0], ip[1], ip[2], ip[3]);
-}
-
-uint16_t ip_calculate_checksum(ip_packet_t * packet) {
+uint16_t ip_calculate_checksum(struct ip_packet *packet) {
     // Treat the packet header as a 2-byte-integer array
     // Sum all integers up and flip all bits
-    int array_size = sizeof(ip_packet_t) / 2;
-    uint16_t * array = (uint16_t*)packet;
-    uint8_t * array2 = (uint8_t*)packet;
+    int array_size = sizeof(*packet) / 2;
+    uint16_t *array = (uint16_t *)packet;
+    // uint8_t *array2 = (uint8_t *)packet;
     uint32_t sum = 0;
     int i;
-    for(i = 0; i < array_size; i++) {
+    for (i = 0; i < array_size; i++) {
         sum += flip_short(array[i]);
     }
     uint32_t carry = sum >> 16;
@@ -40,16 +32,18 @@ uint16_t ip_calculate_checksum(ip_packet_t * packet) {
     return ret;
 }
 
-void ip_send_packet(uint8_t * dst_ip, void * data, int len) {
+void ip_send_packet(ip_addr_t *dst_ip, void *data, uint32_t len) {
     int arp_sent = 3;
-    ip_packet_t * packet = kmalloc(sizeof(ip_packet_t) + len);
-    memset(packet, 0, sizeof(ip_packet_t));
+    struct ip_packet *packet = kmalloc(sizeof(*packet) + len);
+    // FIXME: is this needed?
+    memset(packet, 0, sizeof(*packet));
+
     packet->version = IP_IPV4;
     // 5 * 4 = 20 byte
     packet->ihl = 5;
     // Don't care, set to 0
     packet->tos = 0;
-    packet->length = sizeof(ip_packet_t) + len;
+    packet->length = sizeof(*packet) + len;
     // Used for ip fragmentation, don't care now
     packet->id = 0;
     // Tell router to not divide the packet, and this is packet is the last piece of the fragments.
@@ -62,25 +56,24 @@ void ip_send_packet(uint8_t * dst_ip, void * data, int len) {
     // Once we test the ip packeting sending works, we'll replace it with a packet corresponding to some protocol
     packet->protocol = PROTOCOL_UDP;
 
-    gethostaddr(my_ip);
     memcpy(packet->src_ip, my_ip, 4);
     memcpy(packet->dst_ip, dst_ip, 4);
 
-    void * packet_data = (void*)packet + packet->ihl * 4;
+    void *packet_data = (void *)packet + packet->ihl * 4;
     memcpy(packet_data, data, len);
 
     // Fix packet data order
-    *((uint8_t*)(&packet->version_ihl_ptr)) = htonb(*((uint8_t*)(&packet->version_ihl_ptr)), 4);
-    *((uint8_t*)(packet->flags_fragment_ptr)) = htonb(*((uint8_t*)(packet->flags_fragment_ptr)), 3);
-    packet->length = htons(sizeof(ip_packet_t) + len);
+    *((uint8_t *)(&packet->version_ihl_ptr)) = htonb(*((uint8_t *)(&packet->version_ihl_ptr)), 4);
+    *((uint8_t *)(packet->flags_fragment_ptr)) = htonb(*((uint8_t *)(packet->flags_fragment_ptr)), 3);
+    packet->length = htons(sizeof(*packet) + len);
 
     // Make sure checksum is 0 before checksum calculation
     packet->header_checksum = 0;
     packet->header_checksum = htons(ip_calculate_checksum(packet));
 
 
-    //packet->header_checksum 
-    
+    //packet->header_checksum
+
     // Don't care to pad, because we don't use the option field in ip packet
     /*
      * If the ip is in the same network, the destination mac address is the routers's mac address, the router'll figure out how to route the packet
@@ -90,42 +83,42 @@ void ip_send_packet(uint8_t * dst_ip, void * data, int len) {
     // Now look at the arp, table, if we have the mac address, just send it. If not, we'll send an arp packet to get the mac address, and wait until its mac address show up in
     // our arp  table
 
-    uint8_t dst_hardware_addr[6];
+    mac_addr_t dst_hardware_addr;
 
     // Loop, until we get the mac address of the destination (this should probably done in a separate :))
-    while(!arp_lookup(dst_hardware_addr, dst_ip)) {
-        if(arp_sent != 0) {
+    while (!arp_lookup(&dst_hardware_addr, dst_ip)) {
+        if (arp_sent) {
             arp_sent--;
             // Send an arp packet here
-            arp_send_packet(zero_hardware_addr, dst_ip);
+            arp_send_packet(&zero_hardware_addr, dst_ip);
         }
     }
+
     printk("IP Packet Sent...(checksum: %x)\n", packet->header_checksum);
     // Got the mac address! Now send an ethernet packet
-    ethernet_send_packet(dst_hardware_addr, packet, htons(packet->length), ETHERNET_TYPE_IP);
+    ethernet_send_packet(&dst_hardware_addr, packet, htons(packet->length), ETHERNET_TYPE_IP);
 }
 
 
-void ip_handle_packet(ip_packet_t * packet) {
+void ip_handle_packet(struct ip_packet *packet, uint32_t len) {
     // Fix packet data order (be careful with the endiness problem within a byte)
-    *((uint8_t*)(&packet->version_ihl_ptr)) = ntohb(*((uint8_t*)(&packet->version_ihl_ptr)), 4);
-    *((uint8_t*)(packet->flags_fragment_ptr)) = ntohb(*((uint8_t*)(packet->flags_fragment_ptr)), 3);
+    *((uint8_t *)(&packet->version_ihl_ptr)) = ntohb(*((uint8_t *)(&packet->version_ihl_ptr)), 4);
+    *((uint8_t *)(packet->flags_fragment_ptr)) = ntohb(*((uint8_t *)(packet->flags_fragment_ptr)), 3);
 
     printk("Receive: the whole ip packet \n");
     // Dump source ip, data, checksum
     char src_ip[20];
 
-    if(packet->version == IP_IPV4) {
-        get_ip_str(src_ip, packet->src_ip);
+    if (packet->version == IP_IPV4) {
+        snprintf(src_ip, 20, "%d.%d.%d.%d\n", packet->src_ip[0], packet->src_ip[1], packet->src_ip[2], packet->src_ip[3]);
 
-        void * data_ptr = (void*)packet + packet->ihl * 4;
-        int data_len = ntohs(packet->length) - sizeof(ip_packet_t);
+        int data_len = ntohs(packet->length) - sizeof(*packet);
 
         printk("src: %s, data dump: \n", src_ip);
 
         // If this is a UDP packet
-        if(packet->protocol == PROTOCOL_UDP) {
-            udp_handle_packet(data_ptr);
+        if (packet->protocol == PROTOCOL_UDP) {
+            udp_handle_packet((void *)packet->data, data_len);
         }
         // What ? that's it ? that's ip packet handling ??
         // not really... u need to handle ip fragmentation... but let's make sure we can handle one ip packet first

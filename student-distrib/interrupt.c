@@ -152,7 +152,7 @@ void double_fault_entry(uint32_t error_code) {
     if (tss.cs != KERNEL_CS)
         BUG(); // How is userspace able to trigger a #DF?!
 
-    struct task_struct *task = task_from_stack((void*)tss.esp);
+    struct task_struct *task = task_from_stack((void *)tss.esp);
     if (task->mm)
         switch_directory(task->mm->page_directory);
 

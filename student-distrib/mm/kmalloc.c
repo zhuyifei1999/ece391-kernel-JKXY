@@ -13,7 +13,7 @@ void liballoc_unlock(unsigned long *flags) {
 
 __attribute__ ((malloc))
 void *liballoc_alloc(uint16_t pages) {
-    return alloc_pages(pages, 0, 0);
+    return alloc_pages(pages, 0, GFP_CONS);
 }
 
 void liballoc_free(void *ptr, uint16_t pages) {

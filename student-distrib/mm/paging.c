@@ -221,15 +221,17 @@ static void __physaddr *alloc_phys_mem_consecutive(uint32_t num, uint32_t gfp_fl
     return NULL; // no enough memory
 }
 
-// consider no page boundary
 void __physaddr *kheap_virtual2phys(void *virtual_addr) {
-    if (virtual_addr < KHEAP_ADDR)
+    if ((uint32_t)virtual_addr < KHEAP_ADDR)
         goto err;
 
-    struct page_table_entry *entry = &heap_tables[PAGE_IDX((uint32_t)virtual_addr)];
+    uint32_t extra = (uint32_t)virtual_addr % PAGE_SIZE_SMALL;
 
-    if (entry->present)
-        return (void __physaddr *)PAGE_IDX_ADDR(entry->addr);    
+    struct page_table_entry *entry = &heap_tables[PAGE_IDX((uint32_t)virtual_addr)];
+    if (!entry->present)
+        goto err;
+
+    return (void __physaddr *)(PAGE_IDX_ADDR(entry->addr) + extra);
 
 err:
     panic("Invalid kheap virtual addr for translation %p", virtual_addr);
