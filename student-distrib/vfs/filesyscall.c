@@ -187,6 +187,23 @@ DEFINE_SYSCALL1(LINUX, close, int32_t, fd) {
     return do_sys_close(fd);
 }
 
+DEFINE_SYSCALL5(LINUX, _llseek, uint32_t, fd, uint32_t, offset_high,
+                uint32_t, offset_low, uint32_t *, result, uint32_t, whence) {
+    struct file *file = array_get(&current->files->files, fd);
+    if (!file)
+        return -EBADF;
+
+    if (safe_buf(result, sizeof(*result), true) != sizeof(*result))
+        return -EFAULT;
+
+    int32_t res = filp_seek(file, offset_low, whence);
+    if (res < 0)
+        return res;
+
+    *result = res;
+    return 0;
+}
+
 DEFINE_SYSCALL3(LINUX, ioctl, int32_t, fd, uint32_t, request, unsigned long, arg) {
     struct file *file = array_get(&current->files->files, fd);
     if (!file)
