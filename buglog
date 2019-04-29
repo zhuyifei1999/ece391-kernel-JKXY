@@ -35,13 +35,6 @@ FIXED: 356b402871b18eff9af94752bcf4c9cb1874ab5f Thu Apr 18 19:21:45 2019 -0500 A
 
 ====
 
-BEHAVIOR: after boot up, if the initial shell starts a new shell within a two second time window, and the new shell proceeds to create even more shells, then on the fifth shell created the kernel will panic due to an unhandled page fault.
-CAUSE: a certain call to kmalloc() used wrong size.
-SINCE: ba246fb455cd56d1b77263abc9048bbefd6c06c2 Sat Mar 30 23:08:56 2019 -0500 Say hello to userspace!
-FIXED: 04a13520068844ce662468c76cb32d03009a49f7 Tue Apr 2 00:43:47 2019 -0500 Fix that cursed kmalloc(sizeof(*ptr)), missing *
-
-====
-
 BEHAVIOR: if QEMU runs with KVM, the #DF handler cannot catch #DF resulting in triple fault
 CAUSE: #DF TSS does not have an initialized DS state, resulting in #GP when doing hardware task switch to #DF TSS.
 SINCE: 705de7ebcb27b3ab4d0ef3047e7c1e401888830f Tue Apr 9 18:51:52 2019 -0500 Ability to catch double faults, and panic / recover
@@ -60,6 +53,13 @@ BEHAVIOR: memory leak. addresses from kmalloc() keeps increasing if repeatedly r
 CAUSE: path objects are not completely freed when they are destroyed.
 SINCE: 6e014839db860b27f03989568dd222bec1c908fb Tue Sat Mar 16 14:48:23 2019 -0500 More VFS Junk
 FIXED: 2aad8d14fc6c87a8116089daf9dba2c4e1db70ab Apr 2 12:53:53 2019 -0500 path.c: Fix a memory leak (unfreed memory)
+
+====
+
+BEHAVIOR: after boot up, if the initial shell starts a new shell within a two second time window, and the new shell proceeds to create even more shells, then on the fifth shell created the kernel will panic due to an unhandled page fault.
+CAUSE: a certain call to kmalloc() used wrong size.
+SINCE: ba246fb455cd56d1b77263abc9048bbefd6c06c2 Sat Mar 30 23:08:56 2019 -0500 Say hello to userspace!
+FIXED: 04a13520068844ce662468c76cb32d03009a49f7 Tue Apr 2 00:43:47 2019 -0500 Fix that cursed kmalloc(sizeof(*ptr)), missing *
 
 ====
 
