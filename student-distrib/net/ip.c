@@ -6,7 +6,8 @@
 #include "../lib/stdio.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
-#include "../printk.h"
+
+// adapted from: https://github.com/szhou42/osdev/tree/master/src/kernel
 
 ip_addr_t my_ip = {10, 0, 2, 14};
 ip_addr_t test_target_ip = {10, 0, 2, 15};
@@ -94,7 +95,6 @@ void ip_send_packet(ip_addr_t *dst_ip, void *data, uint32_t len) {
         }
     }
 
-    printk("IP Packet Sent...(checksum: %x)\n", packet->header_checksum);
     // Got the mac address! Now send an ethernet packet
     ethernet_send_packet(&dst_hardware_addr, packet, htons(packet->length), ETHERNET_TYPE_IP);
 
@@ -107,7 +107,6 @@ void ip_handle_packet(struct ip_packet *packet, uint32_t len) {
     *((uint8_t *)(&packet->version_ihl_ptr)) = ntohb(*((uint8_t *)(&packet->version_ihl_ptr)), 4);
     *((uint8_t *)(packet->flags_fragment_ptr)) = ntohb(*((uint8_t *)(packet->flags_fragment_ptr)), 3);
 
-    printk("Receive: the whole ip packet \n");
     // Dump source ip, data, checksum
     char src_ip[20];
 
@@ -115,8 +114,6 @@ void ip_handle_packet(struct ip_packet *packet, uint32_t len) {
         snprintf(src_ip, 20, "%d.%d.%d.%d\n", packet->src_ip[0], packet->src_ip[1], packet->src_ip[2], packet->src_ip[3]);
 
         int data_len = ntohs(packet->length) - sizeof(*packet);
-
-        printk("src: %s, data dump: \n", src_ip);
 
         // If this is a UDP packet
         if (packet->protocol == PROTOCOL_UDP) {

@@ -7,13 +7,15 @@
 #include "../printk.h"
 #include "../initcall.h"
 
+// adapted from: https://github.com/szhou42/osdev/tree/master/src/kernel
+
 #define ARP_TABLE_SIZE 512
 
 struct arp_table_entry arp_table[ARP_TABLE_SIZE];
 int arp_table_size;
 int arp_table_curr;
 
-uint8_t broadcast_mac_address[] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+mac_addr_t broadcast_mac_address = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
 
 void arp_handle_packet(struct arp_packet *arp_packet, uint32_t len) {
     mac_addr_t dst_hardware_addr;
@@ -52,14 +54,10 @@ void arp_handle_packet(struct arp_packet *arp_packet, uint32_t len) {
 
             // Now send it with ethernet
             ethernet_send_packet(&dst_hardware_addr, arp_packet, sizeof(struct arp_packet), ETHERNET_TYPE_ARP);
-
-            // For debug:
         }
-    }
-    else if (ntohs(arp_packet->opcode) == ARP_REPLY){
+    } else if (ntohs(arp_packet->opcode) == ARP_REPLY){
         // May be we can handle the case where we get a reply after sending a request, but i don't think my os will ever need to do so...
-    }
-    else {
+    } else {
         printk("Got unknown ARP, opcode = %d\n", arp_packet->opcode);
     }
 

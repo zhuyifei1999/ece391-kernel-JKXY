@@ -8,6 +8,8 @@
 #include "../printk.h"
 #include "../initcall.h"
 
+// adapted from: https://github.com/szhou42/osdev/tree/master/src/kernel
+
 pci_dev_t pci_rtl8139_device;
 struct rtl8139_dev rtl8139_device;
 

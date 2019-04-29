@@ -2,7 +2,8 @@
 #include "inet.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
-#include "../printk.h"
+
+// adapted from: https://github.com/szhou42/osdev/tree/master/src/kernel
 
 uint16_t udp_calculate_checksum(struct udp_packet *packet) {
     // UDP checksum is optional in IPv4
@@ -21,20 +22,17 @@ void udp_send_packet(ip_addr_t *dst_ip, uint16_t src_port, uint16_t dst_port, vo
 
     // Copy data over
     memcpy(packet->data, data, len);
-    printk("UDP Packet sent\n");
     ip_send_packet(dst_ip, packet, length);
 
     kfree(packet);
 }
 
 void udp_handle_packet(struct udp_packet *packet, uint32_t len) {
-    //uint16_t src_port = ntohs(packet->src_port);
-    uint16_t dst_port = ntohs(packet->dst_port);
-    uint16_t length = ntohs(packet->length);
+    __attribute__((unused)) uint16_t src_port = ntohs(packet->src_port);
+    __attribute__((unused)) uint16_t dst_port = ntohs(packet->dst_port);
 
     __attribute__((unused)) void *data_ptr = packet->data;
-    __attribute__((unused)) uint32_t data_len = length;
-    printk("Received UDP packet, dst_port %d, data dump:\n", dst_port);
+    __attribute__((unused)) uint32_t data_len = ntohs(packet->length);
 
     // TODO
     return;

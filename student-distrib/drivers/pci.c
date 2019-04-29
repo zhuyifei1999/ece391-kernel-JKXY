@@ -3,6 +3,8 @@
 #include "../irq.h"
 #include "../printk.h"
 
+// adapted from: https://github.com/szhou42/osdev/tree/master/src/kernel
+
 static uint32_t pci_size_map[100] = {
     [PCI_VENDOR_ID]       = 2,
     [PCI_DEVICE_ID]       = 2,

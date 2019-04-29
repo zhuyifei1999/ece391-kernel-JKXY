@@ -4,6 +4,7 @@
 #include "task/kthread.h"
 #include "task/session.h"
 #include "task/signal.h"
+#include "net/udp.h"
 #include "char/tty.h"
 #include "tests.h"
 
@@ -88,6 +89,22 @@ static int kshell(void *args) {
         } else if (!strcmp(buf, "startlinux")) {
             extern struct task_struct *init_task;
             send_sig(init_task, SIGTERM);
+        } else if (!strcmp(buf, "udp")) {
+            kernel_unmask_signal(SIGINT);
+
+            while (true) {
+                uint16_t signal = signal_pending_one(current);
+                if (signal)
+                    kernel_get_pending_sig(signal, NULL);
+                if (signal == SIGINT)
+                    break;
+
+                len = filp_read(tty, buf, BUFSIZE - 1);
+                if (len > 0)
+                    udp_send_packet(&(ip_addr_t){10, 0, 2, 2}, 12345, 4444, buf, len);
+            }
+
+            kernel_mask_signal(SIGINT);
         } else {
             fprintf(tty, "Unknown command \"%s\"\n", buf);
         }

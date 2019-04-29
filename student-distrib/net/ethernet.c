@@ -8,7 +8,8 @@
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
 #include "../irq.h"
-#include "../printk.h"
+
+// adapted from: https://github.com/szhou42/osdev/tree/master/src/kernel
 
 int ethernet_send_packet(mac_addr_t *dst_mac_addr, void *data, uint32_t len, uint16_t protocol) {
     mac_addr_t src_mac_addr;
@@ -39,12 +40,10 @@ void ethernet_handle_packet(struct ethernet_frame *frame, uint32_t len) {
     int data_len = len - sizeof(*frame);
     // ARP packet
     if (ntohs(frame->type) == ETHERNET_TYPE_ARP) {
-        printk("(ARP Packet)\n");
         arp_handle_packet((void *)&frame->data, data_len);
     }
     // IP packets(could be TCP, UDP or others)
     if (ntohs(frame->type) == ETHERNET_TYPE_IP) {
-        printk("(IP Packet)\n");
         ip_handle_packet((void *)&frame->data, data_len);
     }
 }
