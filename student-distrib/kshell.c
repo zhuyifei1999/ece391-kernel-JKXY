@@ -91,6 +91,8 @@ static int kshell(void *args) {
         } else if (!strcmp(buf, "startlinux")) {
             extern struct task_struct *init_task;
             send_sig(init_task, SIGTERM);
+        } else if (!strcmp(buf, "panic")) {
+            __attribute__((unused)) volatile int a = *(int *)NULL;
         } else if (!strcmp(buf, "udp")) {
             kernel_unmask_signal(SIGINT);
 
