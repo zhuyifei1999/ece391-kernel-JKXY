@@ -52,7 +52,7 @@ FIXED: 88de99474b217c075a401bb3a20fb1509e890361 Mon Apr 8 21:00:38 2019 -0500 Ch
 BEHAVIOR: memory leak. addresses from kmalloc() keeps increasing if repeatedly running ls
 CAUSE: path objects are not completely freed when they are destroyed.
 SINCE: 6e014839db860b27f03989568dd222bec1c908fb Tue Sat Mar 16 14:48:23 2019 -0500 More VFS Junk
-FIXED: 2aad8d14fc6c87a8116089daf9dba2c4e1db70ab Apr 2 12:53:53 2019 -0500 path.c: Fix a memory leak (unfreed memory)
+FIXED: 2aad8d14fc6c87a8116089daf9dba2c4e1db70ab Tue Apr 2 12:53:53 2019 -0500 path.c: Fix a memory leak (unfreed memory)
 
 ====
 
