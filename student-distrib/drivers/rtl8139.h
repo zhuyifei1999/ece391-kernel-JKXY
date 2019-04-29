@@ -69,6 +69,7 @@ struct rtl8139_dev {
     uint32_t mem_base;
     int eeprom_exist;
     mac_addr_t mac_addr;
+    char *send_buffer;
     char *rx_buffer;
     int tx_cur;
 };

@@ -44,8 +44,11 @@ void receive_packet() {
 static void rtl8139_handler(struct intr_info *info) {
     uint16_t status = inw(rtl8139_device.io_base + 0x3e);
 
-    // if (status & TOK)
-    //     printk("Packet sent\n");
+    if (status & TOK) {
+        if (rtl8139_device.send_buffer)
+            kfree(rtl8139_device.send_buffer);
+        rtl8139_device.send_buffer = NULL;
+    }
     if (status & ROK)
         receive_packet();
     outw(0x5, rtl8139_device.io_base + 0x3E);
@@ -71,10 +74,12 @@ void get_mac_addr(mac_addr_t *src_mac_addr) {
 
 void rtl8139_send_packet(void *data, uint32_t len) {
     // First, copy the data to a physically contiguous chunk of memory
+    if (rtl8139_device.send_buffer)
+        return; // FIXME: Propogate EBUSY
 
-    void *transfer_data = kmalloc(len);
-    void *phys_addr = kheap_virtual2phys(transfer_data);
-    memcpy(transfer_data, data, len);
+    rtl8139_device.send_buffer = kmalloc(len);
+    void *phys_addr = kheap_virtual2phys(rtl8139_device.send_buffer);
+    memcpy(rtl8139_device.send_buffer, data, len);
 
     // Second, fill in physical address of data, and length
     outl((uint32_t)phys_addr, rtl8139_device.io_base + TSAD_array[rtl8139_device.tx_cur]);
@@ -131,6 +136,7 @@ static void rtl8139_init() {
     // Register and enable network interrupts
     uint32_t irq_num = pci_read(pci_rtl8139_device, PCI_INTERRUPT_LINE);
     read_mac_addr();
+
     set_irq_handler(irq_num, &rtl8139_handler);
 }
 DEFINE_INITCALL(rtl8139_init, drivers);
