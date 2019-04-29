@@ -5,7 +5,6 @@
 #include "../mm/kmalloc.h"
 #include "../mm/paging.h"
 #include "../irq.h"
-#include "../printk.h"
 #include "../initcall.h"
 
 // adapted from: https://github.com/szhou42/osdev/tree/master/src/kernel
@@ -44,8 +43,8 @@ void receive_packet() {
 static void rtl8139_handler(struct intr_info *info) {
     uint16_t status = inw(rtl8139_device.io_base + 0x3e);
 
-    if (status & TOK)
-        printk("Packet sent\n");
+    // if (status & TOK)
+    //     printk("Packet sent\n");
     if (status & ROK)
         receive_packet();
     outw(0x5, rtl8139_device.io_base + 0x3E);
@@ -62,7 +61,7 @@ static void read_mac_addr() {
     rtl8139_device.mac_addr[4] = mac_part2 >> 0;
     rtl8139_device.mac_addr[5] = mac_part2 >> 8;
 
-    printk("MAC Address: %01x:%01x:%01x:%01x:%01x:%01x\n", rtl8139_device.mac_addr[0], rtl8139_device.mac_addr[1], rtl8139_device.mac_addr[2], rtl8139_device.mac_addr[3], rtl8139_device.mac_addr[4], rtl8139_device.mac_addr[5]);
+    printk("rtl8139: MAC Address: %01x:%01x:%01x:%01x:%01x:%01x\n", rtl8139_device.mac_addr[0], rtl8139_device.mac_addr[1], rtl8139_device.mac_addr[2], rtl8139_device.mac_addr[3], rtl8139_device.mac_addr[4], rtl8139_device.mac_addr[5]);
 }
 
 void get_mac_addr(mac_addr_t *src_mac_addr) {
