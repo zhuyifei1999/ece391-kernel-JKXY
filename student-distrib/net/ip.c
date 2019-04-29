@@ -97,6 +97,8 @@ void ip_send_packet(ip_addr_t *dst_ip, void *data, uint32_t len) {
     printk("IP Packet Sent...(checksum: %x)\n", packet->header_checksum);
     // Got the mac address! Now send an ethernet packet
     ethernet_send_packet(&dst_hardware_addr, packet, htons(packet->length), ETHERNET_TYPE_IP);
+
+    kfree(packet);
 }
 
 

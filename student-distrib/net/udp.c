@@ -12,16 +12,19 @@ uint16_t udp_calculate_checksum(struct udp_packet *packet) {
 void udp_send_packet(ip_addr_t *dst_ip, uint16_t src_port, uint16_t dst_port, void *data, uint32_t len) {
     uint32_t length = sizeof(struct udp_packet) + len;
     struct udp_packet *packet = kmalloc(length);
-    memset(packet, 0, sizeof(struct udp_packet));
-    packet->src_port = htons(src_port);
-    packet->dst_port = htons(dst_port);
-    packet->length = htons(length);
-    packet->checksum = udp_calculate_checksum(packet);
+    *packet = (struct udp_packet) {
+        .src_port = htons(src_port),
+        .dst_port = htons(dst_port),
+        .length = htons(length),
+        .checksum = udp_calculate_checksum(packet),
+    };
 
     // Copy data over
-    memcpy((void *)packet + sizeof(struct udp_packet), data, len);
+    memcpy(packet->data, data, len);
     printk("UDP Packet sent\n");
     ip_send_packet(dst_ip, packet, length);
+
+    kfree(packet);
 }
 
 void udp_handle_packet(struct udp_packet *packet, uint32_t len) {
