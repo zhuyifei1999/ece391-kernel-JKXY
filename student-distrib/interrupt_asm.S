@@ -47,7 +47,6 @@ ISR_common:
 .cfi_offset edi, -56
 // now we have everything saved, let's make the selectors sane
     movw    $KERNEL_DS, %cx
-    movw    %cx, %ss
     movw    %cx, %ds
     movw    %cx, %es
     movw    %cx, %fs
@@ -71,7 +70,6 @@ ISR_common:
     cld
     call    do_interrupt
     addl    $4,%esp
-    sti
     // TODO: Do BH
 ENTRY(ISR_return):
     cmpw    $KERNEL_CS,76(%esp)
