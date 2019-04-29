@@ -1,0 +1,71 @@
+====
+
+BEHAVIOR: ATA wakeup using interrupts randomly hangs forever; nanosleep for 0 nsecs randomly hangs forever.
+CAUSE: an interrupt tries to wake up the process before it tries to go to sleep; the wake up procedure sees that the process is the same one as the currently running process and ignores the request.
+SINCE: 6fb1586f9148ceef5f59142d7f5876dd9aea6929 Wed Mar 20 23:51:54 2019 -0500 RTC char device implemented
+FIXED: 8062ba65a218067be2f6027be24a377b74be0229 Tue Apr 23 21:19:09 2019 -0500 sched: If wake_up_process() is called on current, wake up on next schedule()
+
+====
+
+BEHAVIOR: PCI fails to detect any devices on any PCI bus
+CAUSE: outl() uses wrong integer size for its parameter
+SINCE: 037dece4ad912b5cb4cfc430e151ef56a44b2c28 Sat Mar 16 15:58:47 2019 -0500 Split lib into many files
+FIXED: 3b34e1f20204d3ddbd226fd9d9c56625c954a23e Mon Apr 22 00:33:35 2019 -0500 pci finish
+
+====
+
+BEHAVIOR: if the kernel is run fast enough, i.e. no printk, no ftrace, no breakpoints, after userspace calls clone() and the syscall returns to child process, the child will segfault.
+CAUSE: when the syscall returns to the parent process userspace, the page directory has been duplicated and set read only, but the CPU was not notified of this change to the page directory and writing to the COW page, when the child then copies from, having corrupted stack.
+SINCE: e7b71f431a992e44696e72ad6e3c729ed6901738 Thu Mar 28 15:16:04 2019 -0500 Preparing paging for user space
+FIXED: 5a84392e3e6529e8ef4cf94b2db6bc47c8de2f11 Sat Apr 20 20:34:48 2019 -0500 paging.c: clone directory should invlpg
+
+====
+
+BEHAVIOR: if userspace calls clone() syscall without CLONE_VM, after the child process returns to userspace it will immediately segfault due to EIP pointing to NULL
+CAUSE: copy on write accounting used virtual address instead of physical address to check the number of users for a certain page. it always think there is no more than one user, causing it not to copy and result in stack corruption. Function return address becomes NULL.
+SINCE: e7b71f431a992e44696e72ad6e3c729ed6901738 Thu Mar 28 15:16:04 2019 -0500 Preparing paging for user space
+FIXED: 03624b42f1f51c662ee46195c681b5b417107ad6 Fri Apr 19 15:31:53 2019 -0500 get_phys_dir_entry() expects a physical address, not virtual.
+
+====
+
+BEHAVIOR: busybox help keeps printing the same string
+CAUSE: raw_tty_write recurses and returns the wrong value upon writing a tab character
+SINCE: ad745de5fe8c8b6690c1604575b3732f12b6f86b Sat Apr 6 14:55:46 2019 -0500 Multiple TTY support
+FIXED: 356b402871b18eff9af94752bcf4c9cb1874ab5f Thu Apr 18 19:21:45 2019 -0500 Add floating point support
+
+====
+
+BEHAVIOR: after boot up, if the initial shell starts a new shell within a two second time window, and the new shell proceeds to create even more shells, then on the fifth shell created the kernel will panic due to an unhandled page fault.
+CAUSE: a certain call to kmalloc() used wrong size.
+SINCE: ba246fb455cd56d1b77263abc9048bbefd6c06c2 Sat Mar 30 23:08:56 2019 -0500 Say hello to userspace!
+FIXED: 04a13520068844ce662468c76cb32d03009a49f7 Tue Apr 2 00:43:47 2019 -0500 Fix that cursed kmalloc(sizeof(*ptr)), missing *
+
+====
+
+BEHAVIOR: if QEMU runs with KVM, the #DF handler cannot catch #DF resulting in triple fault
+CAUSE: #DF TSS does not have an initialized DS state, resulting in #GP when doing hardware task switch to #DF TSS.
+SINCE: 705de7ebcb27b3ab4d0ef3047e7c1e401888830f Tue Apr 9 18:51:52 2019 -0500 Ability to catch double faults, and panic / recover
+FIXED: dee34210e2db9038d7d4a8f9bcb1eca731210f44 Tue Apr 9 22:49:38 2019 -0500 x86_desc.c: Have double fault TSS get a %ds because KVM expects it
+
+====
+
+BEHAVIOR: running counter cause frequent lag in pingpong if run concurrently
+CAUSE: the scheduler epoch switch only occur if the timer interrupt interrupts userspace, the epoch is not checked when a syscall is returned.
+SINCE: b95c7673e5900e780adbb8a59087e96dd8665330 Sat Apr 6 23:25:59 2019 -0500 Add periodic scheduling
+FIXED: 88de99474b217c075a401bb3a20fb1509e890361 Mon Apr 8 21:00:38 2019 -0500 Check for schedule() condition after every syscall
+
+====
+
+BEHAVIOR: memory leak. addresses from kmalloc() keeps increasing if repeatedly running ls
+CAUSE: path objects are not completely freed when they are destroyed.
+SINCE: 6e014839db860b27f03989568dd222bec1c908fb Tue Sat Mar 16 14:48:23 2019 -0500 More VFS Junk
+FIXED: 2aad8d14fc6c87a8116089daf9dba2c4e1db70ab Apr 2 12:53:53 2019 -0500 path.c: Fix a memory leak (unfreed memory)
+
+====
+
+BEHAVIOR: printing in interrupt handlers sometimes bugs out
+CAUSE: while printing the IF is not cleared
+SINCE: 8c34b41c82a4cbf4e34a18caae81ce852085628b Mon Mar 4 13:24:50 2019 -0600 MP3 Release
+FIXED: 4689e809b0b5bff0829eb10d3aab54a8e0ff2329 Sat Mar 9 20:03:59 2019 -0600 Make screen writing interrupt-free
+
+====
