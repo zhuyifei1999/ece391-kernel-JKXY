@@ -6,6 +6,7 @@
 #include "../mm/paging.h"
 #include "../irq.h"
 #include "../initcall.h"
+#include "../printk.h"
 
 // adapted from: https://github.com/szhou42/osdev/tree/master/src/kernel
 

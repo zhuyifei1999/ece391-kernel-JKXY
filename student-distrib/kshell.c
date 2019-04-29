@@ -23,6 +23,8 @@ static int kselftest(void *args) {
 static int kshell(void *args) {
     set_current_comm("kshell");
 
+    do_setsid();
+
     struct file *tty = filp_open_anondevice(TTY_CONSOLE, O_RDWR, S_IFCHR | 0666);
 
     while (1) {
