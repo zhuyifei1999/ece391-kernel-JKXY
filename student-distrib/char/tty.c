@@ -145,8 +145,9 @@ void tty_put(struct tty *tty) {
     unsigned long flags;
     cli_and_save(flags);
 
-    // No more reference count, let's enter a critical section and recheck
     if (!atomic_get(&tty->refcount)) {
+        free_pages(tty->video_mem, 1, 0);
+
         list_remove(&ttys, tty);
         kfree(tty);
     }
@@ -834,6 +835,7 @@ void tty_switch_foreground(uint32_t device_num) {
     foreground_tty = tty;
     // copy the video memory
     memcpy(vga_mem, tty->video_mem, LEN_4K);
+    free_pages(tty->video_mem, 1, 0);
     tty->video_mem = vga_mem;
 
     // set new tty's info to the screen

@@ -488,7 +488,6 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                     if ((*table)[PAGE_TABLE_IDX((uint32_t)ret)+offset].present)
                         goto err_nofree;
                 }
-
             } else { // !dir_entry->present
                 table = mk_user_table(dir_entry);
                 if (!table)
