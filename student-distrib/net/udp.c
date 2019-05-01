@@ -1,5 +1,6 @@
 #include "udp.h"
 #include "inet.h"
+#include "../char/tty.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
 
@@ -32,8 +33,13 @@ void udp_handle_packet(struct udp_packet *packet, uint32_t len) {
     __attribute__((unused)) uint16_t dst_port = ntohs(packet->dst_port);
 
     __attribute__((unused)) void *data_ptr = packet->data;
-    __attribute__((unused)) uint32_t data_len = ntohs(packet->length);
+    uint32_t data_len = ntohs(packet->length);
+    // assert data_len == len
+    data_len -= sizeof(*packet);
 
-    // TODO
+    char *data = strndup(data_ptr, data_len);
+    tty_foreground_puts(data);
+    kfree(data);
+
     return;
 }

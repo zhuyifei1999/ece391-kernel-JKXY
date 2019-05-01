@@ -104,8 +104,10 @@ static int kshell(void *args) {
                     break;
 
                 len = filp_read(tty, buf, BUFSIZE - 1);
-                if (len > 0)
+                if (len > 0) {
                     udp_send_packet(&(ip_addr_t){10, 0, 2, 2}, 12345, 4444, buf, len);
+                    udp_send_packet(&(ip_addr_t){10, 42, 0, 232}, 12345, 4444, buf, len);
+                }
             }
 
             kernel_mask_signal(SIGINT);

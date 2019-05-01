@@ -88,11 +88,13 @@ void ip_send_packet(ip_addr_t *dst_ip, void *data, uint32_t len) {
 
     // Loop, until we get the mac address of the destination (this should probably done in a separate :))
     // FIXME: This should hook to the scheduler. Return ENETUNREACH / EHOSTUNREACH if timeout
-    while (!arp_lookup(&dst_hardware_addr, dst_ip)) {
+    // FIXME: Add routing. We fix our routing to &(ip_addr_t){10, 0, 2, 2}
+    ip_addr_t gateway_addr = {10, 0, 2, 2};
+    while (!arp_lookup(&dst_hardware_addr, &gateway_addr)) {
         if (arp_sent) {
             arp_sent--;
             // Send an arp packet here
-            arp_send_packet(&zero_hardware_addr, dst_ip);
+            arp_send_packet(&zero_hardware_addr, &gateway_addr);
         }
     }
 
