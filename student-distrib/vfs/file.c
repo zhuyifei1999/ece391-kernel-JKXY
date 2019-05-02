@@ -252,18 +252,7 @@ struct file *filp_open(const char *path, uint32_t flags, uint16_t mode) {
     return filp_openat(AT_FDCWD, path, flags, mode);
 }
 
-/*
- *   filp_open_anondevice
- *   DESCRIPTION: open the device without a dev file
- *   INPUTS: uint32_t dev, uint32_t flags, uint16_t mode
- *   RETURN VALUE: file
- *   operation
- */
-struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
-    struct file_operations *file_op = get_dev_file_op(mode, dev);
-    if (!file_op)
-        return ERR_PTR(-ENXIO);
-
+struct file *filp_open_dummy(struct file_operations *file_op, int32_t (*prep_inode)(struct inode *inode, void *prep_arg), void *prep_arg, uint32_t flags, uint16_t mode) {
     struct path *path_dest = path_clone(&root_path);
     if (IS_ERR(path_dest))
         return ERR_CAST(path_dest);
@@ -276,9 +265,13 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
         ret = ERR_CAST(inode);
         goto out_destroy_path;
     }
-    // assign the inode's dev number to dev
-    inode->rdev = dev;
     inode->mode = mode;
+
+    if (prep_inode) {
+        ret = ERR_PTR(prep_inode(inode, prep_arg));
+        if (IS_ERR(ret))
+            goto out_put_inode;
+    }
 
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
@@ -313,6 +306,33 @@ out_destroy_path:
         path_destroy(path_dest);
 
     return ret;
+}
+
+int32_t filp_open_anondevice_inode_prep(struct inode *inode, void *prep_arg) {
+    uint32_t *dev = prep_arg;
+    // assign the inode's dev number to dev
+    inode->rdev = *dev;
+
+    return 0;
+}
+/*
+ *   filp_open_anondevice
+ *   DESCRIPTION: open the device without a dev file
+ *   INPUTS: uint32_t dev, uint32_t flags, uint16_t mode
+ *   RETURN VALUE: file
+ *   operation
+ */
+struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
+    struct file_operations *file_op = get_dev_file_op(mode, dev);
+    if (!file_op)
+        return ERR_PTR(-ENXIO);
+
+    struct file *file = filp_open_dummy(file_op, filp_open_anondevice_inode_prep, &dev, flags, mode);
+    if (IS_ERR(file))
+        goto out;
+
+out:
+    return file;
 }
 
 /*

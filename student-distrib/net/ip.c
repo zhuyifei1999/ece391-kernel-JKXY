@@ -120,7 +120,7 @@ void ip_handle_packet(struct ip_packet *packet, uint32_t len) {
 
         // If this is a UDP packet
         if (packet->protocol == PROTOCOL_UDP) {
-            udp_handle_packet((void *)packet->data, data_len);
+            udp_handle_packet(&packet->src_ip, (void *)packet->data, data_len);
         }
         // What ? that's it ? that's ip packet handling ??
         // not really... u need to handle ip fragmentation... but let's make sure we can handle one ip packet first

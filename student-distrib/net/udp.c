@@ -11,7 +11,7 @@ uint16_t udp_calculate_checksum(struct udp_packet *packet) {
     return 0;
 }
 
-void udp_send_packet(ip_addr_t *dst_ip, uint16_t src_port, uint16_t dst_port, void *data, uint32_t len) {
+void udp_send_packet(ip_addr_t *dst_ip, uint16_t src_port, uint16_t dst_port, const void *data, uint32_t len) {
     uint32_t length = sizeof(struct udp_packet) + len;
     struct udp_packet *packet = kmalloc(length);
     *packet = (struct udp_packet) {
@@ -28,18 +28,20 @@ void udp_send_packet(ip_addr_t *dst_ip, uint16_t src_port, uint16_t dst_port, vo
     kfree(packet);
 }
 
-void udp_handle_packet(struct udp_packet *packet, uint32_t len) {
-    __attribute__((unused)) uint16_t src_port = ntohs(packet->src_port);
-    __attribute__((unused)) uint16_t dst_port = ntohs(packet->dst_port);
+void udp_handle_packet(ip_addr_t *src_ip, struct udp_packet *packet, uint32_t len) {
+    uint16_t src_port = ntohs(packet->src_port);
+    uint16_t dst_port = ntohs(packet->dst_port);
 
-    __attribute__((unused)) void *data_ptr = packet->data;
+    void *data_ptr = packet->data;
     uint32_t data_len = ntohs(packet->length);
     // assert data_len == len
     data_len -= sizeof(*packet);
 
-    char *data = strndup(data_ptr, data_len);
-    tty_foreground_puts(data);
-    kfree(data);
+    udp_receive(src_ip, src_port, dst_port, data_ptr, data_len);
+
+    // char *data = strndup(data_ptr, data_len);
+    // tty_foreground_puts(data);
+    // kfree(data);
 
     return;
 }

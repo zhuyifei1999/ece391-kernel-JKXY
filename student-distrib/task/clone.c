@@ -22,15 +22,11 @@
  */
 static uint16_t _next_pid() {
     static uint16_t pid = 1;
-    unsigned long flags;
 
-    cli_and_save(flags);
-    uint16_t ret = pid;
     // circularly get the next pid
-    pid++;
+    uint16_t ret = pid++;
     if (pid > MAXPID)
         pid = LOOPPID;
-    restore_flags(flags);
 
     return ret;
 }

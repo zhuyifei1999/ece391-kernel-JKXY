@@ -31,6 +31,7 @@ void receive_packet() {
     // and probabbly this should be done in a separate thread...
     void *packet = kmalloc(packet_length);
     memcpy(packet, t, packet_length);
+    // TODO: this should be run in BH
     ethernet_handle_packet(packet, packet_length);
 
     current_packet_ptr = (current_packet_ptr + packet_length + 4 + 3) & RX_READ_POINTER_MASK;

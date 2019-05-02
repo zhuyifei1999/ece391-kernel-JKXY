@@ -96,7 +96,8 @@ DEFINE_SYSCALL3(LINUX, poll, struct pollfd *, fds, int32_t, nfds, int32_t, timeo
         }
         list_destroy(&poll_table[i].cleanup_cb);
 
-        filp_close(poll_table[i].file);
+        if (poll_table[i].file)
+            filp_close(poll_table[i].file);
 
         fds[i].revents = poll_table[i].revents;
     }

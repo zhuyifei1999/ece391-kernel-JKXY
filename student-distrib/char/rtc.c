@@ -35,15 +35,12 @@ static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
     struct rtc_private *private = file->vendor;
 
     // Only one task can wait per struct file
-    cli();
     // set busy if there is already task waiting
     if (private->task) {
-        sti();
         return -EBUSY;
     }
     // set task to current task
     private->task = current;
-    sti();
 
     // TODO: For the linux subsystem, write number of interrupts sinse last read
     uint32_t init_counter_div = private->counter_div;

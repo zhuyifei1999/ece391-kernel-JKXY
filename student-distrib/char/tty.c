@@ -889,7 +889,7 @@ void exit_vidmap_cb() {
 
 /*
  *   init_tty_char
- *   DESCRIPTION: initialize the tty
+ *   DESCRIPTION: initialize the tty character device
  */
 static void init_tty_char() {
     register_dev(S_IFCHR, MKDEV(TTY_MAJOR, MINORMASK), &tty_dev_op);

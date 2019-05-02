@@ -153,6 +153,8 @@ void fill_default_ino_op(struct inode_operations *ino_op);
 
 struct file *filp_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mode);
 struct file *filp_open(const char *path, uint32_t flags, uint16_t mode);
+
+struct file *filp_open_dummy(struct file_operations *file_op, int32_t (*prep_inode)(struct inode *inode, void *prep_arg), void *prep_arg, uint32_t flags, uint16_t mode);
 struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode);
 
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence);

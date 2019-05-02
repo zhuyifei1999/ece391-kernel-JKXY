@@ -19,7 +19,7 @@ static void syscall_handler(struct intr_info *info) {
         handler = syscall_handlers[current->subsystem][info->eax];
     // print error message when handler is not defined
     if (!handler) {
-        printk("%s[%d]: Unknown syscall: %u\n", current->comm, current->pid, info->eax);
+        // printk("%s[%d]: Unknown syscall: %u\n", current->comm, current->pid, info->eax);
         info->eax = -ENOSYS;
     } else {
         // call handler when defined
