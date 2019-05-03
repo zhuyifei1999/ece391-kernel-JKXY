@@ -1,9 +1,9 @@
 #include "session.h"
 #include "task.h"
 #include "../mm/kmalloc.h"
+#include "../syscall.h"
 #include "../err.h"
 #include "../errno.h"
-
 
 int32_t do_setsid(void) {
     struct list_node *node;
@@ -19,13 +19,13 @@ int32_t do_setsid(void) {
     *session = (struct session){
         .sid = current->pid,
         .foreground_pgid = current->pid,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&session->refcount, 1);
 
     current->session = session;
     current->pgid = current->pid;
 
-    return current->pgid;
+    return current->session->sid;
 }
 
 void put_session() {
@@ -73,3 +73,27 @@ int32_t do_setpgid(int32_t pid, int32_t pgid) {
     task->pgid = pgid;
     return 0;
 }
+
+DEFINE_SYSCALL0(LINUX, setsid) {
+    return do_setsid();
+}
+
+DEFINE_SYSCALL1(LINUX, getpgid, uint32_t, pid) {
+    struct task_struct *task = get_task_from_pid(pid);
+    if (IS_ERR(task))
+        return PTR_ERR(task);
+
+    return task->pgid;
+}
+
+DEFINE_SYSCALL2(LINUX, setpgid, uint32_t, pid, uint32_t, pgid) {
+    return do_setpgid(pid, pgid);
+}
+
+DEFINE_SYSCALL0(LINUX, getpgrp) {
+    return current->pgid;
+}
+
+// DEFINE_SYSCALL0(LINUX, setpgrp) {
+//     return do_setpgid(0, 0);
+// }

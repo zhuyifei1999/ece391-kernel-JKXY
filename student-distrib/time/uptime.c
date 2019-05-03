@@ -1,7 +1,7 @@
-#include "timer.h"
-#include "lib/cli.h"
-#include "drivers/rtc.h"
-#include "initcall.h"
+#include "uptime.h"
+#include "../lib/cli.h"
+#include "../drivers/rtc.h"
+#include "../initcall.h"
 
 static uint32_t last_calibration = rtc_rate_to_freq(RTC_HW_RATE);
 static uint32_t rtc_counter = 0;
@@ -38,24 +38,25 @@ static void rtc_handler() {
     rtc_counter++;
 }
 
-void get_timer(struct timer_data *data) {
+void get_uptime(struct timespec *data) {
     unsigned long flags;
     cli_and_save(flags);
 
-    // Make sure millis can never go above 1000
+    // Make sure nsec can never go above NSEC
     uint32_t counter = rtc_counter;
     if (counter >= last_calibration)
         counter = last_calibration - 1;
 
-    *data = (struct timer_data) {
-        .seconds = seconds,
-        .millis = counter * 1000 / last_calibration
+    // multiply in two stages because otherwise we will overflow
+    *data = (struct timespec){
+        .sec = seconds,
+        .nsec = counter * 1000000 / last_calibration * 1000
     };
 
     restore_flags(flags);
 }
 
-static void init_timer() {
+static void init_uptime() {
     register_rtc_handler(&rtc_handler);
 }
-DEFINE_INITCALL(init_timer, drivers);
+DEFINE_INITCALL(init_uptime, drivers);

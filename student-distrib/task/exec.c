@@ -1,18 +1,139 @@
 #include "exec.h"
 #include "ece391exec_shim.h"
+#include "userstack.h"
+#include "signal.h"
+#include "fp.h"
 #include "../char/tty.h"
+#include "../char/random.h"
 #include "../lib/string.h"
 #include "../mm/paging.h"
 #include "../mm/kmalloc.h"
 #include "../vfs/file.h"
 #include "../vfs/device.h"
 #include "../vfs/path.h"
+#include "../cpuid.h"
 #include "../panic.h"
+#include "../syscall.h"
 #include "../eflags.h"
 #include "../err.h"
 #include "../errno.h"
 
 static char elf_magic[4] = {0x7f, 0x45, 0x4c, 0x46};
+
+struct elf_header {
+    char magic[4];
+    uint8_t bit;
+    uint8_t endian;
+    uint8_t header_version;
+    uint8_t abi;
+    char padding[8];
+    uint16_t type;
+    uint16_t isa;
+    uint32_t elf_version;
+    uint32_t entry_pos;
+    uint32_t segment_pos;
+    uint32_t section_pos;
+    uint32_t flags;
+    uint16_t header_size;
+    uint16_t segment_entry_size;
+    uint16_t segment_entry_num;
+    uint16_t section_entry_size;
+    uint16_t section_entry_num;
+    uint16_t section_name_idx;
+};
+
+struct elf_segment {
+    uint32_t type;
+    uint32_t file_offset;
+    uint32_t virt_addr;
+    uint32_t undefined;
+    uint32_t file_size;
+    uint32_t mem_size;
+    uint32_t flags;
+    uint32_t alignment;
+};
+
+// source: <api/linux/auxvec.h>
+#define AT_NULL   0    /* end of vector */
+#define AT_IGNORE 1    /* entry should be ignored */
+#define AT_EXECFD 2    /* file descriptor of program */
+#define AT_PHDR   3    /* program headers for program */
+#define AT_PHENT  4    /* size of program header entry */
+#define AT_PHNUM  5    /* number of program headers */
+#define AT_PAGESZ 6    /* system page size */
+#define AT_BASE   7    /* base address of interpreter */
+#define AT_FLAGS  8    /* flags */
+#define AT_ENTRY  9    /* entry point of program */
+#define AT_NOTELF 10    /* program is not ELF */
+#define AT_UID    11    /* real uid */
+#define AT_EUID   12    /* effective uid */
+#define AT_GID    13    /* real gid */
+#define AT_EGID   14    /* effective gid */
+#define AT_PLATFORM 15  /* string identifying CPU for optimizations */
+#define AT_HWCAP  16    /* arch dependent hints at CPU capabilities */
+#define AT_CLKTCK 17    /* frequency at which times() increments */
+/* AT_* values 18 through 22 are reserved */
+#define AT_SECURE 23   /* secure mode boolean */
+#define AT_BASE_PLATFORM 24    /* string identifying real platform, may
+                 * differ from AT_PLATFORM. */
+#define AT_RANDOM 25    /* address of 16 random bytes */
+#define AT_HWCAP2 26    /* extension of AT_HWCAP */
+
+#define AT_EXECFN 31    /* filename of program */
+
+// <uapi/asm/auxvec.h>
+#define AT_SYSINFO		32
+#define AT_SYSINFO_EHDR		33
+
+struct auxv {
+    int type;
+    long val;
+};
+
+static int32_t decode_elf(struct file *exe, struct elf_header *header) {
+    int32_t res;
+
+    res = filp_seek(exe, 0, SEEK_SET);
+    if (res < 0)
+        return res;
+    if (res != 0)
+        return -ENOEXEC;
+
+    res = filp_read(exe, header, sizeof(*header));
+    if (res < 0)
+        return res;
+    if (res != sizeof(*header))
+        return -ENOEXEC;
+
+    if (strncmp(header->magic, elf_magic, sizeof(elf_magic)))
+        return -ENOEXEC;
+    if (header->bit != 1)
+        return -ENOEXEC;
+    if (header->endian != 1)
+        return -ENOEXEC;
+    if (header->header_version != 1)
+        return -ENOEXEC;
+    if (header->abi != 0)
+        return -ENOEXEC;
+    if (header->type != 2)
+        return -ENOEXEC;
+    if (header->isa != 3)
+        return -ENOEXEC;
+    if (header->elf_version != 1)
+        return -ENOEXEC;
+    if (header->header_size != sizeof(struct elf_header))
+        return -ENOEXEC;
+    if (header->segment_entry_size != sizeof(struct elf_segment))
+        return -ENOEXEC;
+
+    return 0;
+}
+
+static inline __always_inline uint32_t hwcap() {
+    uint32_t a, d;
+    cpuid(1, &a, &d);
+    return d;
+}
 
 /*
  *   do_execve
@@ -39,10 +160,19 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         goto err_close;
     }
 
-    ret = 0;
+    struct elf_header header;
 
-    // TODO: determine subsystem
-    enum subsystem subsystem = SUBSYSTEM_ECE391;
+    ret = decode_elf(exe, &header);
+    if (ret)
+        goto err_close;
+
+    enum subsystem subsystem;
+
+    // TDDO: Any better way?
+    if (header.segment_entry_num == 3)
+        subsystem = SUBSYSTEM_ECE391;
+    else
+        subsystem = SUBSYSTEM_LINUX;
 
     // ECE391 subsystem cannot have more than 6 userspace processes
     // Grading criteria. Nothing can be said...
@@ -63,6 +193,15 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     }
 
     filp_seek(exe, 0, SEEK_SET);
+
+    if (!current->cwd)
+        current->cwd = filp_open("/", O_DIRECTORY, 0);
+
+    if (IS_ERR(current->cwd)) {
+        ret = PTR_ERR(current->cwd);
+        goto err_close;
+    }
+
     // TODO: start of point of no return. If anything fails here deliver SIGSEGV
 
     *current->entry_regs = (struct intr_info){
@@ -86,17 +225,19 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
         uint32_t i;
         array_for_each(&current->files->files, i) {
             struct file *file = array_get(&current->files->files, i);
-            if (file && (file->flags & O_CLOEXEC)) {
+            if (file && array_get(&current->files->cloexec, i)) {
+                // close the file if necessary
                 filp_close(file);
-                //replace current's execution by function's arg
                 array_set(&current->files->files, i, NULL);
+                array_set(&current->files->cloexec, i, NULL);
             }
         }
     } else {
         // if not, give it a default set of file descriptors
         current->files = kmalloc(sizeof(*current->files));
-        atomic_set(&current->files->refcount, 1);
-        current->files->files = (struct array){0};
+        *current->files = (struct files_struct){
+            .refcount = ATOMIC_INITIALIZER(1),
+        };
         switch (subsystem) {
         case SUBSYSTEM_LINUX:;
             struct file *tty = filp_open_anondevice(TTY_CURRENT, O_RDWR, S_IFCHR | 0666);
@@ -123,27 +264,183 @@ int32_t do_execve(char *filename, char *argv[], char *envp[]) {
     }
     // malloc the mm for current
     current->mm = kmalloc(sizeof(*current->mm));
-    current->mm->page_directory = new_pagedir;
-    atomic_set(&current->mm->refcount, 1);
+    *current->mm = (struct mm_struct){
+        .brk = 0,
+        .page_directory = new_pagedir,
+        .refcount = ATOMIC_INITIALIZER(1),
+    };
+
+    memset(current->ldt, 0, sizeof(current->ldt));
+    memset(current->gdt_tls, 0, sizeof(current->gdt_tls));
+
+    if (current->fxsave_data) {
+        kfree(current->fxsave_data);
+        current->fxsave_data = NULL;
+    }
+    finit();
+
+    if (!atomic_dec(&current->sigactions->refcount))
+        kfree(current->sigactions);
+    current->sigactions = kmalloc(sizeof(*current->sigactions));
+    *current->sigactions = (struct sigactions){
+        .refcount = ATOMIC_INITIALIZER(1),
+    };
+
     current->subsystem = subsystem;
 
-    // check if the content and pointer of argv are valid
-    if (argv && argv[0] && *argv[0])
-        set_current_comm(argv[0]);
-    else
-        set_current_comm(list_peek_back(&exe->path->components));
+    set_current_comm(list_peek_back(&exe->path->components));
 
     switch_directory(new_pagedir);
 
     switch (subsystem) {
-    case SUBSYSTEM_LINUX:
-        // TODO
+    case SUBSYSTEM_LINUX: {
+        uint32_t i;
+        uint32_t pos = header.segment_pos;
+        int32_t res;
+        uint32_t file_hdraddr = 0;
+
+        for (i = 0; i < header.segment_entry_num; i++) {
+            struct elf_segment segment;
+
+            res = filp_seek(exe, pos, SEEK_SET);
+            if (res != pos)
+                goto force_sigsegv;
+
+            res = filp_read(exe, &segment, sizeof(segment));
+            if (res != sizeof(segment))
+                goto force_sigsegv;
+
+            switch (segment.type) {
+            case 1: {
+                // LOAD
+                if (segment.file_size > segment.mem_size)
+                    segment.file_size = segment.mem_size;
+                if (!segment.mem_size)
+                    continue;
+
+                uint32_t mapaddr = PAGE_IDX_ADDR(PAGE_IDX(segment.virt_addr));
+                uint32_t numpages = PAGE_IDX(segment.mem_size + segment.virt_addr - mapaddr - 1) + 1;
+                if (!request_pages((void *)mapaddr, numpages, GFP_USER | ((segment.flags & 2) ? 0 : GFP_RO)))
+                    goto force_sigsegv;
+
+                res = filp_seek(exe, segment.file_offset, SEEK_SET);
+                if (res != segment.file_offset)
+                    goto force_sigsegv;
+
+                res = filp_read(exe, (void *)segment.virt_addr, segment.file_size);
+                if (res != segment.file_size)
+                    goto force_sigsegv;
+
+                if (segment.flags & 2)
+                    if (!current->mm->brk || segment.file_size != segment.mem_size)
+                        current->mm->brk = segment.virt_addr + segment.mem_size;
+
+                if (!segment.file_offset)
+                    file_hdraddr = segment.virt_addr;
+
+                break;
+            }
+            case 2: // DYNAMIC
+            case 3: // INTERP
+                goto force_sigsegv; // TODO
+            }
+
+            pos += header.segment_entry_size;
+        }
+
+        current->entry_regs->eip = header.entry_pos;
+
+        // TODO: Any better way to make a better stack address?
+        uint32_t stack_page = (2U << 30) - PAGE_SIZE_LARGE;
+        if (!request_pages((void *)stack_page, 1, GFP_USER | GFP_LARGE))
+            goto force_sigsegv;
+        current->entry_regs->esp = stack_page + PAGE_SIZE_LARGE;
+
+        // Now setup the stack
+
+        // Map VDSO
+        // uint32_t vdso_addr = 2U << 30;
+        // extern unsigned char vdso_start, vdso_end, vsyscall;
+        // if (!request_pages((void *)vdso_addr, 1, GFP_USER | GFP_RO))
+        //     goto force_sigsegv;
+        // memcpy((void *)vdso_addr, &vdso_start, &vdso_end - &vdso_start);
+
+        uint32_t envp_len = 0;
+        if (envp)
+            for (; envp[envp_len]; envp_len++);
+
+        char **envp_user = kcalloc(envp_len + 1, sizeof(*envp_user));
+        for (i = 0; i < envp_len; i++) {
+            push_userstack(current->entry_regs, envp[i], strlen(envp[i]) + 1);
+            envp_user[i] = (void *)current->entry_regs->esp;
+        }
+
+        uint32_t argv_len = 0;
+        if (argv)
+            for (; argv[argv_len]; argv_len++);
+
+        char **argv_user = kcalloc(argv_len + 1, sizeof(*argv_user));
+        for (i = 0; i < argv_len; i++) {
+            push_userstack(current->entry_regs, argv[i], strlen(argv[i]) + 1);
+            argv_user[i] = (void *)current->entry_regs->esp;
+        }
+
+        for (i = 0; i < 16; i++) {
+            int32_t rand = rdrand();
+            push_userstack(current->entry_regs, &rand, sizeof(rand));
+        }
+        uint32_t rand_ptr = current->entry_regs->esp;
+
+        // Now align the stack
+        current->entry_regs->esp &= ~0xf;
+
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_NULL }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_UID, .val = 0 }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_EUID, .val = 0 }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_GID, .val = 0 }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_EGID, .val = 0 }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_RANDOM, .val = rand_ptr }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_PHDR, .val = file_hdraddr + header.segment_pos }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_PHENT, .val = sizeof(struct elf_segment) }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_PHNUM, .val = header.segment_entry_num }, sizeof(struct auxv));;
+        push_userstack(current->entry_regs, // TODO: is this correct?
+            &(struct auxv){ .type = AT_BASE, .val = file_hdraddr }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_ENTRY, .val = header.entry_pos }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_PAGESZ, .val = PAGE_SIZE_SMALL }, sizeof(struct auxv));
+        push_userstack(current->entry_regs,
+            &(struct auxv){ .type = AT_HWCAP, .val = hwcap() }, sizeof(struct auxv));
+        // push_userstack(current->entry_regs,
+        //     &(struct auxv){ .type = AT_SYSINFO, .val = vdso_addr + (&vsyscall - &vdso_start) }, sizeof(struct auxv));
+        // push_userstack(current->entry_regs,
+        //     &(struct auxv){ .type = AT_SYSINFO_EHDR, .val = vdso_addr }, sizeof(struct auxv));
+
+        push_userstack(current->entry_regs, envp_user, (envp_len + 1) * sizeof(*envp_user));
+        push_userstack(current->entry_regs, argv_user, (argv_len + 1) * sizeof(*argv_user));
+
+        kfree(envp_user);
+        kfree(argv_user);
+
+        push_userstack(current->entry_regs, &argv_len, sizeof(argv_len));
+
         // TODO: EDX = a function pointer that the application should register with atexit (BA_OS)
         break;
-    case SUBSYSTEM_ECE391:;
+    }
+    case SUBSYSTEM_ECE391:
         // ECE391 subsystem always map the file to 0x08048000,
         // with stack bottom at the end of the page
         request_pages((void *)ECE391_PAGEADDR, 1, GFP_USER | GFP_LARGE);
+        filp_seek(exe, 0, SEEK_SET);
         filp_read(exe, (void *)(ECE391_PAGEADDR + ECE391_MAPADDR), LEN_4M - ECE391_MAPADDR);
         current->entry_regs->eip = *(uint32_t *)(ECE391_PAGEADDR + ECE391_MAPADDR + 24);
         current->entry_regs->esp = ECE391_PAGEADDR + LEN_4M;
@@ -161,4 +458,54 @@ err_close:
         filp_close(exe);
 
     return ret;
+
+force_sigsegv:
+    force_sig(current, SIGSEGV);
+    return 0;
+}
+
+DEFINE_SYSCALL_COMPLEX(LINUX, execve, regs) {
+    char *filename = (void *)regs->ebx;
+    char **argv = (void *)regs->ecx;
+    char **envp = (void *)regs->edx;
+
+    uint32_t filename_len, argv_len, envp_len;
+
+    regs->eax = -EFAULT;
+    if (!filename || !(filename_len = safe_arr_null_term(filename, sizeof(*filename), false)))
+        return;
+    if (!argv || !(argv_len = safe_arr_null_term(argv, sizeof(*argv), false)))
+        return;
+    if (!envp || !(envp_len = safe_arr_null_term(envp, sizeof(*envp), false)))
+        return;
+
+    char *filename_k = strndup(filename, filename_len);
+
+    char **argv_k = NULL;
+    char **envp_k = NULL;
+
+    uint32_t i;
+    argv_k = kcalloc(argv_len + 1, sizeof(*argv));
+    for (i = 0; i < argv_len; i++)
+        argv_k[i] = strndup(argv[i], safe_arr_null_term(argv[i], 1, false));
+
+    envp_k = kcalloc(envp_len + 1, sizeof(*envp));
+    for (i = 0; i < envp_len; i++)
+        envp_k[i] = strndup(envp[i], safe_arr_null_term(envp[i], 1, false));
+
+    current->entry_regs = regs;
+
+    int32_t res = do_execve(filename_k, argv_k, envp_k);
+    if (res < 0)
+        regs->eax = res;
+
+    kfree(filename_k);
+
+    for (i = 0; i < argv_len; i++)
+        kfree(argv_k[i]);
+    kfree(argv_k);
+
+    for (i = 0; i < envp_len; i++)
+        kfree(envp_k[i]);
+    kfree(envp_k);
 }

@@ -1,12 +1,15 @@
 #include "clone.h"
 #include "exit.h"
 #include "session.h"
+#include "sched.h"
 #include "signal.h"
+#include "tls.h"
 #include "../mm/kmalloc.h"
 #include "../lib/string.h"
 #include "../eflags.h"
 #include "../panic.h"
 #include "../x86_desc.h"
+#include "../syscall.h"
 #include "../initcall.h"
 #include "../err.h"
 #include "../errno.h"
@@ -19,15 +22,11 @@
  */
 static uint16_t _next_pid() {
     static uint16_t pid = 1;
-    unsigned long flags;
 
-    cli_and_save(flags);
-    uint16_t ret = pid;
     // circularly get the next pid
-    pid++;
+    uint16_t ret = pid++;
     if (pid > MAXPID)
         pid = LOOPPID;
-    restore_flags(flags);
 
     return ret;
 }
@@ -55,9 +54,13 @@ static void clone_entry_handler(struct intr_info *info) {
     int (*fn)(void *args) = (void *)info->ebx;
     void *args = (void *)info->ecx;
     int *tidptr = (void *)info->edx;
+    struct user_desc *newtls = (void *)info->esi;
 
-    if (flags & CLONE_PARENT_SETTID)
+    if (flags & CLONE_PARENT_SETTID && tidptr)
         *tidptr = current->pid;
+
+    if (flags & CLONE_SETTLS && newtls)
+        do_set_thread_area(newtls);
 
     current->entry_regs = info;
 
@@ -85,18 +88,19 @@ DEFINE_INITCALL(init_clone_entry, early);
 /*
  *   do_clone
  *   DESCRIPTION: clone a child task from the parent
- *   INPUTS: uint32_t flags, int (*fn)(void *args), void *args, int *parent_tidptr, int *child_tidptr
+ *   INPUTS: uint32_t flags, int (*fn)(void *args), void *args, int *ptid, int *ctid
  *   RETURN VALUE: next available pid number
  *   SIDE EFFECTS: none
  */
-struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, int *parent_tidptr, int *child_tidptr) {
+struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, int *ptid, int *ctid, struct user_desc *newtls) {
     struct task_struct *task = alloc_pages(TASK_STACK_PAGES, TASK_STACK_PAGES_POW, 0);
     if (!task)
         return ERR_PTR(-ENOMEM);
     // TODO: handle OOMs, if fail I think they should just be SIGSEGV-ed
 
     // increase reference count
-    atomic_inc(&current->cwd->refcount);
+    if (current->cwd)
+        atomic_inc(&current->cwd->refcount);
     if (current->exe)
         atomic_inc(&current->exe->refcount);
     if (current->session)
@@ -123,9 +127,16 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
             task->mm = current->mm;
         } else {
             task->mm = kmalloc(sizeof(*task->mm));
-            atomic_set(&task->mm->refcount, 1);
-            task->mm->page_directory = clone_directory(current->mm->page_directory);
+            *task->mm = (struct mm_struct){
+                .brk = current->mm->brk,
+                .page_directory = clone_directory(current->mm->page_directory),
+                .refcount = ATOMIC_INITIALIZER(1),
+            };
         }
+
+        // although irrelevant, only those with mm can have TLS, right?
+        memcpy(task->ldt, current->ldt, sizeof(task->ldt));
+        memcpy(task->gdt_tls, current->gdt_tls, sizeof(task->gdt_tls));
     }
 
     // if share the files, increase the reference count of these files. otherwise copy the file table
@@ -135,10 +146,9 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
             task->files = current->files;
         } else {
             task->files = kmalloc(sizeof(*task->files));
-            // initialize an empty array of file
-            task->files->files = (struct array){0};
-            // the reference count of opened files
-            atomic_set(&task->files->refcount, 1);
+            *task->files = (struct files_struct){
+                .refcount = ATOMIC_INITIALIZER(1),
+            };
             uint32_t i;
             // loop over all files
             array_for_each(&current->files->files, i) {
@@ -147,6 +157,11 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
                     array_set(&task->files->files, i, file);
                     atomic_inc(&file->refcount);
                 }
+            }
+            array_for_each(&current->files->cloexec, i) {
+                void *val = array_get(&current->files->cloexec, i);
+                if (val)
+                    array_set(&task->files->cloexec, i, val);
             }
         }
     }
@@ -161,8 +176,17 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         atomic_set(&task->sigactions->refcount, 1);
     }
 
-    if (flags & CLONE_PARENT_SETTID)
-        *parent_tidptr = task->pid;
+    // The child needs to shared the same FP registers (also irrelevant with mm, but...)
+    if (current->mm) {
+        task->fxsave_data = kmalloc(sizeof(*task->fxsave_data));
+        if (current->fxsave_data)
+            memcpy(task->fxsave_data, current->fxsave_data, sizeof(*task->fxsave_data));
+        else
+            fxsave(task->fxsave_data);
+    }
+
+    if (flags & CLONE_PARENT_SETTID && ptid)
+        *ptid = task->pid;
 
     // The position of this struct intr_info controls where the stack is going
     // to end up, not any of the contents in the struct, bacause we are using
@@ -175,7 +199,8 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
         .eax    = (uint32_t)flags,
         .ebx    = (uint32_t)fn,
         .ecx    = (uint32_t)args,
-        .edx    = (uint32_t)child_tidptr,
+        .edx    = (uint32_t)ctid,
+        .esi    = (uint32_t)newtls,
         .eflags = EFLAGS_BASE | IF,
         .eip    = (uint32_t)&entry_task,
         .cs     = KERNEL_CS,
@@ -200,7 +225,63 @@ struct task_struct *do_clone(uint32_t flags, int (*fn)(void *args), void *args, 
  *   RETURN VALUE: new task
  */
 struct task_struct *kernel_thread(int (*fn)(void *args), void *args) {
-    return do_clone(SIGCHLD, fn, args, NULL, NULL);
+    return do_clone(SIGCHLD, fn, args, NULL, NULL, NULL);
 }
 
-// TODO: fork syscall: cline intr_info to child, set child eax = 0, set parent_tidptr = parent eax
+DEFINE_SYSCALL_COMPLEX(LINUX, clone, regs) {
+    uint32_t flags = regs->ebx;
+    uint32_t child_stack = regs->ecx;
+    int *ptid = (void *)regs->edx;
+    struct user_desc *newtls = (void *)regs->esi;
+    int *ctid = (void *)regs->edi;
+
+    if (ptid && safe_buf(ptid, sizeof(*ptid), true) != sizeof(*ptid))
+        ptid = NULL;
+    if (ctid && safe_buf(ctid, sizeof(*ctid), true) != sizeof(*ctid))
+        ctid = NULL;
+    if (newtls && safe_buf(newtls, sizeof(*newtls), false) != sizeof(*newtls))
+        newtls = NULL;
+
+    struct intr_info *newregs = kmalloc(sizeof(*newregs));
+    if (!newregs) {
+        regs->eax = -ENOMEM;
+        return;
+    }
+    *newregs = *regs;
+
+    newregs->eax = 0;
+
+    if (child_stack)
+        newregs->esp = (uint32_t)child_stack;
+
+    struct task_struct *task = do_clone(SIGCHLD | flags, NULL, newregs, ptid, ctid, newtls);
+    if (IS_ERR(task)) {
+        kfree(newregs);
+        regs->eax = PTR_ERR(task);
+    } else {
+        regs->eax = task->pid;
+        wake_up_process(task);
+    }
+}
+
+DEFINE_SYSCALL_COMPLEX(LINUX, vfork, regs) {
+    struct intr_info *newregs = kmalloc(sizeof(*newregs));
+    if (!newregs) {
+        regs->eax = -ENOMEM;
+        return;
+    }
+    *newregs = *regs;
+
+    newregs->eax = 0;
+
+    struct task_struct *task = do_clone(SIGCHLD | CLONE_VFORK | CLONE_VM, NULL, newregs, NULL, NULL, NULL);
+    if (IS_ERR(task)) {
+        kfree(newregs);
+        regs->eax = PTR_ERR(task);
+    } else {
+        regs->eax = task->pid;
+        wake_up_process(task);
+    }
+
+    // FIXME: We should block until child either exit() or execve()
+}

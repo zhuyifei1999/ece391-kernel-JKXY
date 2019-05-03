@@ -20,17 +20,23 @@
 #define KERNEL_LDT_IDX  7
 #define DUBFLT_TSS_IDX  8
 
+#define TLS_SEG_IDX     9
+#define TLS_SEG_NUM     4
 
-#define SELECTOR(IDX, RPL) ((IDX << 3) + RPL)
+
+#define GDT_SELECTOR(IDX, RPL) (((IDX) << 3) + (RPL))
+#define LDT_SELECTOR(IDX, RPL) (((IDX) << 3) + 4 + (RPL))
+
+#define SELECTER_IDX(sel) ((sel) >> 3)
 
 /* Segment selector values */
-#define KERNEL_CS   SELECTOR(KERNEL_CS_IDX, KERNEL_DPL)
-#define KERNEL_DS   SELECTOR(KERNEL_DS_IDX, KERNEL_DPL)
-#define USER_CS     SELECTOR(USER_CS_IDX, USER_DPL)
-#define USER_DS     SELECTOR(USER_DS_IDX, USER_DPL)
-#define KERNEL_TSS  SELECTOR(KERNEL_TSS_IDX, KERNEL_DPL)
-#define KERNEL_LDT  SELECTOR(KERNEL_LDT_IDX, KERNEL_DPL)
-#define DUBFLT_TSS  SELECTOR(DUBFLT_TSS_IDX, KERNEL_DPL)
+#define KERNEL_CS   GDT_SELECTOR(KERNEL_CS_IDX, KERNEL_DPL)
+#define KERNEL_DS   GDT_SELECTOR(KERNEL_DS_IDX, KERNEL_DPL)
+#define USER_CS     GDT_SELECTOR(USER_CS_IDX, USER_DPL)
+#define USER_DS     GDT_SELECTOR(USER_DS_IDX, USER_DPL)
+#define KERNEL_TSS  GDT_SELECTOR(KERNEL_TSS_IDX, KERNEL_DPL)
+#define KERNEL_LDT  GDT_SELECTOR(KERNEL_LDT_IDX, KERNEL_DPL)
+#define DUBFLT_TSS  GDT_SELECTOR(DUBFLT_TSS_IDX, KERNEL_DPL)
 
 
 /* Number of vectors in the interrupt descriptor table (IDT) */
@@ -50,7 +56,10 @@ struct seg_desc {
     uint16_t seg_lim_15_00;
     uint16_t base_15_00;
     uint8_t  base_23_16;
-    uint32_t type          : 4;
+    uint32_t accessed      : 1;
+    uint32_t rw            : 1;
+    uint32_t dir           : 1;
+    uint32_t exec          : 1;
     uint32_t sys           : 1;
     uint32_t dpl           : 2;
     uint32_t present       : 1;
@@ -124,7 +133,9 @@ extern struct x86_desc gdt_desc;
 
 extern struct seg_desc gdt[];
 
-extern struct seg_desc ldt[];
+typedef struct seg_desc tls_seg_t[TLS_SEG_NUM];
+extern tls_seg_t *gdt_tls;
+extern tls_seg_t ldt;
 
 extern struct tss tss;
 extern struct tss dubflt_tss;
@@ -170,9 +181,9 @@ do {                                    \
  * the base address of the IDT. */
 #define lidt(desc)                      \
 do {                                    \
-    asm volatile ("lidt (%0)"           \
+    asm volatile ("lidt %0"             \
             :                           \
-            : "g" (desc)                \
+            : "m" (desc)                \
             : "memory"                  \
     );                                  \
 } while (0)

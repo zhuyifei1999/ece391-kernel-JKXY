@@ -37,9 +37,7 @@ struct tss dubflt_tss = {
     .cr3 = (uint32_t)&init_page_directory,
 };
 
-struct seg_desc ldt[4];
-struct idt_desc idt[NUM_VEC];
-struct seg_desc gdt[] = {
+struct seg_desc gdt[TLS_SEG_IDX + TLS_SEG_NUM] = {
     [0] = {0}, // First GDT entry cannot be used
     [1] = {0}, // NULL entry
     [KERNEL_CS_IDX] = {
@@ -49,7 +47,10 @@ struct seg_desc gdt[] = {
         .present     = 0x1,
         .dpl         = KERNEL_DPL,
         .sys         = 0x1,
-        .type        = 0xa,
+        .exec        = 0x1,
+        .dir         = 0x0,
+        .rw          = 0x1,
+        .accessed    = 0x0,
 
         .base_31_24 = 0x0,
         .base_23_16 = 0x0,
@@ -64,7 +65,10 @@ struct seg_desc gdt[] = {
         .present     = 0x1,
         .dpl         = KERNEL_DPL,
         .sys         = 0x1,
-        .type        = 0x2,
+        .exec        = 0x0,
+        .dir         = 0x0,
+        .rw          = 0x1,
+        .accessed    = 0x0,
 
         .base_31_24 = 0x0,
         .base_23_16 = 0x0,
@@ -79,7 +83,10 @@ struct seg_desc gdt[] = {
         .present     = 0x1,
         .dpl         = USER_DPL,
         .sys         = 0x1,
-        .type        = 0xa,
+        .exec        = 0x1,
+        .dir         = 0x0,
+        .rw          = 0x1,
+        .accessed    = 0x0,
 
         .base_31_24 = 0x0,
         .base_23_16 = 0x0,
@@ -94,7 +101,10 @@ struct seg_desc gdt[] = {
         .present     = 0x1,
         .dpl         = USER_DPL,
         .sys         = 0x1,
-        .type        = 0x2,
+        .exec        = 0x0,
+        .dir         = 0x0,
+        .rw          = 0x1,
+        .accessed    = 0x0,
 
         .base_31_24 = 0x0,
         .base_23_16 = 0x0,
@@ -106,6 +116,12 @@ struct seg_desc gdt[] = {
     [KERNEL_LDT_IDX] = {0},
     [DUBFLT_TSS_IDX] = {0},
 };
+
+// &gdt[TLS_SEG_IDX] yields a pointer to `struct seg_desc`. We are making
+// a pointer to struct seg_desc [TLS_SEG_NUM]
+tls_seg_t *gdt_tls = (void *)&gdt[TLS_SEG_IDX];
+tls_seg_t ldt;
+struct idt_desc idt[NUM_VEC];
 
 struct x86_desc gdt_desc = {
     .size = sizeof(gdt) - 1,
@@ -125,7 +141,10 @@ void init_x86_desc(void) {
         .present     = 0x1,
         .dpl         = KERNEL_DPL,
         .sys         = 0x0,
-        .type        = 0x2,
+        .exec        = 0x0,
+        .dir         = 0x0,
+        .rw          = 0x1,
+        .accessed    = 0x0,
 
         .base_31_24 = ((uint32_t)(&ldt) & 0xFF000000) >> 24,
         .base_23_16 = ((uint32_t)(&ldt) & 0x00FF0000) >> 16,
@@ -143,7 +162,10 @@ void init_x86_desc(void) {
         .present     = 0x1,
         .dpl         = KERNEL_DPL,
         .sys         = 0x0,
-        .type        = 0x9,
+        .exec        = 0x1,
+        .dir         = 0x0,
+        .rw          = 0x0,
+        .accessed    = 0x1,
 
         .base_31_24 = ((uint32_t)(&tss) & 0xFF000000) >> 24,
         .base_23_16 = ((uint32_t)(&tss) & 0x00FF0000) >> 16,
@@ -161,7 +183,10 @@ void init_x86_desc(void) {
         .present     = 0x1,
         .dpl         = KERNEL_DPL,
         .sys         = 0x0,
-        .type        = 0x9,
+        .exec        = 0x1,
+        .dir         = 0x0,
+        .rw          = 0x0,
+        .accessed    = 0x1,
 
         .base_31_24 = ((uint32_t)(&dubflt_tss) & 0xFF000000) >> 24,
         .base_23_16 = ((uint32_t)(&dubflt_tss) & 0x00FF0000) >> 16,

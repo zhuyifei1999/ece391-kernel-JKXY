@@ -3,17 +3,23 @@
 
 #include "../lib/stdint.h"
 #include "../lib/stdbool.h"
+#include "../time/time.h"
+#include "readdir.h"
 #include "../atomic.h"
 
+#define MAX_PATH 260
+
 // #define O_RDONLY  0x0
-#define O_WRONLY  0x1
-#define O_RDWR    0x2
-#define O_CREAT   0x40
-#define O_EXCL    0x80
-#define O_NOCTTY  0x100
-#define O_TRUNC   0x200
-#define O_APPEND  0x400
-#define O_CLOEXEC 0x80000
+#define O_WRONLY    0x1
+#define O_RDWR      0x2
+#define O_CREAT     0x40
+#define O_EXCL      0x80
+#define O_NOCTTY    0x100
+#define O_TRUNC     0x200
+#define O_APPEND    0x400
+#define O_DIRECTORY 0x10000
+#define O_NOFOLLOW  0x20000
+#define O_CLOEXEC   0x80000
 
 #define AT_FDCWD -100 // Means openat should use CWD
 
@@ -52,12 +58,14 @@
 struct inode;
 struct file;
 
+struct poll_entry;
+
 struct file_operations {
     int32_t (*seek)(struct file *, int32_t, int32_t);
     int32_t (*read)(struct file *, char *, uint32_t);
     int32_t (*write)(struct file *, const char *, uint32_t);
-    // int32_t (*readdir)(struct file *, void *, filldir_t); // TODO: define filldir_t
-    // int32_t (*select)(struct file *, int32_t, select_table *);
+    int32_t (*readdir)(struct file *, void *, filldir_t);
+    int32_t (*poll)(struct file *, struct poll_entry *);
     int32_t (*ioctl)(struct file *, uint32_t, unsigned long, bool);
     // int32_t (*mmap)(struct file *, struct vm_area_struct *);
     int32_t (*open)(struct file *, struct inode *);
@@ -79,7 +87,7 @@ struct inode_operations {
     // int32_t (*rmdir)(struct inode *,const char *,int32_t);
     // int32_t (*mknod)(struct inode *,const char *,int32_t,int32_t,int32_t);
     // int32_t (*rename)(struct inode *,const char *,int32_t,struct inode *,const char *,int32_t);
-    // int32_t (*readlink)(struct inode *,char *,int32_t);
+    int32_t (*readlink)(struct inode *,char *,int32_t);
     // int32_t (*follow_link)(struct inode *,struct inode *,int32_t,int32_t,struct inode **);
     // int32_t (*readpage)(struct inode *, struct page *);
     // int32_t (*writepage)(struct inode *, struct page *);
@@ -97,13 +105,13 @@ struct inode {
     // struct list dentry;
     uint32_t ino;
     uint32_t nlink;
-    // uint32_t uid;
-    // uint32_t gid;
+    uint32_t uid;
+    uint32_t gid;
     uint32_t rdev;
     uint32_t size;
-    // struct timespec atime;
-    // struct timespec mtime;
-    // struct timespec ctime;
+    struct timespec atime;
+    struct timespec mtime;
+    struct timespec ctime;
     // uint32_t blocks;
     // unsigned short bytes;
     uint16_t mode;
@@ -137,15 +145,21 @@ struct file {
     // struct address_space *mapping;
 };
 
+void put_inode(struct inode *inode);
+struct inode *inode_open(int32_t dfd, const char *path, uint32_t flags, uint16_t mode, struct path **path_out);
+
 void fill_default_file_op(struct file_operations *file_op);
 void fill_default_ino_op(struct inode_operations *ino_op);
 
-struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode);
-struct file *filp_open(char *path, uint32_t flags, uint16_t mode);
+struct file *filp_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mode);
+struct file *filp_open(const char *path, uint32_t flags, uint16_t mode);
+
+struct file *filp_open_dummy(struct file_operations *file_op, int32_t (*prep_inode)(struct inode *inode, void *prep_arg), void *prep_arg, uint32_t flags, uint16_t mode);
 struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode);
 
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence);
 int32_t filp_read(struct file *file, void *buf, uint32_t nbytes);
+int32_t filp_readdir(struct file *file, void *data, filldir_t filldir);
 int32_t filp_ioctl(struct file *file, uint32_t request, unsigned long arg, bool arg_user);
 int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes);
 int32_t filp_close(struct file *file);
@@ -158,6 +172,7 @@ int32_t default_file_open(struct file *file, struct inode *inode);
 void default_file_release(struct file *file);
 int32_t default_ino_create(struct inode *inode, const char *name, uint32_t flags, uint16_t mode, struct inode **next);
 int32_t default_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next);
+int32_t default_ino_readlink(struct inode *inode, char *buf, int32_t nbytes);
 void default_ino_truncate(struct inode *inode);
 
 #endif

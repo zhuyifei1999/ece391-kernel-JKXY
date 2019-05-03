@@ -2,7 +2,9 @@
 #define _TASK_H
 
 #include "signal.h"
+#include "fp.h"
 #include "../lib/stdint.h"
+#include "../lib/stdbool.h"
 #include "../lib/string.h"
 #include "../mm/paging.h"
 #include "../compiler.h"
@@ -10,6 +12,7 @@
 #include "../structure/list.h"
 #include "../structure/array.h"
 #include "../vfs/file.h"
+#include "../x86_desc.h"
 #include "../panic.h"
 #include "../atomic.h"
 
@@ -20,12 +23,15 @@ struct session;
 
 struct mm_struct {
     atomic_t refcount;
+    uint32_t brk;
     page_directory_t *page_directory;
 };
 
 struct files_struct {
     atomic_t refcount;
     struct array files;
+    // This is a hack, but I'm too lazy to manage the array within array files
+    struct array cloexec;
 };
 
 enum task_state {
@@ -54,9 +60,14 @@ struct task_struct {
     uint32_t pgid;
     struct sigpending sigpending;
     struct sigactions *sigactions;
+    tls_seg_t ldt;
+    tls_seg_t gdt_tls;
+    fxsave_data_t *fxsave_data;
     struct intr_info *entry_regs;  // for kernel execve
     struct intr_info *return_regs; // for scheduler
     enum task_state state;
+    bool wakeup_current;
+    bool stopped;
     enum subsystem subsystem;
     int exitcode;
 };
@@ -66,12 +77,12 @@ struct task_struct {
 #define ALIGN_SP 0xf        // C likes stuffs to be aligned
 
 // the task_struct is always at the top of the pages of kernel stack
-static inline __always_inline __attribute__((pure, const))
+static inline __always_inline __attribute__((const))
 struct task_struct *task_from_stack(void *stack) {
     uint32_t addr = (uint32_t)stack;
     return (void *)(addr & ~(TASK_STACK_PAGES * PAGE_SIZE_SMALL - 1));
 }
-static inline __always_inline __attribute__((pure, const))
+static inline __always_inline __attribute__((const))
 struct task_struct *get_current(void) {
     int temp;
     return task_from_stack(&temp);

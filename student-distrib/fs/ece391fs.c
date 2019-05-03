@@ -3,6 +3,7 @@
 #include "../vfs/device.h"
 #include "../lib/string.h"
 #include "../mm/kmalloc.h"
+#include "../atomic.h"
 #include "../err.h"
 #include "../errno.h"
 #include "../initcall.h"
@@ -83,7 +84,7 @@ static int32_t ece391fs_read_data(struct super_block *sb, uint32_t inode, uint32
 }
 
 // this reads a file until the file is fully read or nbytes runs out, whichever comes first
-static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes) {
+static int32_t ece391fs_read(struct file *file, char *buf, uint32_t nbytes) {
     // maximum to read
     if (nbytes > file->inode->size - file->pos)
         nbytes = file->inode->size - file->pos;
@@ -102,44 +103,50 @@ static int32_t ece391fs_file_read(struct file *file, char *buf, uint32_t nbytes)
     return read;
 }
 
-// This reads one filename from the directory
-static int32_t ece391fs_dir_read(struct file *file, char *buf, uint32_t nbytes) {
-    // TODO: Should be handled by VFS
-    // TODO: only for ece391 subsystem
+static int32_t ece391fs_readdir(struct file *file, void *data, filldir_t filldir) {
     struct ece391fs_dentry *dentry;
-    int32_t res;
-    res = ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry);
-    if (!res)
-        return 0;
 
-    file->pos++;
+    int i = 0;
+    while (true) {
+        if (!ece391fs_read_dentry_by_index(file->inode->sb, file->pos, &dentry))
+            break;
 
-    char *name = dentry->name;
-    uint8_t len = strlen(name);
+        char *name = dentry->name;
+        uint8_t len = strlen(name);
 
-    // read at most this size. if the filename is larger than nbytes well too bad then
-    if (len > sizeof(dentry->name))
-        len = sizeof(dentry->name);
-    if (len > nbytes)
-        len = nbytes;
+        // read at most this size. if the filename is larger than nbytes well too bad then
+        if (len > sizeof(dentry->name))
+            len = sizeof(dentry->name);
 
-    strncpy(buf, name, len);
-    return len;
-}
+        uint32_t type;
 
-static int32_t ece391fs_read(struct file *file, char *buf, uint32_t nbytes) {
-    switch (file->inode->mode & S_IFMT) {
-    case S_IFREG:
-        return ece391fs_file_read(file, buf, nbytes);
-    case S_IFDIR:
-        return ece391fs_dir_read(file, buf, nbytes);
-    default:
-        return -EINVAL; // VFS should handle the rest
+        switch (dentry->type) {
+        case 0: // RTC device
+            type = S_IFCHR;
+            break;
+        case 1: // Root directory
+            type = S_IFDIR;
+            break;
+        case 2:; // Regular file
+            type = S_IFREG;
+            break;
+        }
+
+        int32_t res = (*filldir)(data, name, len, file->pos, dentry->inode_num, type);
+        if (res < 0)
+            break;
+
+        file->pos++;
+        i++;
+        if (res)
+            break;
     }
+
+    return i;
 }
 
 // find the inode number and prepare the inode struct, given the filename
-int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next) {
+static int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flags, struct inode **next) {
     struct ece391fs_dentry *dentry;
     int32_t res;
     res = ece391fs_read_dentry_by_name(inode->sb, name, &dentry);
@@ -152,8 +159,8 @@ int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flag
     **next = (struct inode){
         .sb = inode->sb,
         .vendor = dentry,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&(*next)->refcount, 1);
 
     res = (*inode->sb->op->read_inode)(*next);
     if (res < 0) {
@@ -165,6 +172,7 @@ int32_t ece391fs_ino_lookup(struct inode *inode, const char *name, uint32_t flag
 
 struct file_operations ece391fs_file_op = {
     .read = &ece391fs_read,
+    .readdir = &ece391fs_readdir,
 };
 struct inode_operations ece391fs_ino_op = {
     .default_file_ops = &ece391fs_file_op,
@@ -263,7 +271,8 @@ DEFINE_INITCALL(init_ece391fs, drivers);
 __testfunc
 static void ece391fs_ls_test() {
     char buf[TEST_LS_BUF_SIZE];
-    struct file *root = filp_open(".", 0, 0);
+    struct file *root = filp_open("/", 0, 0);
+    TEST_ASSERT(!IS_ERR(root));
     TEST_ASSERT(filp_read(root, buf, TEST_LS_BUF_SIZE) == sizeof(".") - 1);
     TEST_ASSERT(!strncmp(buf, ".", sizeof(".") - 1));
     TEST_ASSERT(filp_read(root, buf, TEST_LS_BUF_SIZE) == sizeof("sigtest") - 1);
@@ -309,7 +318,8 @@ static const char target[] = "very large text file with a very long name\n123456
 __testfunc
 static void ece391fs_rs_test() {
     char buf[TEST_RS_BUF_SIZE];
-    struct file *file = filp_open("verylargetextwithverylongname.tx", 0, 0);
+    struct file *file = filp_open("/verylargetextwithverylongname.tx", 0, 0);
+    TEST_ASSERT(!IS_ERR(file));
     TEST_ASSERT(filp_read(file, buf, TEST_RS_BUF_SIZE) == sizeof(target) - 1);
     TEST_ASSERT(!strncmp(buf, target, sizeof(target) - 1));
     TEST_ASSERT(filp_read(file, buf, TEST_RS_BUF_SIZE) == 0);
@@ -334,8 +344,9 @@ DEFINE_TEST(ece391fs_rs_test);
 __testfunc
 static void ece391fs_ro_test() {
     char buf[TEST_RO_BUF_SIZE];
-    struct file *file = filp_open("verylargetextwithverylongname.tx", O_RDWR, 0);
+    struct file *file = filp_open("/verylargetextwithverylongname.tx", O_RDWR, 0);
     // TODO: implement mount options and do EROFS
+    TEST_ASSERT(!IS_ERR(file));
     TEST_ASSERT(filp_write(file, buf, TEST_RO_BUF_SIZE) < 0);
     TEST_ASSERT(!filp_close(file));
 }
@@ -344,7 +355,7 @@ DEFINE_TEST(ece391fs_ro_test);
 // test that names longer than maximum fails
 __testfunc
 static void ece391fs_longname_test() {
-    TEST_ASSERT(IS_ERR(filp_open("verylargetextwithverylongname.txt", 0, 0)));
+    TEST_ASSERT(IS_ERR(filp_open("/verylargetextwithverylongname.txt", 0, 0)));
 }
 DEFINE_TEST(ece391fs_longname_test);
 #endif

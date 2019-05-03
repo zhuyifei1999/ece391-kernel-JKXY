@@ -3,12 +3,16 @@
 #include "task/exit.h"
 #include "task/kthread.h"
 #include "task/session.h"
+#include "task/signal.h"
+#include "net/udp.h"
 #include "char/tty.h"
 #include "tests.h"
 
 #if RUN_TESTS
 static int kselftest(void *args) {
     set_current_comm("kselftest");
+    current->subsystem = SUBSYSTEM_ECE391;
+
     launch_tests();
     return 0;
 }
@@ -18,6 +22,8 @@ static int kselftest(void *args) {
 
 static int kshell(void *args) {
     set_current_comm("kshell");
+
+    do_setsid();
 
     struct file *tty = filp_open_anondevice(TTY_CONSOLE, O_RDWR, S_IFCHR | 0666);
 
@@ -59,6 +65,7 @@ static int kshell(void *args) {
 
                 char stat_field[FIELD_WIDTH+1];
                 snprintf(stat_field, FIELD_WIDTH + 1, "%s%s%s",
+                    task->stopped ? "T" :
                     task->state == TASK_RUNNING ? "R" :
                     task->state == TASK_INTERRUPTIBLE ? "S" :
                     task->state == TASK_UNINTERRUPTIBLE ? "D" :
@@ -81,6 +88,29 @@ static int kshell(void *args) {
 #else
             fprintf(tty, "kselftest unavailable\n");
 #endif
+        } else if (!strcmp(buf, "startlinux")) {
+            extern struct task_struct *init_task;
+            send_sig(init_task, SIGTERM);
+        } else if (!strcmp(buf, "panic")) {
+            __attribute__((unused)) volatile int a = *(int *)NULL;
+        } else if (!strcmp(buf, "udp")) {
+            kernel_unmask_signal(SIGINT);
+
+            while (true) {
+                uint16_t signal = signal_pending_one(current);
+                if (signal)
+                    kernel_get_pending_sig(signal, NULL);
+                if (signal == SIGINT)
+                    break;
+
+                len = filp_read(tty, buf, BUFSIZE - 1);
+                if (len > 0) {
+                    udp_send_packet(&(ip_addr_t){10, 0, 2, 2}, 12345, 4444, buf, len);
+                    udp_send_packet(&(ip_addr_t){10, 42, 0, 232}, 12345, 4444, buf, len);
+                }
+            }
+
+            kernel_mask_signal(SIGINT);
         } else {
             fprintf(tty, "Unknown command \"%s\"\n", buf);
         }

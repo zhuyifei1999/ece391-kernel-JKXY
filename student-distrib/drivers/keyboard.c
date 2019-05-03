@@ -26,7 +26,6 @@
 // function keys map, 0x80 to 0xFF, unassigned have 0xFF
 #define DO_GUI    0xFF
 #define DO_APPS   0xFF
-#define DO_ESC    0x80
 #define DO_F1     0x81
 #define DO_F2     0x82
 #define DO_F3     0x83
@@ -39,16 +38,16 @@
 #define DO_F10    0x8A
 #define DO_F11    0x8B
 #define DO_F12    0x8C
-#define DO_INSERT 0xFF
-#define DO_HOME   0xFF
-#define DO_PGUP   0xFF
-#define DO_DELETE 0xFF
-#define DO_END    0xFF
-#define DO_PGDN   0xFF
-#define DO_UARROW 0xFF
-#define DO_LARROW 0xFF
-#define DO_DARROW 0xFF
-#define DO_RARROW 0xFF
+#define DO_INSERT 0x92
+#define DO_DELETE 0x93
+#define DO_PGUP   0x95
+#define DO_PGDN   0x96
+#define DO_UARROW 0xAA
+#define DO_DARROW 0xAB
+#define DO_RARROW 0xAC
+#define DO_LARROW 0xAD
+#define DO_HOME   0xB0
+#define DO_END    0xB1
 
 // scancode map of the keyboard with capital letters and symbols
 static unsigned char scancode_map[256] = {
@@ -106,7 +105,7 @@ static unsigned char scancode_map[256] = {
     [0x5B]=DO_GUI,[0xDB]=DO_GUI,
     [0x5C]=DO_GUI,[0xDC]=DO_GUI,
     [0x5D]=DO_APPS,[0xDD]=DO_APPS,
-    [0x01]=DO_ESC,[0x81]=DO_ESC,
+    [0x01]='\33',[0x81]='\33',
     [0x3B]=DO_F1,[0xBB]=DO_F1,
     [0x3C]=DO_F2,[0xBC]=DO_F2,
     [0x3D]=DO_F3,[0xBD]=DO_F3,
@@ -230,9 +229,35 @@ static bool do_function(unsigned char scancode_mapped) {
     if (!has_ctrl && has_alt && scancode_mapped >= DO_F1 && scancode_mapped <= DO_F12) {
         tty_switch_foreground(MKDEV(TTY_MAJOR, scancode_mapped - DO_F1 + 1));
         return true;
-    } else if (!has_ctrl && has_alt && scancode_mapped == DO_ESC) {
+    } else if (!has_ctrl && has_alt && (scancode_mapped == 'c')) {
         tty_switch_foreground(TTY_CONSOLE);
         return true;
+    } else if (!has_ctrl && !has_alt) {
+        if (scancode_mapped >= 0x90 && scancode_mapped <= 0x99) {
+            tty_foreground_keyboard('\033', false, false);
+            tty_foreground_keyboard('[', false, false);
+            tty_foreground_keyboard('0' + scancode_mapped - 0x90, false, false);
+            tty_foreground_keyboard('~', false, false);
+            return true;
+        } else if (scancode_mapped >= 0xAA && scancode_mapped <= 0xAD) {
+            tty_foreground_keyboard('\033', false, false);
+            tty_foreground_keyboard('[', false, false);
+            tty_foreground_keyboard('A' + scancode_mapped - 0xAA, false, false);
+            return true;
+        } else if (scancode_mapped >= 0xB0 && scancode_mapped <= 0xBF) {
+            switch (scancode_mapped) {
+            case DO_HOME:
+                tty_foreground_keyboard('\033', false, false);
+                tty_foreground_keyboard('[', false, false);
+                tty_foreground_keyboard('H', false, false);
+                return true;
+            case DO_END:
+                tty_foreground_keyboard('\033', false, false);
+                tty_foreground_keyboard('[', false, false);
+                tty_foreground_keyboard('F', false, false);
+                return true;
+            }
+        }
     }
     return false;
 }

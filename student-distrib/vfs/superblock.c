@@ -24,6 +24,7 @@ void default_sb_put_inode(struct inode *inode) {
     kfree(inode);
 }
 void default_sb_put_super(struct super_block *sb) {
+    filp_close(sb->dev);
 }
 int32_t default_sb_write_super(struct super_block *sb) {
     return -EROFS;

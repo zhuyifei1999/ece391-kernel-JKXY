@@ -28,8 +28,8 @@ int32_t do_mount(struct file *dev, struct super_block_operations *sb_op, struct 
     }
     *root = (struct inode) {
         .sb = super_block,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&root->refcount, 1);
 
     res = (*sb_op->read_inode)(root);
     if (res < 0)
@@ -49,6 +49,7 @@ int32_t do_mount(struct file *dev, struct super_block_operations *sb_op, struct 
     *entry = (struct mount){
         .root = root,
         .path = path,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
 
     res = list_insert_back(&mounttable, entry);
@@ -73,5 +74,40 @@ err_free_sb:
     kfree(super_block);
 
 out:
+    return res;
+}
+
+void put_mount(struct mount *mount) {
+    if (!atomic_dec(&mount->refcount)) {
+        // Do we need reference count superblock?
+        struct super_block *super_block = mount->root->sb;
+        put_inode(mount->root);
+        path_destroy(mount->path);
+        kfree(mount);
+
+        (*super_block->op->put_super)(super_block);
+        kfree(super_block);
+    }
+}
+
+int32_t do_umount(struct path *path) {
+    path = path_checkmnt(path);
+    if (IS_ERR(path))
+        return PTR_ERR(path);
+
+    int32_t res = 0;
+    if (!list_isempty(&path->components)) {
+        res = -EINVAL;
+        goto err_destoy_path;
+    }
+
+    struct mount *entry = path->mnt;
+    list_remove(&mounttable, entry);
+
+    put_mount(entry);
+
+err_destoy_path:
+    path_destroy(path);
+
     return res;
 }

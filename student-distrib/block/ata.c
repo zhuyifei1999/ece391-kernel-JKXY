@@ -7,6 +7,7 @@
 #include "../initcall.h"
 #include "../task/task.h"
 #include "../task/sched.h"
+#include "../structure/array.h"
 #include "../structure/list.h"
 #include "../mm/kmalloc.h"
 #include "../lib/io.h"
@@ -59,6 +60,7 @@ struct ata_data {
     int32_t slave_bit;    // master/slave
     int32_t ata_base_reg; // primary/secondary
     int32_t prt_size;     // partition size
+    struct array disk_cache;
 };
 
 #define ATA_IRQ_PRIM 14
@@ -167,6 +169,7 @@ static int ata_identify(struct ata_data *ata) {
  *   OUTPUT: check code
  */
 static int32_t ata_should_read(struct ata_data *dev) {
+    io_delay(dev);
     uint8_t status = inb(dev->ata_base_reg + STATUS_OFF);
     if (status & STAT_DF || status & STAT_ERR)
         return -EIO;
@@ -195,8 +198,6 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
     // send read command
     outb(CMD_READ_SEC, reg_offset + COMMAND_OFF);
 
-    io_delay(dev);
-    
     // wait ata interrupt and then handle the packet
     while (true) {
         int32_t irq_ret = ata_should_read(dev);
@@ -209,8 +210,6 @@ static int ata_read_28(uint32_t lba, char *buf, struct ata_data *dev) {
         schedule();
         current->state = TASK_RUNNING;
     }
-
-    io_delay(dev);
 
     // read sector to buffer
     asm volatile (
@@ -248,11 +247,6 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     if (!nbytes)
         return 0;
 
-    // malloc the data buf
-    char *read_head_buf = kmalloc(SECTOR_SIZE);
-    if (!read_head_buf)
-        return -ENOMEM;
-
     // use mutex to resist other processes
     mutex_lock_uninterruptable(&ata_mutex);
     in_service = current;
@@ -262,12 +256,23 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     while (nbytes) {
         uint32_t sector_num = pos / SECTOR_SIZE;
         uint32_t sector_off = pos % SECTOR_SIZE;
-        // call ata_read_28 to read data
-        ret = ata_read_28(sector_num, read_head_buf, ata);
 
-        // if it read all
-        if (ret)
-            goto out;
+        char *read_head_buf = array_get(&ata->disk_cache, sector_num);
+        if (!read_head_buf) {
+            // malloc the data buf
+            read_head_buf = kmalloc(SECTOR_SIZE);
+            if (!read_head_buf) {
+                ret = -ENOMEM;
+                goto out;
+            }
+
+            ret = ata_read_28(sector_num, read_head_buf, ata);
+            // if it read fail
+            if (ret)
+                goto out;
+
+            array_set(&ata->disk_cache, sector_num, read_head_buf);
+        }
 
         uint32_t inner_nbytes = SECTOR_SIZE - sector_off;
         if (inner_nbytes > nbytes)
@@ -285,9 +290,6 @@ static int32_t ata_read(struct file *file, char *buf, uint32_t nbytes) {
     ret = byte_count;
 
 out:
-    // free the malloced buf
-    kfree(read_head_buf);
-
     file->pos = pos;
     in_service = NULL;
 
@@ -323,7 +325,7 @@ static int32_t ata_open(struct file *file, struct inode *inode) {
     }
 
     // if the hardware is error
-	if (!ata_identify(file->vendor))
+    if (!ata_identify(file->vendor))
         return -ENXIO;
 
     return 0;
@@ -341,8 +343,6 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     ata = file->vendor;
 
     uint32_t size = ata->prt_size;
-
-    mutex_lock_uninterruptable(&ata_mutex);
 
     int32_t ret;
 
@@ -372,8 +372,6 @@ static int32_t ata_seek(struct file *file, int32_t offset, int32_t whence) {
     ret = new_pos;
 
 out:
-    mutex_unlock(&ata_mutex);
-
     return ret;
 }
 
@@ -388,7 +386,7 @@ static struct file_operations ata_dev_op = {
  *   ata_handler
  *   DESCRIPTION: wake up the read_28
  */
-static void ata_handler() {
+static void ata_handler(struct intr_info *info) {
     if (in_service)
         wake_up_process(in_service);
 }

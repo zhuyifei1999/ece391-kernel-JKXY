@@ -4,19 +4,19 @@
 #include "mount.h"
 #include "device.h"
 #include "dummyinode.h"
+#include "readdir.h"
 #include "../lib/string.h"
 #include "../task/task.h"
 #include "../mm/kmalloc.h"
-#include "../syscall.h"
 #include "../err.h"
 #include "../errno.h"
 
 /*
- *   inode_decref
+ *   put_inode
  *   DESCRIPTION: destroy the inode
  *   INPUTS: struct inode *inode
  */
-void inode_decref(struct inode *inode) {
+void put_inode(struct inode *inode) {
     int32_t refcount = atomic_dec(&inode->refcount);
     if (refcount)
         return;
@@ -27,23 +27,19 @@ void inode_decref(struct inode *inode) {
     (*inode->sb->op->put_inode)(inode);
 }
 
-/*
- *   filp_openat
- *   DESCRIPTION: open the file
- *   INPUTS: struct int32_t dfd, char *path, uint32_t flags, uint16_t mode
- *   RETURN VALUE: struct file
- */
-struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
+struct inode *inode_open(int32_t dfd, const char *path, uint32_t flags, uint16_t mode, struct path **path_out) {
     struct path *path_rel = path_fromstr(path);
     // check if the file's path is valid
     if (IS_ERR(path_rel))
         return ERR_CAST(path_rel);
 
-    struct file *ret;
+    struct inode *ret = NULL;
 
-    char *first_component = list_peek_front(&path_rel->components);
     struct path *path_premount;
-    if (*first_component) {
+    if (path_rel->absolute) {
+        // absolute path
+        path_premount = path_clone(path_rel);
+    } else {
         // relative path
         struct file *rel;
         if (dfd == AT_FDCWD) {
@@ -58,9 +54,6 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         // TODO: ENOTDIR
 
         path_premount = path_join(rel->path, path_rel);
-    } else {
-        // absolute path
-        path_premount = path_clone(path_rel);
     }
 
     // check if the path is vaild
@@ -69,11 +62,19 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         goto out_rel;
     }
 
+resolve_mount:;
     // now resolve mounts
     struct path *path_dest = path_checkmnt(path_premount);
+    path_destroy(path_premount);
+
     if (IS_ERR(path_dest)) {
         ret = ERR_CAST(path_dest);
-        goto out_premount;
+        goto out_rel;
+    } else if (!path_dest->mnt) {
+        // We don't have a mount table?
+        path_destroy(path_dest);
+        ret = ERR_PTR(-EINVAL);
+        goto out_rel;
     }
 
     // now, from the mount root, get the inode
@@ -98,69 +99,145 @@ struct file *filp_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode)
         }
         if (res < 0) {
             ret = ERR_PTR(res);
-            goto out_inode_decref;
+            goto out_put_inode;
         }
         // destroy the inode
-        inode_decref(inode);
+        put_inode(inode);
         inode = next_inode;
     }
 
     // user asked that file must be newly created
     if (flags & O_EXCL && !created) {
         ret = ERR_PTR(-EEXIST);
-        goto out_inode_decref;
+        goto out_put_inode;
     }
+
+    if ((inode->mode & S_IFMT) == S_IFLNK && !(flags & O_NOFOLLOW)) {
+        char *link_target = kmalloc(MAX_PATH + 1);
+        if (!link_target) {
+            ret = ERR_PTR(-ENOMEM);
+            goto out_put_inode;
+        }
+        link_target[MAX_PATH] = '\0';
+
+        int32_t res = (*inode->op->readlink)(inode, link_target, MAX_PATH);
+        if (res < 0) {
+            kfree(link_target);
+            ret = ERR_PTR(res);
+            goto out_put_inode;
+        }
+        if (!res) {
+            kfree(link_target);
+            ret = ERR_PTR(-EINVAL);
+            goto out_put_inode;
+        }
+
+        link_target[res] = '\0';
+
+        list_pop_back(&path_dest->components);
+
+        struct path *path_target_rel = path_fromstr(link_target);
+        kfree(link_target);
+        if (IS_ERR(path_target_rel)) {
+            ret = ERR_CAST(path_target_rel);
+            goto out_put_inode;
+        }
+
+        struct path *path_target = path_join(path_dest, path_target_rel);
+        path_destroy(path_target_rel);
+        if (IS_ERR(path_target)) {
+            ret = ERR_CAST(path_target);
+            goto out_put_inode;
+        }
+
+        path_destroy(path_dest);
+        put_inode(inode);
+        path_premount = path_target;
+
+        goto resolve_mount;
+    }
+
+    ret = inode;
+
+out_put_inode:
+    if (IS_ERR(ret))
+        put_inode(inode);
+
+    if (IS_ERR(ret) || !path_out)
+        path_destroy(path_dest);
+    else
+        *path_out = path_dest;
+
+out_rel:
+    path_destroy(path_rel);
+
+    return ret;
+}
+
+/*
+ *   filp_openat
+ *   DESCRIPTION: open the file
+ *   INPUTS: struct int32_t dfd, char *path, uint32_t flags, uint16_t mode
+ *   RETURN VALUE: struct file
+ */
+struct file *filp_openat(int32_t dfd, const char *path, uint32_t flags, uint16_t mode) {
+    struct path *path_stru;
+
+    struct inode *inode = inode_open(dfd, path, flags, mode, &path_stru);
+    if (IS_ERR(inode))
+        return ERR_CAST(inode);
+
+    struct file *ret;
 
     struct file_operations *file_op;
     switch (inode->mode & S_IFMT) {
+    case S_IFLNK:
+        ret = ERR_PTR(-ELOOP);
+        goto out;
     case S_IFCHR:
     case S_IFBLK:
         file_op = get_dev_file_op(inode->mode, inode->rdev);
         if (!file_op) {
             ret = ERR_PTR(-ENXIO);
-            goto out_inode_decref;
+            goto out;
         }
         break;
-    // TODO: Pipes, sockets, directories, etc.
+    // TODO: Pipes, sockets, etc.
     default:
         file_op = inode->op->default_file_ops;
         break;
     }
 
+    if (current->subsystem == SUBSYSTEM_LINUX)
+        if ((inode->mode & S_IFMT) == S_IFDIR && ((flags & O_WRONLY) || (flags & O_RDWR))) {
+            ret = ERR_PTR(-EISDIR);
+            goto out;
+        }
+
     // allocate the space in the kernel
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
         ret = ERR_PTR(-ENOMEM);
-        goto out_inode_decref;
+        goto out;
     }
     *ret = (struct file){
         .op = file_op,
         .inode = inode,
-        .path = path_dest,
+        .path = path_stru,
         .flags = flags,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&ret->refcount, 1);
-    atomic_inc(&inode->refcount);
 
     int32_t res = (*ret->op->open)(ret, inode);
     if (res < 0) {
         kfree(ret);
         ret = ERR_PTR(res);
-        goto out_inode_decref;
+        goto out;
     }
 
-// destroy three contents
-out_inode_decref:
-    inode_decref(inode);
-
+out:
     if (IS_ERR(ret))
-        path_destroy(path_dest);
-
-out_premount:
-    path_destroy(path_premount);
-
-out_rel:
-    path_destroy(path_rel);
+        put_inode(inode);
 
     return ret;
 }
@@ -171,22 +248,11 @@ out_rel:
  *   INPUTS: char *path, uint32_t flags, uint16_t mode
  *   RETURN VALUE: file
  */
-struct file *filp_open(char *path, uint32_t flags, uint16_t mode) {
+struct file *filp_open(const char *path, uint32_t flags, uint16_t mode) {
     return filp_openat(AT_FDCWD, path, flags, mode);
 }
 
-/*
- *   filp_open_anondevice
- *   DESCRIPTION: open the device without a dev file
- *   INPUTS: uint32_t dev, uint32_t flags, uint16_t mode
- *   RETURN VALUE: file
- *   operation
- */
-struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
-    struct file_operations *file_op = get_dev_file_op(mode, dev);
-    if (!file_op)
-        return ERR_PTR(-ENXIO);
-
+struct file *filp_open_dummy(struct file_operations *file_op, int32_t (*prep_inode)(struct inode *inode, void *prep_arg), void *prep_arg, uint32_t flags, uint16_t mode) {
     struct path *path_dest = path_clone(&root_path);
     if (IS_ERR(path_dest))
         return ERR_CAST(path_dest);
@@ -199,14 +265,18 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
         ret = ERR_CAST(inode);
         goto out_destroy_path;
     }
-    // assign the inode's dev number to dev
-    inode->rdev = dev;
     inode->mode = mode;
+
+    if (prep_inode) {
+        ret = ERR_PTR(prep_inode(inode, prep_arg));
+        if (IS_ERR(ret))
+            goto out_put_inode;
+    }
 
     ret = kmalloc(sizeof(*ret));
     if (!ret) {
         ret = ERR_PTR(-ENOMEM);
-        goto out_inode_decref;
+        goto out_put_inode;
     }
 
     // assign the value to the ret
@@ -216,8 +286,8 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
         .path = path_dest,
         // TODO: change flags according to mode
         .flags = flags,
+        .refcount = ATOMIC_INITIALIZER(1),
     };
-    atomic_set(&ret->refcount, 1);
     atomic_inc(&inode->refcount);
 
     // check the res's value
@@ -225,17 +295,44 @@ struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
     if (res < 0) {
         kfree(ret);
         ret = ERR_PTR(res);
-        goto out_inode_decref;
+        goto out_put_inode;
     }
 
-out_inode_decref:
-    inode_decref(inode);
+out_put_inode:
+    put_inode(inode);
 
 out_destroy_path:
     if (IS_ERR(ret))
         path_destroy(path_dest);
 
     return ret;
+}
+
+int32_t filp_open_anondevice_inode_prep(struct inode *inode, void *prep_arg) {
+    uint32_t *dev = prep_arg;
+    // assign the inode's dev number to dev
+    inode->rdev = *dev;
+
+    return 0;
+}
+/*
+ *   filp_open_anondevice
+ *   DESCRIPTION: open the device without a dev file
+ *   INPUTS: uint32_t dev, uint32_t flags, uint16_t mode
+ *   RETURN VALUE: file
+ *   operation
+ */
+struct file *filp_open_anondevice(uint32_t dev, uint32_t flags, uint16_t mode) {
+    struct file_operations *file_op = get_dev_file_op(mode, dev);
+    if (!file_op)
+        return ERR_PTR(-ENXIO);
+
+    struct file *file = filp_open_dummy(file_op, filp_open_anondevice_inode_prep, &dev, flags, mode);
+    if (IS_ERR(file))
+        goto out;
+
+out:
+    return file;
 }
 
 /*
@@ -246,6 +343,9 @@ out_destroy_path:
  *   operation
  */
 int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
+    if ((file->inode->mode & S_IFMT) == S_IFDIR)
+        return -EISDIR;
+
     return (*file->op->seek)(file, offset, whence);
 }
 
@@ -257,12 +357,30 @@ int32_t filp_seek(struct file *file, int32_t offset, int32_t whence) {
  *   operation
  */
 int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
-    char *buf_char = buf;
-
     if ((file->flags & O_WRONLY))
         return -EINVAL;
+    if ((file->inode->mode & S_IFMT) == S_IFDIR) {
+        switch (current->subsystem) {
+        case SUBSYSTEM_LINUX:
+            return -EISDIR;
+        case SUBSYSTEM_ECE391:
+            return compat_ece391_dir_read(file, buf, nbytes);
+        }
+    }
 
-    return (*file->op->read)(file, buf_char, nbytes);
+    return (*file->op->read)(file, buf, nbytes);
+}
+
+/*
+ *   filp_readdir
+ *   DESCRIPTION: read the directory
+ *   INPUTS: struct file *file, void *data, filldir_t filldir
+ */
+int32_t filp_readdir(struct file *file, void *data, filldir_t filldir) {
+    if ((file->inode->mode & S_IFMT) != S_IFDIR)
+        return -ENOTDIR;
+
+    return (*file->op->readdir)(file, data, filldir);
 }
 
 /*
@@ -273,15 +391,15 @@ int32_t filp_read(struct file *file, void *buf, uint32_t nbytes) {
  *   operation
  */
 int32_t filp_write(struct file *file, const void *buf, uint32_t nbytes) {
-    const char *buf_char = buf;
-
     if (!(file->flags & O_WRONLY) && !(file->flags & O_RDWR))
         return -EINVAL;
+    if ((file->inode->mode & S_IFMT) == S_IFDIR)
+        return -EISDIR;
     if (file->flags & O_APPEND)
         filp_seek(file, 0, SEEK_END);
 
     // invoke the write operation
-    return (*file->op->write)(file, buf_char, nbytes);
+    return (*file->op->write)(file, buf, nbytes);
 }
 
 /*
@@ -307,151 +425,9 @@ int32_t filp_close(struct file *file) {
     (*file->op->release)(file);
     // destroy the path
     path_destroy(file->path);
-    inode_decref(file->inode);
+    put_inode(file->inode);
     kfree(file);
     return 0;
-}
-
-/*
- *   do_sys_read
- *   DESCRIPTION: syscall-read
- *   INPUTS: struct file *file,*buf, nbytes
- *   RETURN VALUE: int32_t result code
- */
-int32_t do_sys_read(int32_t fd, void *buf, int32_t nbytes) {
-    struct file *file = array_get(&current->files->files, fd);
-    if (!file)
-        return -EBADF;
-
-    // check the nbyte input
-    uint32_t safe_nbytes = safe_buf(buf, nbytes, true);
-    if (!safe_nbytes && nbytes)
-        return -EFAULT;
-
-    return filp_read(file, buf, nbytes);
-}
-DEFINE_SYSCALL3(ECE391, read, int32_t, fd, void *, buf, int32_t, nbytes) {
-    return do_sys_read(fd, buf, nbytes);
-}
-DEFINE_SYSCALL3(LINUX, read, int32_t, fd, void *, buf, int32_t, nbytes) {
-    return do_sys_read(fd, buf, nbytes);
-}
-
-/*
- *   do_sys_write
- *   DESCRIPTION: syscall-write
- *   INPUTS: struct file *file,*buf, nbytes
- *   RETURN VALUE: int32_t result code
- */
-int32_t do_sys_write(int32_t fd, const void *buf, int32_t nbytes) {
-    struct file *file = array_get(&current->files->files, fd);
-    if (!file)
-        return -EBADF;
-
-    // check the nbyte input
-    uint32_t safe_nbytes = safe_buf(buf, nbytes, false);
-    if (!safe_nbytes && nbytes)
-        return -EFAULT;
-
-    return filp_write(file, buf, nbytes);
-}
-DEFINE_SYSCALL3(ECE391, write, int32_t, fd, const void *, buf, int32_t, nbytes) {
-    return do_sys_write(fd, buf, nbytes);
-}
-DEFINE_SYSCALL3(LINUX, write, int32_t, fd, const void *, buf, int32_t, nbytes) {
-    return do_sys_write(fd, buf, nbytes);
-}
-
-/*
- *   do_sys_openat
- *   DESCRIPTION: syscall-open the file
- *   INPUTS: int32_t dfd, char *path, uint32_t flags, uint16_t mode
- *   RETURN VALUE: int32_t result code
- */
-int32_t do_sys_openat(int32_t dfd, char *path, uint32_t flags, uint16_t mode) {
-    // determine the length of the path
-    uint32_t length = safe_arr_null_term(path, sizeof(char), false);
-    if (!length)
-        return -EFAULT;
-
-    // allocate kernel memory to store path
-    char *path_kern = strndup(path, length);
-    if (!path_kern)
-        return -ENOMEM;
-
-    int32_t res;
-
-    // call flip_open
-    struct file *file = filp_openat(dfd, path, flags, mode);
-    if (IS_ERR(file)) {
-        res = PTR_ERR(file);
-        goto out_free;
-    }
-
-
-    uint32_t i;
-    // loop until no elements to get and no elements to set
-    for (i = 0;; i++) {
-        if (!array_get(&current->files->files, i)) {
-            if (!array_set(&current->files->files, i, file)) {
-                res = i;
-                goto out_free;
-            }
-        }
-    }
-
-// free the memory allocated to store path
-out_free:
-    kfree(path_kern);
-    return res;
-}
-DEFINE_SYSCALL1(ECE391, open, /* const */ char *, filename) {
-    int fd = do_sys_openat(AT_FDCWD, filename, O_RDWR, 0);
-    if (fd < 8)
-        return fd;
-
-    // Seriously?! ECE391 subsystem must not obey zero-one-infinity rule?!
-    int32_t do_sys_close(int32_t fd);
-    do_sys_close(fd);
-    return -ENFILE;
-}
-DEFINE_SYSCALL3(LINUX, open, char *, path, uint32_t, flags, uint16_t, mode) {
-    return do_sys_openat(AT_FDCWD, path, flags, mode);
-}
-DEFINE_SYSCALL4(LINUX, openat, int, dirfd, char *, path, uint32_t, flags, uint16_t, mode) {
-    return do_sys_openat(dirfd, path, flags, mode);
-}
-
-/*
- *   do_sys_close
- *   DESCRIPTION: syscall-close the file
- *   INPUTS: file index fd
- *   RETURN VALUE: int32_t result code
- */
-int32_t do_sys_close(int32_t fd) {
-    int32_t res;
-    struct file *file = array_get(&current->files->files, fd);
-    if (!file)
-        return -EBADF;
-
-    res = filp_close(file);
-    if (res < 0)
-        return res;
-
-    res = array_set(&current->files->files, fd, NULL);
-    if (res < 0)
-        return res;
-
-    return 0;
-}
-DEFINE_SYSCALL1(ECE391, close, int32_t, fd) {
-    // This is so evil OMG
-    if (fd == 0 || fd == 1)
-        return -EIO;
-    return do_sys_close(fd);
-}
-DEFINE_SYSCALL1(LINUX, close, int32_t, fd) {
-    return do_sys_close(fd);
 }
 
 /*
@@ -493,6 +469,9 @@ int32_t default_file_seek(struct file *file, int32_t offset, int32_t whence) {
 int32_t default_file_read(struct file *file, char *buf, uint32_t nbytes) {
     return -EINVAL;
 }
+int32_t default_file_readdir(struct file *file, void *data, filldir_t filldir) {
+    return -ENOTDIR;
+}
 int32_t default_file_write(struct file *file, const char *buf, uint32_t nbytes) {
     return -EINVAL;
 }
@@ -520,7 +499,9 @@ int32_t default_ino_lookup(struct inode *inode, const char *name, uint32_t flags
 // int32_t default_ino_rmdir(struct inode *inode, const char *, int32_t);
 // int32_t default_ino_mknod(struct inode *inode, const char *, int32_t, int32_t, int32_t);
 // int32_t default_ino_rename(struct inode *inode, const char *, int32_t, struct inode *, const char *, int32_t);
-// int32_t default_ino_readlink(struct inode *inode, char *, int32_t);
+int32_t default_ino_readlink(struct inode *inode, char *buf, int32_t nbytes) {
+    return -EINVAL;
+}
 void default_ino_truncate(struct inode *inode) {
 }
 
@@ -535,6 +516,8 @@ void fill_default_file_op(struct file_operations *file_op) {
         file_op->seek = &default_file_seek;
     if (!file_op->read)
         file_op->read = &default_file_read;
+    if (!file_op->readdir)
+        file_op->readdir = &default_file_readdir;
     if (!file_op->write)
         file_op->write = &default_file_write;
     if (!file_op->ioctl)
@@ -556,6 +539,8 @@ void fill_default_ino_op(struct inode_operations *ino_op) {
         ino_op->create = &default_ino_create;
     if (!ino_op->lookup)
         ino_op->lookup = &default_ino_lookup;
+    if (!ino_op->readlink)
+        ino_op->readlink = &default_ino_readlink;
     if (!ino_op->truncate)
         ino_op->truncate = &default_ino_truncate;
 }

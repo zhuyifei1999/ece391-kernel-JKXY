@@ -1,7 +1,9 @@
 #include "sched.h"
 #include "exit.h"
-#include "../x86_desc.h"
+#include "fp.h"
+#include "../lib/cli.h"
 #include "../mm/paging.h"
+#include "../x86_desc.h"
 #include "../interrupt.h"
 #include "../initcall.h"
 #include "../panic.h"
@@ -18,6 +20,7 @@ static void _switch_to(struct task_struct *task, struct intr_info *info) {
     schedule_pit_counter = 0;
     // store into into current's return registers
     current->return_regs = info;
+    sched_fxsave();
 
     if (task->mm) // this task has userspace, update page directory
         switch_directory(task->mm->page_directory);
@@ -52,21 +55,31 @@ static void switch_to(struct task_struct *task) {
 }
 
 void schedule(void) {
-    extern struct task_struct *swapper_task;
+    unsigned long flags;
+    cli_and_save(flags);
 
     // place current at the end of the schedule queue if it is not swapper_task
-    if (current != swapper_task && current->state == TASK_RUNNING)
+    extern struct task_struct *swapper_task;
+    if (
+        current != swapper_task && !current->stopped && (
+            current->state == TASK_RUNNING ||
+            current->wakeup_current
+        )
+    ) {
         list_insert_back(&schedule_queue, current);
+        current->wakeup_current = false;
+    }
 
     // if the schedule queue is empty, switch to the swapper_task
-    if (list_isempty(&schedule_queue)) {
+    if (list_isempty(&schedule_queue))
         switch_to(swapper_task);
-    } else
-        // switch to the first process in the schedule queue
+    else // switch to the first process in the schedule queue
         switch_to(list_pop_front(&schedule_queue));
 
     // we are safe to clean up whatever task that needs clean up here
     do_free_tasks();
+
+    restore_flags(flags);
 }
 
 void cond_schedule(void) {
@@ -82,8 +95,14 @@ void pit_schedule(struct intr_info *info) {
 }
 
 void wake_up_process(struct task_struct *task) {
-    if (task == current)
-        return; // can't wake up self
+    if (task == current) {
+        // One case where this happens is interrupts. The task is added to
+        // a structure accessible by an interrupt handler, who wakes the task
+        // up before the task goes to sleep. We workaround this by letting
+        // its next schedule() call 'wake up' itself as if it's running.
+        current->wakeup_current = true;
+        return;
+    }
 
     unsigned long flags;
     cli_and_save(flags);

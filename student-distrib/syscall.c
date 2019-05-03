@@ -13,20 +13,22 @@ intr_handler_t *syscall_handlers[NUM_SUBSYSTEMS][MAX_SYSCALL];
  */
 static void syscall_handler(struct intr_info *info) {
     intr_handler_t *handler = NULL;
+    // printk("%s[%d]: Syscall: %u %x %x %x %x\n", current->comm, current->pid, info->eax, info->ebx, info->ecx, info->edx, info->esi);
     // perform sanity check on the value of eax
     if (info->eax < MAX_SYSCALL) // load proper handler into handler
         handler = syscall_handlers[current->subsystem][info->eax];
     // print error message when handler is not defined
     if (!handler) {
-        printk("Unknown syscall: %u\n", info->eax);
+        // printk("%s[%d]: Unknown syscall: %u\n", current->comm, current->pid, info->eax);
         info->eax = -ENOSYS;
     } else {
         // call handler when defined
         (*handler)(info);
+        // printk("%s[%d]: Sysret: %x\n", current->comm, current->pid, info->eax);
     }
 
     // Evil ece391 subsystem shim
-    if ((int32_t)info->eax < 0)
+    if (current->subsystem == SUBSYSTEM_ECE391 && (int32_t)info->eax < 0)
         info->eax = -1;
 }
 

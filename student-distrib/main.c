@@ -26,16 +26,29 @@
 struct task_struct *swapper_task;
 struct task_struct *init_task;
 
+#define HAS_ECE391 1
+
+static void mount_root_device(uint32_t device_num, char *fsname) {
+    struct file *root_block = filp_open_anondevice(device_num, 0, S_IFBLK | 0666);
+    if (IS_ERR(root_block))
+        panic("Could not open root device: %d\n", PTR_ERR(root_block));
+    int32_t res = do_mount(root_block, get_sb_op_by_name(fsname), &root_path);
+    if (res < 0)
+        panic("Could not mount root: %d\n", res);
+    filp_close(root_block);
+}
+
 static int run_init_process(void *args) {
     set_current_comm("init");
 
     char *argv[] = {
-        "shell",
+        args,
         NULL
     };
     char *envp[] = {
         "HOME=/",
-        // "TERM=linux"
+        "TERM=linux-16color",
+        "PATH=/bin:/",
         NULL
     };
 
@@ -43,16 +56,14 @@ static int run_init_process(void *args) {
         do_setsid();
     }
 
-    int i;
-    for (i = 0; i < _NSIG; i++)
-        kernel_unmask_signal(i);
-
     int32_t res = do_execve(argv[0], argv, envp);
     if (res)
         panic("Could not execute init: %d\n", res);
 
     return res;
 }
+
+#if HAS_ECE391
 
 static int kernel_init_shepherd(void *args) {
     set_current_comm("shepherd");
@@ -74,18 +85,20 @@ static int kernel_init_shepherd(void *args) {
     kernel_unmask_signal(SIGTERM);
     kernel_unmask_signal(SIGCHLD);
 
-    struct task_struct *userspace_init = kernel_thread(&run_init_process, NULL);
+    struct task_struct *userspace_init = kernel_thread(&run_init_process, "/shell");
     wake_up_process(userspace_init);
 
     while (true) {
-        uint16_t signal = kernel_get_pending_sig();
+        uint16_t signal = signal_pending_one(current);
+        if (signal)
+            kernel_get_pending_sig(signal, NULL);
         switch (signal) {
         case SIGTERM: // TODO: Do subsystem switch
             send_sig(userspace_init, SIGTERM);
             return 0;
         case SIGCHLD:
             do_wait(userspace_init);
-            userspace_init = kernel_thread(&run_init_process, NULL);
+            userspace_init = kernel_thread(&run_init_process, "/shell");
             wake_up_process(userspace_init);
             break;
         default:
@@ -96,6 +109,8 @@ static int kernel_init_shepherd(void *args) {
     }
 }
 
+#endif
+
 static int kernel_dummy_init(void *args) {
     // The purpose of this dummy PID 1 is to fork off all the shells on different TTYs,
     // because the ECE391 subsystem is too bad and can't self-govern.
@@ -103,6 +118,8 @@ static int kernel_dummy_init(void *args) {
     set_current_comm("kernel_init");
 
     tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
+
+#if HAS_ECE391
 
     int i;
 
@@ -122,12 +139,11 @@ static int kernel_dummy_init(void *args) {
 
     // TODO: Make a centain signal do the subsystem switch
     while (true) {
-        uint16_t signal = kernel_get_pending_sig();
+        uint16_t signal = signal_pending_one(current);
+        if (signal)
+            kernel_get_pending_sig(signal, NULL);
         switch (signal) {
-        case SIGTERM: // TODO: Do subsystem switch
-            for (i = 0; i < NUM_TERMS; i++) {
-                send_sig(shepards[i], SIGTERM);
-            }
+        case SIGTERM:
             goto do_switch;
         default:
             current->state = TASK_INTERRUPTIBLE;
@@ -136,8 +152,47 @@ static int kernel_dummy_init(void *args) {
         }
     }
 
-do_switch: // TODO
-    panic("TODO");
+do_switch:
+    tty_switch_foreground(MKDEV(TTY_MAJOR, 1));
+    printk("Starting Linux\n");
+
+    for (i = 0; i < NUM_TERMS; i++) {
+        send_sig(shepards[i], SIGTERM);
+    }
+
+do_switch_loop:;
+    // Terminate all userspace
+    struct list_node *node;
+    list_for_each(&tasks, node) {
+        struct task_struct *task = node->value;
+        if (task->mm && task->subsystem == SUBSYSTEM_ECE391 && task != current)
+            send_sig(task, SIGTERM);
+    }
+
+    // Wait for them to exit. Because we are child reaper, SIGCHLD messes up our
+    // terminal reading if we don't wait first.
+    schedule();
+    list_for_each(&tasks, node) {
+        struct task_struct *task = node->value;
+        if (task->mm && task->subsystem == SUBSYSTEM_ECE391 && task != current)
+            goto do_switch_loop;
+    }
+#endif
+
+    int32_t res = do_umount(&root_path);
+    if (res < 0)
+        panic("Could not umount root: %d\n", res);
+
+    // device (8, 2) is secondary ATA master
+    mount_root_device(MKDEV(8, 2), "ustar");
+
+    // attach to TTY 1
+    do_setsid();
+    struct file *file = filp_open_anondevice(MKDEV(TTY_MAJOR, 1), O_RDWR, S_IFCHR | 0666);
+    if (!IS_ERR(file))
+        filp_close(file);
+
+    return run_init_process("/sbin/login");
 }
 
 noreturn void kernel_main(void) {
@@ -147,27 +202,20 @@ noreturn void kernel_main(void) {
         .comm      = "swapper",
     };
 
-    swapper_task->sigactions = kcalloc(1, sizeof(*swapper_task->sigactions));
-    atomic_set(&swapper_task->sigactions->refcount, 1);
+    swapper_task->sigactions = kmalloc(sizeof(*swapper_task->sigactions));
+    *swapper_task->sigactions = (struct sigactions){
+        .refcount = ATOMIC_INITIALIZER(1),
+    };
+
     int i;
-    for (i = 0; i < _NSIG; i++)
+    for (i = 0; i < NSIG; i++)
         kernel_mask_signal(i);
 
     // Initialize drivers
     DO_INITCALL(drivers);
 
     // device (1, 0) is 0th initrd
-    struct file *root_block = filp_open_anondevice(MKDEV(1, 0), 0, S_IFBLK | 0666);
-    // device (8, 2) is secondary ATA master
-    // struct file *root_block = filp_open_anondevice(MKDEV(8, 2), 0, S_IFBLK | 0666);
-    if (IS_ERR(root_block))
-        panic("Could not open initrd: %d\n", PTR_ERR(root_block));
-    int32_t res = do_mount(root_block, get_sb_op_by_name("ece391fs"), &root_path);
-    if (res < 0)
-        panic("Could not mount root: %d\n", res);
-    swapper_task->cwd = filp_open("/", 0, 0);
-    if (IS_ERR(swapper_task->cwd))
-        panic("Could not set working directory to root directory: %d\n", PTR_ERR(swapper_task->cwd));
+    mount_root_device(MKDEV(1, 0), "ece391fs");
 
     init_task = kernel_thread(&kernel_dummy_init, NULL);
 

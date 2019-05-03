@@ -35,15 +35,12 @@ static int32_t rtc_read(struct file *file, char *buf, uint32_t nbytes) {
     struct rtc_private *private = file->vendor;
 
     // Only one task can wait per struct file
-    cli();
     // set busy if there is already task waiting
     if (private->task) {
-        sti();
         return -EBUSY;
     }
     // set task to current task
     private->task = current;
-    sti();
 
     // TODO: For the linux subsystem, write number of interrupts sinse last read
     uint32_t init_counter_div = private->counter_div;
@@ -219,7 +216,7 @@ static void rtc_char_expect_rate(struct file *dev, uint8_t rate) {
 }
 
 static void rtc_char_test_single(uint8_t rate) {
-    struct file *dev = filp_open("rtc", O_RDWR, 0);
+    struct file *dev = filp_open("/rtc", O_RDWR, 0);
     TEST_ASSERT(!IS_ERR(dev));
 
     uint32_t freq = rtc_rate_to_freq(rate);
@@ -241,7 +238,7 @@ DEFINE_TEST(rtc_char_test);
 
 // test initial rate is 2Hz (rate = 15)
 static void rtc_char_test_initial_rate_bad_input() {
-    struct file *dev = filp_open("rtc", O_RDWR, 0);
+    struct file *dev = filp_open("/rtc", O_RDWR, 0);
     TEST_ASSERT(!IS_ERR(dev));
     rtc_char_expect_rate(dev, 15);
 

@@ -39,7 +39,7 @@
  *
  * ZERO PAGE and KERN LOW are mapped directly onto physical memory
  * KERN DIR are mapped onto 8M to 12M on physical memory
- * Userspace and Kernel Heap are dynamically applocated
+ * Userspace and Kernel Heap are dynamically allocated
  *
  * ZERO PAGE contains certain IO memory for kernel usage:
  * - Video memory mapped to 0xB8000 + 4K
@@ -48,7 +48,7 @@
  * kernel stack growing from 8M to 4M
  *
  * Userspace and Kernel Heap are allocated on a 4K page-by-page basis.
- * Userspace has its allocation on a page dyble allocated on Kernel Heap,
+ * Userspace has its allocation on a page table allocated on Kernel Heap,
  * tracked by process-specific page tables.
  * Kernel Heap allocation is tracked by pages tables in KERN DIR
  *
@@ -71,6 +71,9 @@
  *
  * PAGE TABLES are global page tables for Kernel Heap
  */
+
+#define PAGEDIR_INDEX(vaddr) (((uint32_t)vaddr) >> 22)
+#define PAGETBL_INDEX(vaddr) ((((uint32_t)vaddr) >>12) & 0x3ff)
 
 #define KLOW_ADDR  LEN_4M  // kernel address
 #define VIDEO_ADDR 0xB8000 // video memory address
@@ -154,11 +157,15 @@ void switch_directory(page_directory_t *dir);
 // #define GFP_RW      0
 #define GFP_RO      (1<<2)
 
+#define GFP_CONS    (1<<3)
+
 __attribute__((malloc))
 void *request_pages(void *page, uint32_t num, uint32_t gfp_flags);
 
 __attribute__((malloc))
 void *alloc_pages(uint32_t num, uint16_t align, uint32_t gfp_flags);
+
+void __physaddr *kheap_virtual2phys(void *virtual_addr);
 
 void free_pages(void *pages, uint32_t num, uint32_t gfp_flags);
 

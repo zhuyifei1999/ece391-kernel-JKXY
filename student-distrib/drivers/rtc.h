@@ -17,6 +17,22 @@
 extern struct list rtc_handlers;
 void register_rtc_handler(void (*handler)(void));
 
+uint8_t rtc_get_year();
+uint8_t rtc_get_month();
+uint8_t rtc_get_day();
+uint8_t rtc_get_hour();
+uint8_t rtc_get_minute();
 uint8_t rtc_get_second();
+
+struct rtc_timestamp {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+};
+
+void rtc_get_timestamp(struct rtc_timestamp *timestamp);
 
 #endif

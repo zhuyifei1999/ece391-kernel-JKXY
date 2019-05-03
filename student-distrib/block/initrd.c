@@ -28,6 +28,8 @@ static int32_t initrd_read(struct file *file, char *buf, uint32_t nbytes) {
         nbytes = max_nbytes;
     // copy nbytes of file into buffer
     memcpy(buf, metadata->start_addr + file->pos, nbytes);
+
+    file->pos += nbytes;
     return nbytes;
 }
 

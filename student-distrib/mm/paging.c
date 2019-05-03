@@ -193,8 +193,52 @@ static int16_t *get_phys_dir_entry(const void __physaddr *addr, uint32_t gfp_fla
     return &phys_dir[idx];
 }
 
+static void __physaddr *alloc_phys_mem_consecutive(uint32_t num, uint32_t gfp_flags){
+    unsigned long flags;
+    if ((gfp_flags & GFP_LARGE) || (gfp_flags & GFP_USER))
+        return NULL;
+
+    uint32_t start_idx = PHYS_DIR_LARGE_NUM;
+    uint32_t end_idx = PHYS_DIR_SMALL_NUM;
+
+    cli_and_save(flags);
+
+    for (; start_idx < end_idx; start_idx++) {
+        uint16_t j;
+        for (j = start_idx; j < start_idx + num; j++)
+            if (phys_dir[j / LEN_1K] || phys_dir[j])
+                goto cont;
+
+        for (j = start_idx; j < start_idx + num; j++)
+            phys_dir[j] = PHYS_DIR_KERNEL;
+
+        restore_flags(flags);
+        return (void  __physaddr *)(start_idx * page_size(gfp_flags));
+        cont:;
+    }
+    restore_flags(flags);
+
+    return NULL; // no enough memory
+}
+
+void __physaddr *kheap_virtual2phys(void *virtual_addr) {
+    if ((uint32_t)virtual_addr < KHEAP_ADDR)
+        goto err;
+
+    uint32_t extra = (uint32_t)virtual_addr % PAGE_SIZE_SMALL;
+
+    struct page_table_entry *entry = &heap_tables[PAGE_IDX((uint32_t)virtual_addr)];
+    if (!entry->present)
+        goto err;
+
+    return (void __physaddr *)(PAGE_IDX_ADDR(entry->addr) + extra);
+
+err:
+    panic("Invalid kheap virtual addr for translation %p", virtual_addr);
+}
+
 /*  alloc_phys_mem
- *  DESCRIPTION: allocate given size of memory.
+ *  DESCRIPTION: allocate physical memory.
  *  INPUTS: uint32_t gfp_flags
  *  OUTPUTS: none
  *  RETURN VALUE: if success, return the memory address;otherwise return NULL pointer.
@@ -397,8 +441,13 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
             return NULL;
     }
 
-    // TODO: if page + num cross boundaries
-    if (num > NUM_ENTRIES)
+    if ((gfp_flags & GFP_LARGE) && num > NUM_ENTRIES)
+        return NULL;
+    if (
+        !(gfp_flags & GFP_LARGE) &&
+        (PAGE_DIR_IDX((uint32_t)page) != PAGE_DIR_IDX((uint32_t)page + num * PAGE_SIZE_SMALL)
+    ))
+        // TODO: Handle this cross boundary
         return NULL;
 
     cli_and_save(flags);
@@ -425,7 +474,6 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                     .global  = 0,
                     .addr    = PAGE_IDX((uint32_t)physaddr)
                 };
-                continue;
             }
         } else { /* !(gfp_flags & GFP_LARGE) */
             struct page_directory_entry *dir_entry = &(*directory)[PAGE_DIR_IDX((uint32_t)ret)];
@@ -440,7 +488,6 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                     if ((*table)[PAGE_TABLE_IDX((uint32_t)ret)+offset].present)
                         goto err_nofree;
                 }
-
             } else { // !dir_entry->present
                 table = mk_user_table(dir_entry);
                 if (!table)
@@ -459,7 +506,6 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                     .global  = 0,
                     .addr    = PAGE_IDX((uint32_t)physaddr)
                 };
-                continue;
             }
         }
     } else { /* !(gfp_flags & GFP_USER) */
@@ -473,20 +519,33 @@ void *request_pages(void *page, uint32_t num, uint32_t gfp_flags) {
                 if (heap_tables[PAGE_IDX((uint32_t)ret)+offset].present)
                     goto err_nofree;
             }
-
-            // Mapping...
-            for (offset = 0; offset < num; offset++) {
-                void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
+            if (gfp_flags & GFP_CONS) {
+                void __physaddr *physaddr = alloc_phys_mem_consecutive(num, gfp_flags);
                 if (!physaddr)
                     goto err;
-                heap_tables[PAGE_IDX((uint32_t)ret)+offset] = (struct page_table_entry){
-                    .present = 1,
-                    .user    = 0,
-                    .rw      = !(gfp_flags & GFP_RO),
-                    .global  = 1,
-                    .addr    = PAGE_IDX((uint32_t)physaddr)
-                };
-                continue;
+                for (offset = 0; offset < num; offset++) {
+                    heap_tables[PAGE_IDX((uint32_t)ret)+offset] = (struct page_table_entry){
+                        .present = 1,
+                        .user    = 0,
+                        .rw      = !(gfp_flags & GFP_RO),
+                        .global  = 1,
+                        .addr    = PAGE_IDX((uint32_t)physaddr + offset * PAGE_SIZE_SMALL)
+                    };
+                }
+            } else {
+                // Mapping...
+                for (offset = 0; offset < num; offset++) {
+                    void __physaddr *physaddr = alloc_phys_mem(gfp_flags);
+                    if (!physaddr)
+                        goto err;
+                    heap_tables[PAGE_IDX((uint32_t)ret)+offset] = (struct page_table_entry){
+                        .present = 1,
+                        .user    = 0,
+                        .rw      = !(gfp_flags & GFP_RO),
+                        .global  = 1,
+                        .addr    = PAGE_IDX((uint32_t)physaddr)
+                    };
+                }
             }
         }
     }
@@ -1024,7 +1083,7 @@ DEFINE_TEST(paging_content_test);
 __testfunc
 static void page_fault_good() {
     TEST_ASSERT_NOINTR(INTR_EXC_PAGE_FAULT, ({
-        volatile char a;
+        __attribute__((unused)) volatile char a;
         // first byte of kernel
         a = *(char *)KLOW_ADDR;
         // last byte of kernel, after 4 MiB page
@@ -1044,7 +1103,7 @@ DEFINE_TEST(page_fault_good);
  */
 __testfunc
 static void page_fault_bad() {
-    volatile char a;
+    __attribute__((unused)) volatile char a;
     TEST_ASSERT_INTR(INTR_EXC_PAGE_FAULT, ({
         // NULL pointer dereference
         a = *(char *)NULL;

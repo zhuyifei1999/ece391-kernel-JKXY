@@ -3,6 +3,7 @@
 
 #include "../lib/stdint.h"
 #include "../structure/list.h"
+#include "../atomic.h"
 
 // In our context, super_block_operations basically means filesystem type
 

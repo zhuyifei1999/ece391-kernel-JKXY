@@ -4,8 +4,9 @@
 #include "file.h"
 #include "../structure/list.h"
 
-// These macros are from <linux/kdev_t.h>
-#define MINORBITS 20
+// These macros are from <linux/kdev_t.h>, corrected to match <bits/sysmacros.h>
+// #define MINORBITS 20
+#define MINORBITS 8
 #define MINORMASK ((1U << MINORBITS) - 1)
 #define MAJOR(dev) ((unsigned int) ((dev) >> MINORBITS))
 #define MINOR(dev) ((unsigned int) ((dev) & MINORMASK))

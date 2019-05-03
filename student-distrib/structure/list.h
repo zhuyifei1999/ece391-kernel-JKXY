@@ -22,6 +22,7 @@ void list_init(struct list *list);
 
 int32_t list_insert_front(struct list *list, void *value);
 int32_t list_insert_back(struct list *list, void *value);
+int32_t list_insert_ordered(struct list *list, void *value, int (*compare)(const void *, const void *));
 
 void *list_peek_front(struct list *list);
 void *list_peek_back(struct list *list);
