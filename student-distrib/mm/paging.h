@@ -39,7 +39,7 @@
  *
  * ZERO PAGE and KERN LOW are mapped directly onto physical memory
  * KERN DIR are mapped onto 8M to 12M on physical memory
- * Userspace and Kernel Heap are dynamically applocated
+ * Userspace and Kernel Heap are dynamically allocated
  *
  * ZERO PAGE contains certain IO memory for kernel usage:
  * - Video memory mapped to 0xB8000 + 4K
@@ -48,7 +48,7 @@
  * kernel stack growing from 8M to 4M
  *
  * Userspace and Kernel Heap are allocated on a 4K page-by-page basis.
- * Userspace has its allocation on a page dyble allocated on Kernel Heap,
+ * Userspace has its allocation on a page table allocated on Kernel Heap,
  * tracked by process-specific page tables.
  * Kernel Heap allocation is tracked by pages tables in KERN DIR
  *
