@@ -1,5 +1,0 @@
-*.o
-*.bak
-mp3.img
-bootimg
-Makefile.dep
